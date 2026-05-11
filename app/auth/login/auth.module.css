@@ -1,0 +1,312 @@
+/* ============================================
+   HRM System — Auth Pages (Login & Register)
+   Shared styles via CSS Modules
+   ============================================ */
+
+:root {
+  --auth-bg: #0f1117;
+  --auth-card: #16181f;
+  --auth-card-border: rgba(255, 255, 255, 0.07);
+  --auth-accent: #4f6ef7;
+  --auth-accent-hover: #3a58e0;
+  --auth-accent-glow: rgba(79, 110, 247, 0.35);
+  --auth-text-primary: #f0f2f8;
+  --auth-text-secondary: #8a8fa8;
+  --auth-input-bg: #1e2029;
+  --auth-input-border: rgba(255, 255, 255, 0.1);
+  --auth-input-focus: rgba(79, 110, 247, 0.5);
+  --auth-error-bg: rgba(239, 68, 68, 0.1);
+  --auth-error-border: rgba(239, 68, 68, 0.3);
+  --auth-error-text: #f87171;
+  --auth-success-bg: rgba(34, 197, 94, 0.1);
+  --auth-success-border: rgba(34, 197, 94, 0.3);
+  --auth-success-text: #4ade80;
+}
+
+/* ---- Layout ---- */
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--auth-bg);
+  padding: 1.5rem;
+  font-family: 'DM Sans', 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle radial gradient backdrop */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 10%, rgba(79, 110, 247, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 90%, rgba(120, 80, 220, 0.08) 0%, transparent 70%);
+  z-index: 0;
+}
+
+/* ---- Card ---- */
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  background: var(--auth-card);
+  border: 1px solid var(--auth-card-border);
+  border-radius: 20px;
+  padding: 2.5rem 2.25rem;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03),
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 80px rgba(79, 110, 247, 0.06);
+  animation: cardIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---- Brand ---- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 2rem;
+}
+
+.logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--auth-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -1px;
+  box-shadow: 0 4px 14px var(--auth-accent-glow);
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--auth-text-primary);
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.brandName span {
+  color: var(--auth-accent);
+}
+
+/* ---- Header ---- */
+.cardHeader {
+  margin-bottom: 1.75rem;
+}
+
+.cardHeader h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--auth-text-primary);
+  letter-spacing: -0.8px;
+  margin: 0 0 0.3rem;
+}
+
+.cardHeader p {
+  font-size: 0.88rem;
+  color: var(--auth-text-secondary);
+  margin: 0;
+}
+
+/* ---- Form ---- */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.field label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--auth-text-secondary);
+  letter-spacing: 0.2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.field input {
+  background: var(--auth-input-bg);
+  border: 1px solid var(--auth-input-border);
+  border-radius: 10px;
+  color: var(--auth-text-primary);
+  font-size: 0.92rem;
+  font-family: inherit;
+  padding: 0.72rem 1rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.field input::placeholder {
+  color: rgba(138, 143, 168, 0.45);
+}
+
+.field input:focus {
+  border-color: var(--auth-accent);
+  box-shadow: 0 0 0 3px var(--auth-input-focus);
+}
+
+/* ---- Forgot link ---- */
+.forgotLink {
+  font-size: 0.78rem;
+  color: var(--auth-accent);
+  text-decoration: none;
+  font-weight: 500;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.forgotLink:hover { opacity: 1; }
+
+/* ---- Error / Success ---- */
+.errorBox,
+.successBox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.4;
+  animation: fadeIn 0.2s ease both;
+}
+
+.errorBox {
+  background: var(--auth-error-bg);
+  border: 1px solid var(--auth-error-border);
+  color: var(--auth-error-text);
+}
+
+.successBox {
+  background: var(--auth-success-bg);
+  border: 1px solid var(--auth-success-border);
+  color: var(--auth-success-text);
+}
+
+.errorIcon,
+.successIcon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.errorIcon {
+  background: rgba(239, 68, 68, 0.25);
+  color: var(--auth-error-text);
+}
+
+.successIcon {
+  background: rgba(34, 197, 94, 0.25);
+  color: var(--auth-success-text);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Submit Button ---- */
+.submitBtn {
+  margin-top: 0.25rem;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: var(--auth-accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.93rem;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 16px var(--auth-accent-glow);
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--auth-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px var(--auth-accent-glow);
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ---- Spinner ---- */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Switch Link ---- */
+.switchLink {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--auth-text-secondary);
+}
+
+.switchLink a {
+  color: var(--auth-accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+
+.switchLink a:hover {
+  opacity: 0.8;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 480px) {
+  .card {
+    padding: 2rem 1.5rem;
+  }
+}
