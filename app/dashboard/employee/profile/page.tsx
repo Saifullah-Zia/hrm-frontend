@@ -1,0 +1,216 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuthStore } from "@/store/authStore";
+import {
+  employeeProfileApi,
+  EmployeeProfileDto,
+} from "@/services/employeeProfileApi";
+
+const inputClass =
+  "w-full px-3 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/40 transition-colors";
+
+export default function EmployeeProfilePage() {
+  const { user } = useAuthStore();
+  const userId = user?.userId;
+  const qc = useQueryClient();
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const profileQuery = useQuery({
+    queryKey: ["employee-profile", userId],
+    queryFn: () => employeeProfileApi.getByUserId(userId!),
+    enabled: typeof userId === "number",
+  });
+
+  const [draft, setDraft] = useState<EmployeeProfileDto | null>(null);
+
+  useEffect(() => {
+    if (profileQuery.data) setDraft({ ...profileQuery.data });
+  }, [profileQuery.data]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const saveMutation = useMutation({
+    mutationFn: (dto: EmployeeProfileDto) =>
+      employeeProfileApi.update(dto.id!, {
+        ...dto,
+        userId: dto.userId,
+      }),
+    onSuccess: (updated) => {
+      qc.setQueryData(["employee-profile", userId], updated);
+      setDraft(updated);
+      setToast({ message: "Profile updated.", type: "success" });
+    },
+    onError: () => {
+      setToast({
+        message: "Could not save profile. Check permissions or try again.",
+        type: "error",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    if (!draft?.id) {
+      setToast({ message: "No profile record to update yet.", type: "error" });
+      return;
+    }
+    saveMutation.mutate(draft);
+  };
+
+  if (typeof userId !== "number") {
+    return (
+      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
+        Your account is missing <code className="text-amber-100">userId</code> in the JWT. Add a{" "}
+        <code className="text-amber-100">userId</code> (or <code className="text-amber-100">id</code>) claim in the
+        Spring token so the app can load your profile.
+      </div>
+    );
+  }
+
+  if (profileQuery.isLoading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 w-48 rounded-lg bg-white/10" />
+        <div className="h-40 rounded-2xl bg-white/[0.04]" />
+      </div>
+    );
+  }
+
+  if (profileQuery.isError || !draft) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold text-white/90 tracking-tight">My profile</h1>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#13151e] px-5 py-6 text-sm text-white/50">
+          No employee profile was found for your user. HR may still be setting up your record, or the backend path may
+          differ from <code className="text-indigo-300">GET /api/employee-profiles/user/{"{userId}"}</code>.
+        </div>
+      </div>
+    );
+  }
+
+  const setField = (field: keyof EmployeeProfileDto, value: string) => {
+    setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      {toast && (
+        <div
+          className={`fixed top-5 right-5 z-50 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
+            toast.type === "success"
+              ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
+              : "border-rose-500/30 bg-rose-500/15 text-rose-200"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      <div>
+        <h1 className="text-2xl font-bold text-white/90 tracking-tight">My profile</h1>
+        <p className="text-white/40 text-sm mt-1">View and update your contact details.</p>
+      </div>
+
+      <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Username</label>
+            <p className="mt-1.5 text-white/80 text-sm">{user?.username}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Email</label>
+            <p className="mt-1.5 text-white/80 text-sm">{user?.email ?? "—"}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Phone</label>
+            <input
+              className={`mt-1.5 ${inputClass}`}
+              value={draft.phone ?? ""}
+              onChange={(e) => setField("phone", e.target.value)}
+              placeholder="Phone number"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">CNIC</label>
+            <input
+              className={`mt-1.5 ${inputClass}`}
+              value={draft.cnicNumber ?? ""}
+              onChange={(e) => setField("cnicNumber", e.target.value)}
+              placeholder="National ID"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Address</label>
+            <input
+              className={`mt-1.5 ${inputClass}`}
+              value={draft.address ?? ""}
+              onChange={(e) => setField("address", e.target.value)}
+              placeholder="Street, city"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Date of birth</label>
+            <input
+              type="date"
+              className={`mt-1.5 ${inputClass}`}
+              value={(draft.dateOfBirth ?? "").slice(0, 10)}
+              onChange={(e) => setField("dateOfBirth", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Joining date</label>
+            <p className="mt-1.5 text-white/60 text-sm py-2.5">
+              {(draft.joiningDate && new Date(draft.joiningDate).toLocaleDateString()) || "—"}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Emergency contact</label>
+            <input
+              className={`mt-1.5 ${inputClass}`}
+              value={draft.emergencyContactName ?? ""}
+              onChange={(e) => setField("emergencyContactName", e.target.value)}
+              placeholder="Name"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Emergency phone</label>
+            <input
+              className={`mt-1.5 ${inputClass}`}
+              value={draft.emergencyContactPhone ?? ""}
+              onChange={(e) => setField("emergencyContactPhone", e.target.value)}
+              placeholder="Phone"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Department ID</label>
+            <p className="mt-1.5 text-white/50 text-sm py-2.5">{draft.departmentId ?? "—"}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Position ID</label>
+            <p className="mt-1.5 text-white/50 text-sm py-2.5">{draft.positionId ?? "—"}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Status</label>
+            <p className="mt-1.5 text-white/70 text-sm py-2.5 capitalize">{draft.employmentStatus ?? "—"}</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saveMutation.isPending}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {saveMutation.isPending ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

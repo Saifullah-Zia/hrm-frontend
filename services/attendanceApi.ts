@@ -73,4 +73,14 @@ export const attendanceApi = {
 
   delete: (id: number): Promise<void> =>
     apiFetch<void>(`/api/attendance/${id}`, { method: "DELETE" }),
+
+  /**
+   * Rows for one user. Your `AttendanceController` only exposes `GET /api/attendance` (all),
+   * so this loads that list and filters client-side. Prefer adding `GET /api/attendance/user/{userId}`
+   * (or `/me`) on the server so employees never receive other users' rows.
+   */
+  getByUserId: async (userId: number): Promise<AttendanceDTO[]> => {
+    const all = await apiFetch<AttendanceDTO[]>("/api/attendance");
+    return all.filter((r) => Number(r.userId) === Number(userId));
+  },
 };

@@ -83,9 +83,9 @@ export const useAuthStore = create<AuthState>()(
         console.log("[authStore] JWT payload role:", payload.role, "Normalized role:", userRole);
 
         const user: AuthUser = {
-          username: payload.name ?? payload.sub,
+          username: payload.name ?? payload.sub ?? payload.username,
           role: userRole,
-          userId: payload.userId,
+          userId: payload.userId ?? payload.id ?? payload.user_id,
           email: payload.email ?? payload.sub,
           token,
         };

@@ -8,19 +8,21 @@ import { notificationApi } from "@/services/notificationApi";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ToastState = { message: string; type: "success" | "error" | "info" } | null;
-type FilterStatus = "ALL" | "PENDING" | "APPROVED" | "REJECT"; // ✅ Changed from REJECTED
+type FilterStatus = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING:  "bg-amber-500/15  text-amber-400  border-amber-500/25",
   APPROVED: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
-  REJECT:   "bg-rose-500/15   text-rose-400   border-rose-500/25", // ✅ Changed key from REJECTED
+  REJECTED: "bg-rose-500/15   text-rose-400   border-rose-500/25",
+  REJECT:   "bg-rose-500/15   text-rose-400   border-rose-500/25",
 };
 
 const STATUS_DOT: Record<string, string> = {
   PENDING:  "bg-amber-400",
   APPROVED: "bg-emerald-400",
+  REJECTED: "bg-rose-400",
   REJECT: "bg-rose-400",
 };
 
@@ -195,14 +197,17 @@ export default function AdminLeavePage() {
     total:    leaves.length,
     pending:  leaves.filter(l => l.status === "PENDING").length,
     approved: leaves.filter(l => l.status === "APPROVED").length,
-    rejected: leaves.filter(l => l.status === "REJECT").length, // uses REJECT (matches backend)
+    rejected: leaves.filter(l => l.status === "REJECTED" || l.status === "REJECT").length,
   }), [leaves]);
 
   // ── Filtered list ──────────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
+    const isRejectedStatus = (s: string) => s === "REJECTED" || s === "REJECT";
     return leaves.filter(l => {
-      const matchFilter = filter === "ALL" || l.status === filter;
+      const matchFilter =
+        filter === "ALL" ||
+        (filter === "REJECTED" ? isRejectedStatus(l.status ?? "") : l.status === filter);
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -318,7 +323,7 @@ export default function AdminLeavePage() {
             />
             <div className="flex gap-2 flex-wrap">
               {/* ✅ Changed array values to match correct status strings */}
-              {(["ALL", "PENDING", "APPROVED", "REJECT"] as FilterStatus[]).map(s => (
+              {(["ALL", "PENDING", "APPROVED", "REJECTED"] as FilterStatus[]).map(s => (
                 <button
                   key={s}
                   onClick={() => setFilter(s)}

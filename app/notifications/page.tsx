@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notificationApi } from "@/services/notificationApi";
 import { leaveApi } from "@/services/leaveApi";
-import { NotificationDTO } from "@/app/types/notification";  // ✅ fixed import path
+import { NotificationDTO } from "@/app/types/notification"; // ✅ fixed import path
+import { useAuthStore } from "@/store/authStore";
+
+const PAYSLIPS_HREF = "/dashboard/employee/payslips";
+
+function isPayrollNotification(type: string) {
+  const t = (type ?? "").toUpperCase();
+  return t === "PAYROLL" || t.includes("PAYROLL");
+}
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -126,23 +135,40 @@ export default function NotificationsPage() {
   };
 
   const getTypeIcon = (type: string) => {
+    if (isPayrollNotification(type)) return "💰";
     switch (type) {
       case "LEAVE_REQUEST":  return "📋";
       case "LEAVE_APPROVED": return "✅";
       case "LEAVE_REJECTED": return "❌";
-      case "PAYROLL":        return "💰";
       default:               return "🔔";
     }
   };
 
   const getTypeColor = (type: string) => {
+    if (isPayrollNotification(type)) return "bg-indigo-500/15 text-indigo-400";
     switch (type) {
       case "LEAVE_REQUEST":  return "bg-blue-500/15 text-blue-400";
       case "LEAVE_APPROVED": return "bg-emerald-500/15 text-emerald-400";
       case "LEAVE_REJECTED": return "bg-rose-500/15 text-rose-400";
-      case "PAYROLL":        return "bg-indigo-500/15 text-indigo-400";
       default:               return "bg-gray-500/15 text-gray-400";
     }
+  };
+
+  const isEmployee = user?.role?.toUpperCase() === "EMPLOYEE";
+
+  const handleViewPayslips = async (e: React.MouseEvent, notif: NotificationDTO) => {
+    e.stopPropagation();
+    if (notif.status === "UNREAD") {
+      try {
+        await notificationApi.markAsRead(notif.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notif.id ? { ...n, status: "READ" } : n))
+        );
+      } catch (err) {
+        console.error("Failed to mark as read:", err);
+      }
+    }
+    router.push(PAYSLIPS_HREF);
   };
 
   return (
@@ -259,6 +285,29 @@ export default function NotificationsPage() {
                       <span className="inline-block mt-2 px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-400 text-xs">
                         Rejected
                       </span>
+                    )}
+
+                    {/* Payroll — matches PayRollService notifications (type PAYROLL, referenceId = payroll id) */}
+                    {isEmployee && isPayrollNotification(notif.type) && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={(e) => handleViewPayslips(e, notif)}
+                          className="px-4 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 text-xs font-medium hover:bg-indigo-500/25 transition-colors"
+                        >
+                          View payslips
+                        </button>
+                        {notif.status === "UNREAD" && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDismiss(e, notif.id)}
+                            disabled={actionLoading === notif.id}
+                            className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 

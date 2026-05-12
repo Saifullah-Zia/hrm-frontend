@@ -21,14 +21,14 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const isAdminOrSuperAdmin = () => {
-    const role = user?.role?.toUpperCase();
-    return role === "ADMIN" || role === "SUPERADMIN" || role === "SUPER_ADMIN";
+  const isEmployee = () => user?.role?.toUpperCase() === "EMPLOYEE";
+
+  const isPayrollNotification = (type: string) => {
+    const t = (type ?? "").toUpperCase();
+    return t === "PAYROLL" || t.includes("PAYROLL");
   };
 
   const fetchNotifications = async () => {
-    if (!isAdminOrSuperAdmin()) return;
-
     setLoading(true);
     try {
       const [notifs, count] = await Promise.all([
@@ -45,7 +45,6 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   };
 
   const fetchUnreadCount = async () => {
-    if (!isAdminOrSuperAdmin()) return;
     try {
       const count = await notificationApi.getUnreadCount();
       setUnreadCount(count.count);
@@ -64,13 +63,11 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     }
   };
 
-  // Initial unread count + poll every 30s
+  // Initial unread count + poll every 30s (all roles — employees see e.g. new payroll)
   useEffect(() => {
-    if (isAdminOrSuperAdmin()) {
-      fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 30000);
-      return () => clearInterval(interval);
-    }
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
   }, [user?.role]);
 
   // Close dropdowns on outside click
@@ -94,7 +91,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
 
   const handleMarkAsRead = async (notificationId: number) => {
     const notif = notifications.find((n) => n.id === notificationId);
-    if (!notif || notif.status !== "UNREAD") return; // skip if already read
+    if (!notif || notif.status !== "UNREAD") return;
 
     try {
       await notificationApi.markAsRead(notificationId);
@@ -104,6 +101,17 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       console.error("Failed to mark as read:", error);
+    }
+  };
+
+  /** Mark read when needed, then deep-link employees to payslips for payroll alerts. */
+  const handleNotificationRowClick = async (notif: NotificationDTO) => {
+    if (notif.status === "UNREAD") {
+      await handleMarkAsRead(notif.id);
+    }
+    if (isEmployee() && isPayrollNotification(notif.type)) {
+      setNotifOpen(false);
+      router.push("/dashboard/employee/payslips");
     }
   };
 
@@ -123,6 +131,8 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   };
 
   const getNotificationIcon = (type: string) => {
+    const t = (type ?? "").toUpperCase();
+    if (t.includes("PAYROLL")) return "💰";
     switch (type) {
       case "LEAVE_REQUEST":  return "📋";
       case "LEAVE_APPROVED": return "✅";
@@ -210,24 +220,13 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     </div>
   );
 
-  // ── Non-admin: no bell ─────────────────────────────────────────────────────
-  if (!isAdminOrSuperAdmin()) {
-    return (
-      <header className="flex items-center justify-between px-4 md:px-6 h-16 bg-[#13151e] border-b border-white/[0.06] flex-shrink-0">
-        <LeftSection />
-        <UserMenu />
-      </header>
-    );
-  }
-
-  // ── Admin/SuperAdmin: full navbar with live notification bell ──────────────
   return (
     <header className="flex items-center justify-between px-4 md:px-6 h-16 bg-[#13151e] border-b border-white/[0.06] flex-shrink-0">
       <LeftSection />
 
       <div className="flex items-center gap-2">
 
-        {/* ── Bell Button ───────────────────────────────────────────────── */}
+        {/* Notifications (all roles — employees get payroll, admins get leave, etc.) */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={handleToggleNotif}
@@ -294,7 +293,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
                   notifications.map((notif) => (
                     <div
                       key={notif.id}
-                      onClick={() => handleMarkAsRead(notif.id)}
+                      onClick={() => void handleNotificationRowClick(notif)}
                       className={`px-4 py-3 flex gap-3 hover:bg-white/[0.03] transition-colors cursor-pointer ${
                         notif.status === "UNREAD" ? "bg-indigo-500/[0.04]" : "opacity-60"
                       }`}

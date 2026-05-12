@@ -3,11 +3,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 function getToken(): string | null {
   try {
     const raw = localStorage.getItem("hrm-auth");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.state?.token ?? null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const t = parsed?.state?.token ?? null;
+      if (t) return t;
+    }
+    return localStorage.getItem("token");
   } catch {
-    return null;
+    return localStorage.getItem("token");
   }
 }
 

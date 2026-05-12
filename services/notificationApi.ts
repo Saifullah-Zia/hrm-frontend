@@ -8,19 +8,15 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 function getToken(): string | null {
   try {
     const raw = localStorage.getItem("hrm-auth");
-    if (!raw) {
-      console.warn("⚠️ No hrm-auth found in localStorage");
-      return null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const t = parsed?.state?.token ?? null;
+      if (t) return t;
     }
-    const parsed = JSON.parse(raw);
-    const token = parsed?.state?.token ?? null;
-    if (!token) {
-      console.warn("⚠️ Token not found inside hrm-auth state");
-    }
-    return token;
+    return localStorage.getItem("token");
   } catch (e) {
     console.error("❌ Failed to parse auth token from localStorage:", e);
-    return null;
+    return localStorage.getItem("token");
   }
 }
 
