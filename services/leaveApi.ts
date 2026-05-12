@@ -1,5 +1,4 @@
-// app/services/leaveApi.ts
-
+// services/leaveApi.ts
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 function getToken(): string | null {
@@ -15,6 +14,7 @@ function getToken(): string | null {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
+  console.log("📡 Calling:", `${BASE_URL}${path}`);
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -27,6 +27,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const errorText = await res.text();
+    console.error(`❌ HTTP ${res.status}: ${errorText}`);
     throw new Error(errorText || `HTTP ${res.status}`);
   }
 
@@ -34,15 +35,42 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (contentType && contentType.includes("application/json")) {
     return res.json();
   }
-
   return res.text() as Promise<T>;
 }
 
-export const leaveApi = {
-  // ✅ Fixed: /api/leave not /api/leaves
-  approveLeave: (leaveId: number): Promise<void> =>
-    apiFetch<void>(`/api/leave/${leaveId}/approve`, { method: "PUT" }),
+export interface LeaveDto {
+  id: number;
+  startDate: string;
+  endDate: string;
+  leaveType: string;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  userId: number;
+  userName: string;
+}
 
-  rejectLeave: (leaveId: number): Promise<void> =>
-    apiFetch<void>(`/api/leave/${leaveId}/reject`, { method: "PUT" }),
+export const leaveApi = {
+  getAll: (): Promise<LeaveDto[]> => apiFetch<LeaveDto[]>("/api/leave"),
+  getByStatus: (status: string): Promise<LeaveDto[]> =>
+    apiFetch<LeaveDto[]>(`/api/leave/status/${status}`),
+  getById: (id: number): Promise<LeaveDto> =>
+    apiFetch<LeaveDto>(`/api/leave/${id}`),
+  getByUserId: (userId: number): Promise<LeaveDto[]> =>
+    apiFetch<LeaveDto[]>(`/api/leave/user/${userId}`),
+  apply: (dto: Partial<LeaveDto>): Promise<LeaveDto> =>
+    apiFetch<LeaveDto>("/api/leave", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    }),
+  approveLeave: (leaveId: number): Promise<LeaveDto> =>
+    apiFetch<LeaveDto>(`/api/leave/${leaveId}/approve`, { method: "PUT" }),
+  rejectLeave: (leaveId: number): Promise<LeaveDto> =>
+    apiFetch<LeaveDto>(`/api/leave/${leaveId}/reject`, { method: "PUT" }),
+  update: (id: number, dto: Partial<LeaveDto>): Promise<LeaveDto> =>
+    apiFetch<LeaveDto>(`/api/leave/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(dto),
+    }),
+  delete: (id: number): Promise<string> =>
+    apiFetch<string>(`/api/leave/${id}`, { method: "DELETE" }),
 };
