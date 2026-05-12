@@ -37,7 +37,7 @@ const NAV_ITEMS = {
     { label: "Attendance Overview", href: "/dashboard/superadmin/attendance",    icon: "clock" },
   ],
   ADMIN: [
-    { label: "Employee Profiles",   href: "/dashboard/admin/employees",         icon: "users" },
+    { label: "Employee Profiles",   href: "/dashboard/admin/employee-profiles",         icon: "users" },
     { label: "Leave Approvals",     href: "/dashboard/admin/leaves",            icon: "calendar" },
     { label: "Payroll Processing",  href: "/dashboard/admin/payroll",           icon: "currency" },
     { label: "Attendance Tracking", href: "/dashboard/admin/attendance",        icon: "clock" },
