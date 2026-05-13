@@ -65,24 +65,25 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background glow */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/8 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#fc0175]/8 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="relative w-full max-w-md bg-[#16181f] border border-white/[0.07] rounded-2xl p-8 shadow-2xl">
 
         {/* Brand */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
-            <span className="text-white font-bold text-sm">H</span>
+          <div className="w-10 h-10 rounded-xl bg-black ring-1 ring-white/10 overflow-hidden flex items-center justify-center shadow-lg shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/jcat-logo.png" alt="JCAT Solutions HRM" width={40} height={40} className="object-contain p-0.5" />
           </div>
-          <span className="text-white font-semibold text-lg tracking-tight">
-            HRM<span className="text-indigo-400">System</span>
+          <span className="text-white font-semibold text-lg tracking-tight leading-snug">
+            JCAT Solutions <span className="text-indigo-400">HRM</span>
           </span>
         </div>
 
         {/* Header */}
         <div className="mb-7">
           <h2 className="text-2xl font-bold text-white/90 tracking-tight">Create account</h2>
-          <p className="text-white/40 text-sm mt-1">Join your organization&apos;s HRM platform</p>
+          <p className="text-white/40 text-sm mt-1">Join your organization on JCAT Solutions HRM</p>
         </div>
 
         {/* Form */}

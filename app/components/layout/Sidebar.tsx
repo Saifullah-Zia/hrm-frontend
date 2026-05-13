@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { BRAND_FULL_NAME, BRAND_LOGO_PATH } from "@/lib/branding";
 
 // ── Icons (inline SVG to avoid extra dependencies) ──────────
 const Icon = ({ d }: { d: string }) => (
@@ -32,6 +34,7 @@ const NAV_ITEMS = {
     { label: "User Management",     href: "/dashboard/superadmin/users",        icon: "users" },
     { label: "Department CRUD",     href: "/dashboard/superadmin/departments",   icon: "building" },
     { label: "Position Management", href: "/dashboard/superadmin/positions",     icon: "briefcase" },
+    { label: "Leave policies",      href: "/dashboard/superadmin/leave-policy", icon: "calendar" },
     { label: "Payroll & Reports",   href: "/dashboard/superadmin/payroll",       icon: "currency" },
     { label: "Announcements",       href: "/dashboard/superadmin/announcements", icon: "bell" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
@@ -40,6 +43,7 @@ const NAV_ITEMS = {
   ADMIN: [
     { label: "Employee Profiles",   href: "/dashboard/admin/employee-profiles",         icon: "users" },
     { label: "Leave Approvals",     href: "/dashboard/admin/leaves",            icon: "calendar" },
+    { label: "Leave balances",      href: "/dashboard/admin/leave-balances",    icon: "chart" },
     { label: "Payroll Processing",  href: "/dashboard/admin/payroll",           icon: "currency" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
     { label: "Attendance Tracking", href: "/dashboard/admin/attendance",        icon: "clock" },
@@ -62,7 +66,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_COLORS = {
-  SUPERADMIN: "bg-rose-500/15 text-rose-400 border-rose-500/20",
+  SUPERADMIN: "bg-indigo-500/15 text-indigo-300 border-indigo-500/25",
   ADMIN:      "bg-amber-500/15 text-amber-400 border-amber-500/20",
   EMPLOYEE:   "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
 };
@@ -94,12 +98,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     >
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-white/[0.06]">
-        <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 flex-shrink-0">
-          <span className="text-white font-bold text-sm">H</span>
+        <div className="relative w-9 h-9 rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex-shrink-0 shadow-lg shadow-black/40">
+          <Image
+            src={BRAND_LOGO_PATH}
+            alt={BRAND_FULL_NAME}
+            width={36}
+            height={36}
+            className="object-contain p-0.5"
+            priority
+          />
         </div>
-        <div>
-          <p className="text-white font-semibold text-sm leading-tight">HRM System</p>
-          <p className="text-white/40 text-xs">com.hrm.system</p>
+        <div className="min-w-0">
+          <p className="text-white font-semibold text-sm leading-tight">{BRAND_FULL_NAME}</p>
+          <p className="text-white/40 text-xs truncate">JCAT Solutions</p>
         </div>
       </div>
 
@@ -159,7 +170,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="px-3 py-4 border-t border-white/[0.06]">
         <button
           onClick={logout}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all duration-150"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:text-indigo-300 hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/20 transition-all duration-150"
         >
           <Icon d={ICONS.logout} />
           Sign out

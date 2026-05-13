@@ -15,12 +15,30 @@ function getToken(): string | null {
   }
 }
 
-/** Optional HR endpoint: `GET /api/leave/balance/user/{userId}` returning this shape. If missing, UI estimates from leave history. */
+/** `GET /api/leave/balance/user/{userId}` — matches Spring `LeaveBalanceDto`. */
 export interface LeaveBalanceDto {
+  id?: number;
+  userId?: number;
+  userName?: string;
   leaveType: string;
+  year?: number;
   totalDays: number;
   usedDays: number;
+  pendingDays?: number;
   remainingDays: number;
+  carryForwardDays?: number;
+}
+
+/** `GET /api/leave/policy` — matches Spring `LeavePolicyDto`. */
+export interface LeavePolicyDto {
+  id: number;
+  leaveType: string;
+  totalDaysPerYear: number;
+  requiresOneYear: boolean;
+  carryForward: boolean;
+  maxCarryForwardDays: number;
+  isPublicHoliday: boolean;
+  applyBeforeDays: number | null;
 }
 
 async function apiFetchOptionalJson<T>(path: string): Promise<T | null> {
@@ -52,7 +70,15 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (!res.ok) {
     const errorText = await res.text();
     console.error(`❌ HTTP ${res.status}: ${errorText}`);
-    throw new Error(errorText || `HTTP ${res.status}`);
+    let message = errorText || `HTTP ${res.status}`;
+    try {
+      const j = JSON.parse(errorText) as { message?: string; error?: string };
+      if (typeof j.message === "string") message = j.message;
+      else if (typeof j.error === "string") message = j.error;
+    } catch {
+      /* plain text */
+    }
+    throw new Error(message);
   }
 
   const contentType = res.headers.get("content-type");
@@ -62,16 +88,32 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.text() as Promise<T>;
 }
 
+export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "REJECT" | "CANCELLED";
+
 export interface LeaveDto {
   id: number;
   startDate: string;
   endDate: string;
   leaveType: string;
-  reason: string;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "REJECT";
+  reason?: string;
+  status: LeaveStatus;
   userId: number;
-  userName: string;
+  userName?: string;
+  durationDays?: number;
+  /** Populated on successful `POST /api/leave` apply. */
+  remainingDaysAfterRequest?: number | null;
 }
+
+export const leavePolicyApi = {
+  getAll: (): Promise<LeavePolicyDto[]> => apiFetch<LeavePolicyDto[]>("/api/leave/policy"),
+  getByType: (leaveType: string): Promise<LeavePolicyDto> =>
+    apiFetch<LeavePolicyDto>(`/api/leave/policy/${encodeURIComponent(leaveType)}`),
+  update: (id: number, dto: Partial<LeavePolicyDto>): Promise<LeavePolicyDto> =>
+    apiFetch<LeavePolicyDto>(`/api/leave/policy/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(dto),
+    }),
+};
 
 export const leaveApi = {
   getAll: (): Promise<LeaveDto[]> => apiFetch<LeaveDto[]>("/api/leave"),
@@ -82,9 +124,23 @@ export const leaveApi = {
   getByUserId: (userId: number): Promise<LeaveDto[]> =>
     apiFetch<LeaveDto[]>(`/api/leave/user/${userId}`),
 
-  /** Returns null if the backend does not expose balances yet. */
+  /** Current-year balances; returns `null` if the endpoint is missing or non-JSON error. */
   getBalanceByUserId: (userId: number): Promise<LeaveBalanceDto[] | null> =>
     apiFetchOptionalJson<LeaveBalanceDto[]>(`/api/leave/balance/user/${userId}`),
+
+  /** Shortcut supported by `LeaveController` (same data as balance/user). */
+  getMyBalance: (userId: number): Promise<LeaveBalanceDto[] | null> =>
+    apiFetchOptionalJson<LeaveBalanceDto[]>(`/api/leave/my-balance?userId=${userId}`),
+
+  getAllBalances: (): Promise<LeaveBalanceDto[]> =>
+    apiFetch<LeaveBalanceDto[]>("/api/leave/balance/all"),
+
+  /** Tries `GET /api/leave/balance/user/{id}` then `GET /api/leave/my-balance?userId=`. */
+  async getBalancesForEmployee(userId: number): Promise<LeaveBalanceDto[] | null> {
+    const direct = await apiFetchOptionalJson<LeaveBalanceDto[]>(`/api/leave/balance/user/${userId}`);
+    if (direct !== null) return direct;
+    return apiFetchOptionalJson<LeaveBalanceDto[]>(`/api/leave/my-balance?userId=${userId}`);
+  },
 
   apply: (dto: Partial<LeaveDto>): Promise<LeaveDto> =>
     apiFetch<LeaveDto>("/api/leave", {

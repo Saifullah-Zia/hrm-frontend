@@ -73,14 +73,14 @@ function getInitials(name: string) {
 
 // Matches the sidebar ROLE_COLORS exactly
 const ROLE_STYLES: Record<Role, string> = {
-  SUPERADMIN: "bg-rose-500/15 text-rose-400 border border-rose-500/25",
+  SUPERADMIN: "bg-indigo-500/15 text-indigo-300 border border-indigo-500/25",
   ADMIN:      "bg-amber-500/15 text-amber-400 border border-amber-500/25",
   EMPLOYEE:   "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25",
 };
 
 // Avatar background per role
 const AVATAR_STYLES: Record<Role, string> = {
-  SUPERADMIN: "bg-rose-500/20 border-rose-500/30 text-rose-300",
+  SUPERADMIN: "bg-indigo-500/20 border-indigo-500/30 text-indigo-300",
   ADMIN:      "bg-amber-500/20 border-amber-500/30 text-amber-300",
   EMPLOYEE:   "bg-emerald-500/20 border-emerald-500/30 text-emerald-300",
 };
@@ -323,7 +323,7 @@ function DeleteModal({ open, onClose, onConfirm, userName }: {
           Cancel
         </button>
         <button onClick={handleDelete} disabled={loading}
-          className="px-4 py-2 text-sm bg-rose-600 text-white rounded-xl hover:bg-rose-500 disabled:opacity-50 transition-colors shadow-lg shadow-rose-600/20">
+          className="px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-500 disabled:opacity-50 transition-colors shadow-lg shadow-red-600/20">
           {loading ? "Deleting…" : "Delete"}
         </button>
       </div>
@@ -425,7 +425,7 @@ export default function UserManagementPage() {
         {/* ── Stat Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <StatCard label="Total users"  value={stats.total}      accent="text-white/80" />
-          <StatCard label="Superadmins"  value={stats.superadmin} accent="text-rose-400" />
+          <StatCard label="Superadmins"  value={stats.superadmin} accent="text-indigo-400" />
           <StatCard label="Admins"       value={stats.admin}      accent="text-amber-400" />
           <StatCard label="Employees"    value={stats.employee}   accent="text-emerald-400" />
         </div>

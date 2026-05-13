@@ -60,9 +60,11 @@ export default function LoginPage() {
         {/* Brand */}
         <div className={styles.brand}>
           <div className={styles.logo}>
-            <span>H</span>
+            <img src="/jcat-logo.png" alt="JCAT Solutions HRM" width={38} height={38} />
           </div>
-          <h1 className={styles.brandName}>HRM<span>System</span></h1>
+          <h1 className={styles.brandName}>
+            JCAT Solutions <span>HRM</span>
+          </h1>
         </div>
 
         {/* Header */}

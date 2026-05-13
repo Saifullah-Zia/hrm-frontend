@@ -1,15 +1,14 @@
 /* ============================================
-   HRM System — Auth Pages (Login & Register)
-   Shared styles via CSS Modules
+   JCAT Solutions HRM — Auth (Login & Register)
    ============================================ */
 
 :root {
   --auth-bg: #0f1117;
   --auth-card: #16181f;
   --auth-card-border: rgba(255, 255, 255, 0.07);
-  --auth-accent: #4f6ef7;
-  --auth-accent-hover: #3a58e0;
-  --auth-accent-glow: rgba(79, 110, 247, 0.35);
+  --auth-accent: #fc0175;
+  --auth-accent-hover: #d40068;
+  --auth-accent-glow: rgba(252, 1, 117, 0.4);
   --auth-text-primary: #f0f2f8;
   --auth-text-secondary: #8a8fa8;
   --auth-input-bg: #1e2029;
@@ -81,16 +80,20 @@
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--auth-accent);
+  background: #0a0a0f;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -1px;
-  box-shadow: 0 4px 14px var(--auth-accent-glow);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .brandName {

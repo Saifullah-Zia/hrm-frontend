@@ -3,12 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { leaveApi, LeaveDto } from "@/services/leaveApi";
-import { notificationApi } from "@/services/notificationApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ToastState = { message: string; type: "success" | "error" | "info" } | null;
-type FilterStatus = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
+type FilterStatus = "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -17,6 +16,7 @@ const STATUS_STYLES: Record<string, string> = {
   APPROVED: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   REJECTED: "bg-rose-500/15   text-rose-400   border-rose-500/25",
   REJECT:   "bg-rose-500/15   text-rose-400   border-rose-500/25",
+  CANCELLED: "bg-white/10 text-white/50 border-white/15",
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -24,16 +24,19 @@ const STATUS_DOT: Record<string, string> = {
   APPROVED: "bg-emerald-400",
   REJECTED: "bg-rose-400",
   REJECT: "bg-rose-400",
+  CANCELLED: "bg-white/40",
 };
 
 const LEAVE_TYPE_ICON: Record<string, string> = {
-  SICK:       "🤒",
-  CASUAL:     "🌴",
-  ANNUAL:     "📅",
-  MATERNITY:  "👶",
-  PATERNITY:  "👨‍👦",
-  EMERGENCY:  "🚨",
-  UNPAID:     "💸",
+  SICK:         "🤒",
+  CASUAL:       "🌴",
+  ANNUAL:       "📅",
+  MATERNITY:    "👶",
+  PATERNITY:    "👨‍👦",
+  EMERGENCY:    "🚨",
+  UNPAID:       "💸",
+  EIDULFITAR:   "🌙",
+  EIDULAZHA:    "🕌",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -45,6 +48,11 @@ const daysBetween = (start: string, end: string) => {
   const ms = new Date(end).getTime() - new Date(start).getTime();
   return Math.max(1, Math.round(ms / 86_400_000) + 1);
 };
+
+function durationForLeave(leave: LeaveDto): number {
+  if (leave.durationDays != null && leave.durationDays > 0) return leave.durationDays;
+  return daysBetween(leave.startDate, leave.endDate);
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -128,7 +136,7 @@ function ConfirmModal({
             <span className="text-white/40">Duration</span>
             <span className="text-white/80">
               {fmt(leave.startDate)} → {fmt(leave.endDate)}{" "}
-              <span className="text-white/40">({daysBetween(leave.startDate, leave.endDate)} days)</span>
+              <span className="text-white/40">({durationForLeave(leave)} day{durationForLeave(leave) !== 1 ? "s" : ""})</span>
             </span>
           </div>
         </div>
@@ -198,6 +206,7 @@ export default function AdminLeavePage() {
     pending:  leaves.filter(l => l.status === "PENDING").length,
     approved: leaves.filter(l => l.status === "APPROVED").length,
     rejected: leaves.filter(l => l.status === "REJECTED" || l.status === "REJECT").length,
+    cancelled: leaves.filter(l => l.status === "CANCELLED").length,
   }), [leaves]);
 
   // ── Filtered list ──────────────────────────────────────────────────────────
@@ -292,12 +301,13 @@ export default function AdminLeavePage() {
           </div>
 
           {/* ── Stats ───────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
               { label: "Total",    value: stats.total,    color: "text-white/80",   bg: "bg-white/5",          dot: "bg-white/30"      },
               { label: "Pending",  value: stats.pending,  color: "text-amber-400",  bg: "bg-amber-500/10",     dot: "bg-amber-400"     },
               { label: "Approved", value: stats.approved, color: "text-emerald-400",bg: "bg-emerald-500/10",   dot: "bg-emerald-400"   },
               { label: "Rejected", value: stats.rejected, color: "text-rose-400",   bg: "bg-rose-500/10",      dot: "bg-rose-400"      },
+              { label: "Cancelled", value: stats.cancelled, color: "text-white/50", bg: "bg-white/5",         dot: "bg-white/40"      },
             ].map(s => (
               <div key={s.label} className={`${s.bg} border border-white/[0.06] rounded-2xl p-4`}>
                 <div className="flex items-center gap-2 mb-2">
@@ -323,7 +333,7 @@ export default function AdminLeavePage() {
             />
             <div className="flex gap-2 flex-wrap">
               {/* ✅ Changed array values to match correct status strings */}
-              {(["ALL", "PENDING", "APPROVED", "REJECTED"] as FilterStatus[]).map(s => (
+              {(["ALL", "PENDING", "APPROVED", "REJECTED", "CANCELLED"] as FilterStatus[]).map(s => (
                 <button
                   key={s}
                   onClick={() => setFilter(s)}
@@ -336,7 +346,7 @@ export default function AdminLeavePage() {
                   {s}
                   {s !== "ALL" && (
                     <span className="ml-1.5 opacity-60">
-                      ({s === "PENDING" ? stats.pending : s === "APPROVED" ? stats.approved : stats.rejected})
+                      ({s === "PENDING" ? stats.pending : s === "APPROVED" ? stats.approved : s === "CANCELLED" ? stats.cancelled : stats.rejected})
                     </span>
                   )}
                 </button>
@@ -395,7 +405,7 @@ export default function AdminLeavePage() {
                           <p className="text-white/70 text-sm">{fmt(leave.startDate)}</p>
                           <p className="text-white/30 text-xs">→ {fmt(leave.endDate)}</p>
                           <p className="text-indigo-400/70 text-xs mt-0.5">
-                            {daysBetween(leave.startDate, leave.endDate)} day{daysBetween(leave.startDate, leave.endDate) !== 1 ? "s" : ""}
+                            {durationForLeave(leave)} day{durationForLeave(leave) !== 1 ? "s" : ""}
                           </p>
                         </td>
 

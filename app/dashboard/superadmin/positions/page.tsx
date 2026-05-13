@@ -430,7 +430,7 @@ function DeleteModal({
         <button
           onClick={handleDelete}
           disabled={loading}
-          className="px-4 py-2 text-sm bg-rose-600 text-white rounded-xl hover:bg-rose-500 disabled:opacity-50 transition-colors shadow-lg shadow-rose-600/20"
+          className="px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-500 disabled:opacity-50 transition-colors shadow-lg shadow-red-600/20"
         >
           {loading
             ? "Deleting..."

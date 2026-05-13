@@ -26,7 +26,7 @@ export function openPayslipPrintView(p: PayrollDTO, employeeName: string) {
   </style>
 </head>
 <body>
-  <h1>HRM — Payslip</h1>
+  <h1>JCAT Solutions HRM — Payslip</h1>
   <p class="muted">${employeeName}</p>
   <p class="muted">Period: ${p.month ?? "—"} · Status: ${p.status ?? "—"}</p>
   <table>

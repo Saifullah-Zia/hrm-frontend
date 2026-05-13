@@ -132,7 +132,7 @@ export default function AttendanceClockCard({ userId }: { userId: number }) {
             type="button"
             disabled={busy || hasCheckedIn || policyQuery.isLoading}
             onClick={() => checkInMutation.mutate()}
-            className="px-4 py-2 rounded-xl text-sm font-medium bg-emerald-600/90 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600/90 text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {checkInMutation.isPending ? "…" : "Check in"}
           </button>

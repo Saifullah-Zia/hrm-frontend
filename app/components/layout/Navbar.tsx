@@ -207,7 +207,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
           <div className="p-1.5">
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-rose-400 hover:bg-rose-500/10 transition-colors"
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-indigo-400 hover:bg-indigo-500/10 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -239,7 +239,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
 
             {/* Red badge — only visible when unread > 0 */}
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-indigo-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-md shadow-indigo-600/40">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -254,7 +254,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
                 <div className="flex items-center gap-2">
                   <p className="text-white/80 text-sm font-semibold">Notifications</p>
                   {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[10px] font-bold">
+                    <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 text-[10px] font-bold">
                       {unreadCount} new
                     </span>
                   )}

@@ -82,12 +82,12 @@ const Avatar = ({
       <img
         src={picture}
         alt={name}
-        className={`${sizes[size]} rounded-full object-cover ring-2 ring-[#6C63FF]/30`}
+        className={`${sizes[size]} rounded-full object-cover ring-2 ring-[#FC0175]/30`}
       />
     );
   return (
     <div
-      className={`${sizes[size]} rounded-full bg-gradient-to-br from-[#6C63FF] to-[#4ECDC4] flex items-center justify-center font-semibold text-white ring-2 ring-[#6C63FF]/30`}
+      className={`${sizes[size]} rounded-full bg-gradient-to-br from-[#FC0175] to-[#ff6cad] flex items-center justify-center font-semibold text-white ring-2 ring-[#FC0175]/30`}
     >
       {initials}
     </div>
@@ -116,7 +116,7 @@ const Field = ({
 }) => (
   <div className="flex flex-col gap-1">
     <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
-      <span className="text-[#6C63FF]">{icon}</span>
+      <span className="text-[#FC0175]">{icon}</span>
       {label}
     </label>
     <input
@@ -126,7 +126,7 @@ const Field = ({
       disabled={isReadOnly}
       placeholder={placeholder}
       className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] placeholder-[#3D4065]
-        focus:outline-none focus:border-[#6C63FF] focus:ring-1 focus:ring-[#6C63FF]/30 transition-all
+        focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all
         disabled:opacity-60 disabled:cursor-default"
     />
   </div>
@@ -210,7 +210,7 @@ const Modal = ({
           {/* User ID */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
-              <span className="text-[#6C63FF]">
+              <span className="text-[#FC0175]">
                 <User size={13} />
               </span>
               User ID
@@ -222,7 +222,7 @@ const Modal = ({
               disabled={isReadOnly || mode === "edit"}
               placeholder="e.g. 4"
               className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] placeholder-[#3D4065]
-                focus:outline-none focus:border-[#6C63FF] focus:ring-1 focus:ring-[#6C63FF]/30 transition-all
+                focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all
                 disabled:opacity-60 disabled:cursor-default"
             />
           </div>
@@ -305,7 +305,7 @@ const Modal = ({
           {/* FIX 2: Profile Picture – file picker instead of URL input */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
-              <span className="text-[#6C63FF]">
+              <span className="text-[#FC0175]">
                 <User size={13} />
               </span>
               Profile Picture
@@ -316,7 +316,7 @@ const Modal = ({
               <img
                 src={form.profilePicture}
                 alt="Preview"
-                className="w-14 h-14 rounded-full object-cover ring-2 ring-[#6C63FF]/30 mb-1"
+                className="w-14 h-14 rounded-full object-cover ring-2 ring-[#FC0175]/30 mb-1"
               />
             )}
 
@@ -337,7 +337,7 @@ const Modal = ({
                 }}
                 className="text-sm text-[#8B8FA8] file:mr-3 file:py-1.5 file:px-3
                   file:rounded-lg file:border-0 file:text-xs file:font-medium
-                  file:bg-[#6C63FF]/20 file:text-[#6C63FF] hover:file:bg-[#6C63FF]/30
+                  file:bg-[#FC0175]/20 file:text-[#FC0175] hover:file:bg-[#FC0175]/30
                   file:cursor-pointer cursor-pointer"
               />
             )}
@@ -350,7 +350,7 @@ const Modal = ({
           {/* Address – full width */}
           <div className="sm:col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
-              <span className="text-[#6C63FF]">
+              <span className="text-[#FC0175]">
                 <MapPin size={13} />
               </span>
               Address
@@ -362,7 +362,7 @@ const Modal = ({
               rows={2}
               placeholder="Full address..."
               className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] placeholder-[#3D4065]
-                focus:outline-none focus:border-[#6C63FF] focus:ring-1 focus:ring-[#6C63FF]/30 transition-all resize-none
+                focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all resize-none
                 disabled:opacity-60 disabled:cursor-default"
             />
           </div>
@@ -384,7 +384,7 @@ const Modal = ({
                 }
                 disabled={isReadOnly}
                 className="w-full appearance-none bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0]
-                  focus:outline-none focus:border-[#6C63FF] focus:ring-1 focus:ring-[#6C63FF]/30 transition-all
+                  focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all
                   disabled:opacity-60 disabled:cursor-default"
               >
                 <option value="ACTIVE">Active</option>
@@ -404,14 +404,14 @@ const Modal = ({
           <div className="px-6 py-4 border-t border-[#2A2D45] flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-[#2A2D45] text-[#8B8FA8] hover:text-white hover:border-[#6C63FF] transition-all"
+              className="px-4 py-2 text-sm rounded-lg border border-[#2A2D45] text-[#8B8FA8] hover:text-white hover:border-[#FC0175] transition-all"
             >
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={saving}
-              className="px-4 py-2 text-sm rounded-lg bg-[#6C63FF] hover:bg-[#5A52E0] text-white font-medium
+              className="px-4 py-2 text-sm rounded-lg bg-[#FC0175] hover:bg-[#d40068] text-white font-medium
                 transition-all flex items-center gap-2 disabled:opacity-60"
             >
               {saving && <Loader2 size={14} className="animate-spin" />}
@@ -448,7 +448,7 @@ const DeleteConfirm = ({
       <div className="flex gap-3">
         <button
           onClick={onCancel}
-          className="flex-1 py-2 text-sm rounded-lg border border-[#2A2D45] text-[#8B8FA8] hover:text-white hover:border-[#6C63FF] transition-all"
+          className="flex-1 py-2 text-sm rounded-lg border border-[#2A2D45] text-[#8B8FA8] hover:text-white hover:border-[#FC0175] transition-all"
         >
           Cancel
         </button>
@@ -566,7 +566,7 @@ export default function EmployeeProfilesPage() {
             onClick={() =>
               setModal({ open: true, mode: "create", profile: null })
             }
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#6C63FF] hover:bg-[#5A52E0] text-white text-sm font-medium rounded-xl transition-all shadow-lg shadow-[#6C63FF]/20"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#FC0175] hover:bg-[#d40068] text-white text-sm font-medium rounded-xl transition-all shadow-lg shadow-[#FC0175]/20"
           >
             <Plus size={16} />
             Add Profile
@@ -579,9 +579,9 @@ export default function EmployeeProfilesPage() {
             {
               label: "Total Profiles",
               value: stats.total,
-              color: "from-[#1E1B4B] to-[#0D0F1E]",
-              border: "border-[#6C63FF]/30",
-              text: "text-[#6C63FF]",
+              color: "from-[#7c003f] to-[#0D0F1E]",
+              border: "border-[#FC0175]/30",
+              text: "text-[#FC0175]",
             },
             {
               label: "Active",
@@ -628,7 +628,7 @@ export default function EmployeeProfilesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-[#0D0F1E] border border-[#2A2D45] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[#E2E4F0] placeholder-[#3D4065]
-                focus:outline-none focus:border-[#6C63FF] focus:ring-1 focus:ring-[#6C63FF]/20 transition-all"
+                focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/20 transition-all"
             />
           </div>
           <div className="flex gap-2">
@@ -638,8 +638,8 @@ export default function EmployeeProfilesPage() {
                 onClick={() => setStatusFilter(s)}
                 className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all ${
                   statusFilter === s
-                    ? "bg-[#6C63FF] border-[#6C63FF] text-white"
-                    : "bg-[#0D0F1E] border-[#2A2D45] text-[#8B8FA8] hover:border-[#6C63FF] hover:text-white"
+                    ? "bg-[#FC0175] border-[#FC0175] text-white"
+                    : "bg-[#0D0F1E] border-[#2A2D45] text-[#8B8FA8] hover:border-[#FC0175] hover:text-white"
                 }`}
               >
                 {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
@@ -663,7 +663,7 @@ export default function EmployeeProfilesPage() {
           {/* Body */}
           {loading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-[#8B8FA8]">
-              <Loader2 size={20} className="animate-spin text-[#6C63FF]" />
+              <Loader2 size={20} className="animate-spin text-[#FC0175]" />
               <span className="text-sm">Loading profiles...</span>
             </div>
           ) : error ? (
@@ -672,7 +672,7 @@ export default function EmployeeProfilesPage() {
               <p className="text-sm text-red-400">{error}</p>
               <button
                 onClick={fetchAll}
-                className="mt-2 text-xs text-[#6C63FF] hover:underline"
+                className="mt-2 text-xs text-[#FC0175] hover:underline"
               >
                 Try again
               </button>
@@ -738,7 +738,7 @@ export default function EmployeeProfilesPage() {
   console.log("profile to edit:", p); // ← add this
   setModal({ open: true, mode: "edit", profile: p });
  }}
-                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#4ECDC4] hover:bg-[#4ECDC4]/10 transition-all"
+                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
                     title="View"
                   >
                     <User size={15} />
@@ -747,7 +747,7 @@ export default function EmployeeProfilesPage() {
                     onClick={() =>
                       setModal({ open: true, mode: "edit", profile: p })
                     }
-                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#6C63FF] hover:bg-[#6C63FF]/10 transition-all"
+                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
                     title="Edit"
                   >
                     <Pencil size={15} />

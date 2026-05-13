@@ -12,6 +12,32 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* JCAT brand: remap entire `indigo-*` scale so buttons & accents use #FC0175 family site-wide */
+  --color-indigo-50: #fff8fc;
+  --color-indigo-100: #ffe8f3;
+  --color-indigo-200: #ffc9e6;
+  --color-indigo-300: #ff9dcc;
+  --color-indigo-400: #ff6cad;
+  --color-indigo-500: #ff3b94;
+  --color-indigo-600: #fc0175;
+  --color-indigo-700: #d40068;
+  --color-indigo-800: #a80054;
+  --color-indigo-900: #7c003f;
+  --color-indigo-950: #450022;
+
+  /* Same palette for `blue-*` so info/leave badges and any blue utilities match the brand */
+  --color-blue-50: #fff8fc;
+  --color-blue-100: #ffe8f3;
+  --color-blue-200: #ffc9e6;
+  --color-blue-300: #ff9dcc;
+  --color-blue-400: #ff6cad;
+  --color-blue-500: #ff3b94;
+  --color-blue-600: #fc0175;
+  --color-blue-700: #d40068;
+  --color-blue-800: #a80054;
+  --color-blue-900: #7c003f;
+  --color-blue-950: #450022;
 }
 
 body {
