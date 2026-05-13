@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
+import AttendanceClockCard from "@/app/components/employee/AttendanceClockCard";
 
 const STATUS_COLORS: Record<string, string> = {
   PRESENT: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
@@ -80,6 +81,8 @@ export default function EmployeeAttendancePage() {
           />
         </div>
       </div>
+
+      <AttendanceClockCard userId={userId} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5">

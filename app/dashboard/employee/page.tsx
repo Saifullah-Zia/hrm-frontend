@@ -7,6 +7,7 @@ import { leaveApi } from "@/services/leaveApi";
 import { attendanceApi } from "@/services/attendanceApi";
 import { payrollApi } from "@/services/payrollApi";
 import { announcementApi } from "@/services/announcementApi";
+import AttendanceClockCard from "@/app/components/employee/AttendanceClockCard";
 
 const LINKS = [
   { href: "/dashboard/employee/profile", label: "My profile", desc: "Contact & HR details", emoji: "👤" },
@@ -73,6 +74,8 @@ export default function EmployeeDashboard() {
           </p>
         )}
       </div>
+
+      {typeof userId === "number" && <AttendanceClockCard userId={userId} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stat("Pending leave", typeof userId === "number" ? String(pendingLeave) : "—")}
