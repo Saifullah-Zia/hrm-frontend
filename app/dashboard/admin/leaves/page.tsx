@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/authStore";
-import { leaveApi, LeaveDto } from "@/services/leaveApi";
+import {
+  leaveApi,
+  LeaveDto,
+  normalizeLeaveStatus,
+  isRejectedLeaveStatus,
+} from "@/services/leaveApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -185,11 +190,15 @@ export default function AdminLeavePage() {
     try {
       const data = await leaveApi.getAll();
       // Sort: PENDING first, then newest
-      setLeaves(data.sort((a, b) => {
-        if (a.status === "PENDING" && b.status !== "PENDING") return -1;
-        if (a.status !== "PENDING" && b.status === "PENDING") return 1;
-        return 0;
-      }));
+      setLeaves(
+        data.sort((a, b) => {
+          const ap = normalizeLeaveStatus(a.status) === "PENDING";
+          const bp = normalizeLeaveStatus(b.status) === "PENDING";
+          if (ap && !bp) return -1;
+          if (!ap && bp) return 1;
+          return 0;
+        })
+      );
     } catch {
       setToast({ message: "Failed to load leave requests", type: "error" });
     } finally {
@@ -203,20 +212,20 @@ export default function AdminLeavePage() {
 
   const stats = useMemo(() => ({
     total:    leaves.length,
-    pending:  leaves.filter(l => l.status === "PENDING").length,
-    approved: leaves.filter(l => l.status === "APPROVED").length,
-    rejected: leaves.filter(l => l.status === "REJECTED" || l.status === "REJECT").length,
-    cancelled: leaves.filter(l => l.status === "CANCELLED").length,
+    pending:  leaves.filter((l) => normalizeLeaveStatus(l.status) === "PENDING").length,
+    approved: leaves.filter((l) => normalizeLeaveStatus(l.status) === "APPROVED").length,
+    rejected: leaves.filter((l) => isRejectedLeaveStatus(l.status)).length,
+    cancelled: leaves.filter((l) => normalizeLeaveStatus(l.status) === "CANCELLED").length,
   }), [leaves]);
 
   // ── Filtered list ──────────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
-    const isRejectedStatus = (s: string) => s === "REJECTED" || s === "REJECT";
-    return leaves.filter(l => {
+    return leaves.filter((l) => {
+      const st = normalizeLeaveStatus(l.status);
       const matchFilter =
         filter === "ALL" ||
-        (filter === "REJECTED" ? isRejectedStatus(l.status ?? "") : l.status === filter);
+        (filter === "REJECTED" ? isRejectedLeaveStatus(l.status) : st === filter);
       const q = search.toLowerCase();
       const matchSearch =
         !q ||
@@ -419,8 +428,20 @@ export default function AdminLeavePage() {
                         {/* Status */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[leave.status] ?? "bg-gray-400"}`} />
-                            <span className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${STATUS_STYLES[leave.status] ?? "bg-gray-500/15 text-gray-400 border-gray-500/25"}`}>
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                STATUS_DOT[normalizeLeaveStatus(leave.status)] ??
+                                STATUS_DOT[leave.status] ??
+                                "bg-gray-400"
+                              }`}
+                            />
+                            <span
+                              className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${
+                                STATUS_STYLES[normalizeLeaveStatus(leave.status)] ??
+                                STATUS_STYLES[leave.status] ??
+                                "bg-gray-500/15 text-gray-400 border-gray-500/25"
+                              }`}
+                            >
                               {leave.status}
                             </span>
                           </div>
@@ -428,7 +449,7 @@ export default function AdminLeavePage() {
 
                         {/* Actions */}
                         <td className="px-5 py-4">
-                          {leave.status === "PENDING" ? (
+                          {normalizeLeaveStatus(leave.status) === "PENDING" ? (
                             <div className="flex items-center gap-2">
                               {/* Approve */}
                               <button
@@ -456,7 +477,11 @@ export default function AdminLeavePage() {
                             </div>
                           ) : (
                             <span className="text-white/20 text-xs italic">
-                              {leave.status === "APPROVED" ? "Approved" : "Rejected"}
+                              {normalizeLeaveStatus(leave.status) === "APPROVED"
+                                ? "Approved"
+                                : normalizeLeaveStatus(leave.status) === "CANCELLED"
+                                  ? "Cancelled"
+                                  : "Rejected"}
                             </span>
                           )}
                         </td>

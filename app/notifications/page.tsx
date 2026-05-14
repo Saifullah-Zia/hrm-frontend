@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notificationApi } from "@/services/notificationApi";
 import { leaveApi } from "@/services/leaveApi";
+import { probationApi } from "@/services/probationApi";
 import { NotificationDTO } from "@/app/types/notification"; // ✅ fixed import path
 import { useAuthStore } from "@/store/authStore";
 
@@ -12,6 +13,18 @@ const PAYSLIPS_HREF = "/dashboard/employee/payslips";
 function isPayrollNotification(type: string) {
   const t = (type ?? "").toUpperCase();
   return t === "PAYROLL" || t.includes("PAYROLL");
+}
+
+function isProbationType(type: string) {
+  return (type ?? "").toUpperCase().includes("PROBATION");
+}
+
+/** Admin alert when an employee's probation period has ended (not the employee "congratulations" message). */
+function isProbationHrReviewNotification(notif: NotificationDTO) {
+  if (!isProbationType(notif.type)) return false;
+  const m = (notif.message ?? "").toLowerCase();
+  if (m.includes("congratulations")) return false;
+  return m.includes("review") || m.includes("probation period completed") || m.includes("employment");
 }
 
 export default function NotificationsPage() {
@@ -134,8 +147,37 @@ export default function NotificationsPage() {
     await handleMarkAsRead(id);
   };
 
+  const handleConfirmProbation = async (e: React.MouseEvent, notif: NotificationDTO) => {
+    e.stopPropagation();
+    if (!notif.referenceId) {
+      setToast({ message: "No employee reference on this notification", type: "error" });
+      return;
+    }
+    setActionLoading(notif.id);
+    try {
+      const adminId = typeof user?.userId === "number" ? user.userId : undefined;
+      const msg = await probationApi.confirmProbation(notif.referenceId, adminId);
+      await notificationApi.markAsRead(notif.id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, status: "READ" } : n))
+      );
+      setToast({ message: msg || "Probation confirmed.", type: "success" });
+    } catch (error: unknown) {
+      const err = error as { message?: string; response?: { data?: unknown } };
+      const body = err.response?.data;
+      const text =
+        typeof body === "string" ? body : body && typeof body === "object" && "message" in (body as object)
+          ? String((body as { message?: string }).message)
+          : err.message;
+      setToast({ message: text || "Failed to confirm probation", type: "error" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const getTypeIcon = (type: string) => {
     if (isPayrollNotification(type)) return "💰";
+    if (isProbationType(type)) return "🎓";
     switch (type) {
       case "LEAVE_REQUEST":  return "📋";
       case "LEAVE_APPROVED": return "✅";
@@ -146,6 +188,7 @@ export default function NotificationsPage() {
 
   const getTypeColor = (type: string) => {
     if (isPayrollNotification(type)) return "bg-indigo-500/15 text-indigo-400";
+    if (isProbationType(type)) return "bg-violet-500/15 text-violet-300";
     switch (type) {
       case "LEAVE_REQUEST":  return "bg-blue-500/15 text-blue-400";
       case "LEAVE_APPROVED": return "bg-emerald-500/15 text-emerald-400";
@@ -155,6 +198,7 @@ export default function NotificationsPage() {
   };
 
   const isEmployee = user?.role?.toUpperCase() === "EMPLOYEE";
+  const isHr = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
   const handleViewPayslips = async (e: React.MouseEvent, notif: NotificationDTO) => {
     e.stopPropagation();
@@ -297,6 +341,44 @@ export default function NotificationsPage() {
                         >
                           View payslips
                         </button>
+                        {notif.status === "UNREAD" && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDismiss(e, notif.id)}
+                            disabled={actionLoading === notif.id}
+                            className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Probation — HR review (referenceId = employee user id) */}
+                    {isHr && isProbationHrReviewNotification(notif) && notif.status === "UNREAD" && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={(e) => handleConfirmProbation(e, notif)}
+                          disabled={actionLoading === notif.id}
+                          className="px-4 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-medium hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+                        >
+                          {actionLoading === notif.id ? "Processing…" : "Confirm permanent"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDismiss(e, notif.id)}
+                          disabled={actionLoading === notif.id}
+                          className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Probation — employee congratulations (read-only + dismiss) */}
+                    {isEmployee && isProbationType(notif.type) && notif.message?.toLowerCase().includes("congratulations") && (
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {notif.status === "UNREAD" && (
                           <button
                             type="button"

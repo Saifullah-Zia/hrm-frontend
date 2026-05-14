@@ -35,6 +35,8 @@ const NAV_ITEMS = {
     { label: "Department CRUD",     href: "/dashboard/superadmin/departments",   icon: "building" },
     { label: "Position Management", href: "/dashboard/superadmin/positions",     icon: "briefcase" },
     { label: "Leave policies",      href: "/dashboard/superadmin/leave-policy", icon: "calendar" },
+    { label: "Leave balances",      href: "/dashboard/superadmin/leave-balances", icon: "chart" },
+    { label: "Probation",           href: "/dashboard/superadmin/probation",    icon: "calendar" },
     { label: "Payroll & Reports",   href: "/dashboard/superadmin/payroll",       icon: "currency" },
     { label: "Announcements",       href: "/dashboard/superadmin/announcements", icon: "bell" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
@@ -43,6 +45,7 @@ const NAV_ITEMS = {
   ADMIN: [
     { label: "Employee Profiles",   href: "/dashboard/admin/employee-profiles",         icon: "users" },
     { label: "Leave Approvals",     href: "/dashboard/admin/leaves",            icon: "calendar" },
+    { label: "Probation",           href: "/dashboard/admin/probation",         icon: "calendar" },
     { label: "Leave balances",      href: "/dashboard/admin/leave-balances",    icon: "chart" },
     { label: "Payroll Processing",  href: "/dashboard/admin/payroll",           icon: "currency" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },

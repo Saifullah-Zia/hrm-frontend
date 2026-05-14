@@ -12,6 +12,9 @@ interface UserDTO {
   email: string;
   role: Role;
   active?: boolean;
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  probationStatus?: string | null;
 }
 
 interface CreateUserPayload {
@@ -67,8 +70,13 @@ const userApi = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getInitials(name: string) {
-  return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+function fmtShort(d: string | null | undefined) {
+  if (!d) return "—";
+  try {
+    return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return "—";
+  }
 }
 
 // Matches the sidebar ROLE_COLORS exactly
@@ -458,6 +466,12 @@ export default function UserManagementPage() {
                 <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-white/30 uppercase tracking-wider w-32">
                   Role
                 </th>
+                <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-white/30 uppercase tracking-wider w-28">
+                  Probation
+                </th>
+                <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-white/30 uppercase tracking-wider w-28">
+                  Prob. end
+                </th>
                 <th className="text-right px-5 py-3.5 text-[11px] font-semibold text-white/30 uppercase tracking-wider w-36">
                   Actions
                 </th>
@@ -466,13 +480,13 @@ export default function UserManagementPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-14 text-white/25 text-sm">
+                  <td colSpan={6} className="text-center py-14 text-white/25 text-sm">
                     Loading…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-14 text-white/25 text-sm">
+                  <td colSpan={6} className="text-center py-14 text-white/25 text-sm">
                     No users found
                   </td>
                 </tr>
@@ -502,6 +516,13 @@ export default function UserManagementPage() {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${ROLE_STYLES[user.role]}`}>
                         {ROLE_LABEL[user.role]}
                       </span>
+                    </td>
+
+                    <td className="px-5 py-3.5 text-white/45 text-xs">
+                      {user.probationStatus ?? "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-white/45 text-xs">
+                      {fmtShort(user.probationEndDate)}
                     </td>
 
                     {/* Actions */}

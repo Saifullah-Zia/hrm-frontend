@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { announcementApi } from "@/services/announcementApi";
 import apiClient from "@/lib/apiClient";
+import { distinctUserAttendanceCountOnLocalDate } from "@/lib/attendanceDate";
 import { payrollApi } from "@/services/payrollApi";
 
 interface DashboardStats {
@@ -42,7 +43,7 @@ export default function AdminDashboard() {
         setStats({
           employees:        usersRes.data?.length        ?? 0,
           pendingLeaves:    leavesRes.data?.length       ?? 0,
-          attendanceToday:  attendanceRes.data?.length   ?? 0,
+          attendanceToday: distinctUserAttendanceCountOnLocalDate(attendanceRes.data),
           payrollProcessed: payrollTotal,
           announcements:    announcementsRes?.length     ?? 0,
           departments:      departmentsRes.data?.length  ?? 0,
