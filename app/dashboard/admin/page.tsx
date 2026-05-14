@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { announcementApi } from "@/services/announcementApi";
 import apiClient from "@/lib/apiClient";
+import { payrollApi } from "@/services/payrollApi";
 
 interface DashboardStats {
   employees: number;
@@ -26,14 +27,14 @@ export default function AdminDashboard() {
           usersRes,
           leavesRes,
           attendanceRes,
-          payrollRes,
+          payrollTotal,
           announcementsRes,
           departmentsRes,
         ] = await Promise.all([
           apiClient.get("/api/users"),                    // ✅ GET /api/users
           apiClient.get("/api/leave/status/PENDING"),     // ✅ GET /api/leave/status/{status}
           apiClient.get("/api/attendance"),               // ✅ GET /api/attendance
-          apiClient.get("/api/payroll"),                  // ✅ GET /api/payroll
+          payrollApi.getTotalCount(),
           announcementApi.getAll(),                       // ✅ GET /api/announcements
           apiClient.get("/api/departments"),              // ✅ GET /api/departments
         ]);
@@ -42,7 +43,7 @@ export default function AdminDashboard() {
           employees:        usersRes.data?.length        ?? 0,
           pendingLeaves:    leavesRes.data?.length       ?? 0,
           attendanceToday:  attendanceRes.data?.length   ?? 0,
-          payrollProcessed: payrollRes.data?.length      ?? 0,
+          payrollProcessed: payrollTotal,
           announcements:    announcementsRes?.length     ?? 0,
           departments:      departmentsRes.data?.length  ?? 0,
         });

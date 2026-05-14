@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { announcementApi } from "@/services/announcementApi";
 import apiClient from "@/lib/apiClient";
+import { payrollApi } from "@/services/payrollApi";
 
 interface DashboardStats {
   totalUsers: number;
@@ -26,13 +27,13 @@ export default function SuperAdminDashboard() {
         const [
           usersRes,
           departmentsRes,
-          payrollRes,
+          payrollTotal,
           leavesRes,
           announcementsRes,
         ] = await Promise.all([
           apiClient.get("/api/users"),                 // ✅ GET /api/users
           apiClient.get("/api/departments"),           // ✅ GET /api/departments
-          apiClient.get("/api/payroll"),               // ✅ GET /api/payroll
+          payrollApi.getTotalCount(),
           apiClient.get("/api/leave/status/PENDING"),  // ✅ GET /api/leave/status/{status}
           announcementApi.getAll(),                    // ✅ GET /api/announcements
         ]);
@@ -43,7 +44,7 @@ export default function SuperAdminDashboard() {
           totalUsers:       allUsers.length,
           departments:      departmentsRes.data?.length  ?? 0,
           activeEmployees:  allUsers.filter((u: any) => u.role === "EMPLOYEE").length,
-          payrollThisMonth: payrollRes.data?.length      ?? 0,
+          payrollThisMonth: payrollTotal,
           pendingApprovals: leavesRes.data?.length       ?? 0,
           announcements:    announcementsRes?.length     ?? 0,
         });

@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useEmployeeProfiles }  from '@/hooks/useEmployeeProfiles';
-import { EmployeeProfileDto, EmploymentStatus } from '@app/types/employee';
-import { EmployeeStats }      from '@app/dashboard/admin/_components/EmployeeStats';
+import { useEmployeeProfiles } from "@/hooks/useEmployeeProfiles";
+import type { EmployeeProfileDto } from "@/services/employeeProfileApi";
+import type { EmploymentStatus } from "@/app/types/employee";
+import { EmployeeStats } from "@/app/dashboard/admin/_components/EmployeeStats";
 import { EmployeeTable }      from './_components/EmployeeTable';
 import { EmployeeFormModal }  from './_components/EmployeeFormModal';
 import { DeleteModal }        from './_components/DeleteModal';

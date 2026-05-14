@@ -9,10 +9,12 @@ import { z } from "zod";
 import Image from "next/image";
 import { useAuthStore } from "@/store/authStore";
 import { loginUser } from "@/services/authService";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
 import { BRAND_FULL_NAME, BRAND_LOGO_PATH } from "@/lib/branding";
+import { Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -23,6 +25,7 @@ export default function LoginPage() {
   const { setToken, getRedirectPath } = useAuthStore();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -37,7 +40,10 @@ export default function LoginPage() {
     setServerError(null);
 
     try {
-      const token = await loginUser(data);
+      const token = await loginUser({
+        email: data.email,
+        password: data.password,
+      });
       setToken(token);
 
       // Also set cookie for middleware
@@ -45,14 +51,7 @@ export default function LoginPage() {
 
       router.push(getRedirectPath());
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string }; status?: number } };
-      if (error.response?.status === 401) {
-        setServerError("Invalid username or password.");
-      } else if (error.response?.data?.message) {
-        setServerError(error.response.data.message);
-      } else {
-        setServerError("Something went wrong. Please try again.");
-      }
+      setServerError(getApiErrorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setIsLoading(false);
     }
@@ -99,35 +98,51 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Username */}
+            {/* Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                Username
+                Email
               </label>
               <input
-                {...register("username")}
-                type="text"
-                autoComplete="username"
-                placeholder="Enter your username"
+                {...register("email")}
+                suppressHydrationWarning
+                type="email"
+                autoComplete="email"
+                placeholder="you@company.com"
                 className="w-full bg-white/[0.06] border border-white/[0.1] text-white placeholder-zinc-600 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500/60 focus:bg-white/[0.08] transition-all duration-200"
               />
-              {errors.username && (
-                <p className="text-red-400 text-xs mt-1">{errors.username.message}</p>
+              {errors.email && (
+                <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                Password
-              </label>
-              <input
-                {...register("password")}
-                type="password"
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                className="w-full bg-white/[0.06] border border-white/[0.1] text-white placeholder-zinc-600 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500/60 focus:bg-white/[0.08] transition-all duration-200"
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                  Password
+                </label>
+                <Link href="/auth/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300">
+                  Forgot?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  {...register("password")}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="w-full bg-white/[0.06] border border-white/[0.1] text-white placeholder-zinc-600 rounded-xl px-4 py-3 pr-11 text-sm outline-none focus:border-indigo-500/60 focus:bg-white/[0.08] transition-all duration-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>
               )}
@@ -163,7 +178,7 @@ export default function LoginPage() {
           {/* Register link */}
           <p className="text-center text-zinc-500 text-sm">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+            <Link href="/auth/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
               Create account
             </Link>
           </p>

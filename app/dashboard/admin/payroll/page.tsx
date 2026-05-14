@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  payrollApi,
+  type PayrollDTO,
+  type CreatePayrollPayload,
+} from "@/services/payrollApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -8,27 +13,6 @@ interface UserDTO {
   id: number;
   name: string;
   email?: string;
-}
-
-interface PayrollDTO {
-  id: number;
-  userId: number;
-  userName?: string;
-  salary: number;
-  bonuses: number;
-  deductions: number;
-  netSalary: number;
-  month?: string;
-  status?: string;
-}
-
-interface CreatePayrollPayload {
-  userId: number;
-  salary: number;
-  bonuses: number;
-  deductions: number;
-  month?: string;
-  status?: string;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -58,25 +42,6 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   // For non-JSON responses (like delete returning plain text)
   return res.text() as Promise<T>;
 }
-
-const payrollApi = {
-  getAll: () => apiFetch<PayrollDTO[]>("/api/payroll"),
-
-  create: (payload: CreatePayrollPayload) =>
-    apiFetch<PayrollDTO>("/api/payroll", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-
-  update: (id: number, payload: CreatePayrollPayload) =>
-    apiFetch<PayrollDTO>(`/api/payroll/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    }),
-
-  delete: (id: number) =>
-    apiFetch<string>(`/api/payroll/${id}`, { method: "DELETE" }),
-};
 
 const userApi = {
   getAll: () => apiFetch<UserDTO[]>("/api/users"),
@@ -441,38 +406,65 @@ export default function PayrollManagementPage() {
   const [editPayroll, setEditPayroll] = useState<PayrollDTO | null>(null);
   const [showDelete, setShowDelete]   = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PayrollDTO | null>(null);
-  const [pageError, setPageError]     = useState("");
+  const [pageError, setPageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   // ─── Notification State ─────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
-  // ─── Show Notification Function ─────────────────────────────────────────────
-  const showNotification = (message: string, type: "success" | "error" | "info") => {
+  const showNotification = useCallback((message: string, type: "success" | "error" | "info") => {
     setToast({ message, type });
-  };
+  }, []);
 
-  // ─── Fetch ──────────────────────────────────────────────────────────────────
+  // ─── Fetch payroll (paginated) ─────────────────────────────────────────────
 
-  async function fetchData() {
-    setLoading(true);
-    setPageError("");
-    try {
-      const [payrollData, usersData] = await Promise.all([
-        payrollApi.getAll(),
-        userApi.getAll(),
-      ]);
-      setPayrolls(payrollData);
-      setUsers(usersData);
-      showNotification("Data loaded successfully", "success");
-    } catch (err) {
-      showNotification(err instanceof Error ? err.message : "Failed to load data", "error");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const loadPayrolls = useCallback(
+    async (pageOverride?: number) => {
+      setLoading(true);
+      setPageError("");
+      const pageIndex = pageOverride !== undefined ? pageOverride : page;
+      try {
+        const pay = await payrollApi.getPage({
+          page: pageIndex,
+          size: pageSize,
+          sort: "id,desc",
+        });
+        setPayrolls(pay.content);
+        setTotalElements(pay.totalElements);
+        setTotalPages(Math.max(1, pay.totalPages));
+        if (pageOverride !== undefined) setPage(pageOverride);
+      } catch (err) {
+        setToast({
+          message: err instanceof Error ? err.message : "Failed to load payroll",
+          type: "error",
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, pageSize]
+  );
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    void loadPayrolls();
+  }, [loadPayrolls]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setUsers(await userApi.getAll());
+      } catch (err) {
+        setToast({
+          message: err instanceof Error ? err.message : "Failed to load users",
+          type: "error",
+        });
+      }
+    })();
+  }, []);
 
   // ─── Save (create or update) ─────────────────────────────────────────────────
 
@@ -484,10 +476,13 @@ export default function PayrollManagementPage() {
         const employee = users.find(u => u.id === data.userId);
         showNotification(`✅ Payroll updated for ${employee?.name || "employee"} - Email notification sent`, "success");
       } else {
-        const created = await payrollApi.create(data);
-        setPayrolls((prev) => [...prev, created]);
-        const employee = users.find(u => u.id === data.userId);
-        showNotification(`✅ Payroll created for ${employee?.name || "employee"} - Email sent to ${employee?.email || "their email"}`, "success");
+        await payrollApi.create(data);
+        await loadPayrolls(0);
+        const employee = users.find((u) => u.id === data.userId);
+        showNotification(
+          `✅ Payroll created for ${employee?.name || "employee"} - Email sent to ${employee?.email || "their email"}`,
+          "success"
+        );
       }
     } catch (err) {
       showNotification(err instanceof Error ? err.message : "Failed to save payroll", "error");
@@ -503,7 +498,7 @@ export default function PayrollManagementPage() {
     setDeleteLoading(true);
     try {
       const message = await payrollApi.delete(deleteTarget.id);
-      setPayrolls((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      await loadPayrolls();
       showNotification(`🗑️ ${message || "Payroll deleted successfully"}`, "success");
     } catch (err) {
       showNotification(err instanceof Error ? err.message : "Failed to delete payroll", "error");
@@ -579,6 +574,7 @@ export default function PayrollManagementPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/80 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
           />
+          <p className="text-[11px] text-white/25 mt-1.5">Filters the current page of results.</p>
         </div>
 
         {/* Table */}
@@ -672,6 +668,59 @@ export default function PayrollManagementPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && totalElements > 0 && (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-1">
+            <p className="text-xs text-white/35">
+              Total <span className="text-white/55 tabular-nums">{totalElements}</span> records
+              {payrolls.length > 0 && (
+                <>
+                  {" "}
+                  · this page: <span className="text-white/55 tabular-nums">{payrolls.length}</span>
+                </>
+              )}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-white/40">
+                Rows
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(0);
+                  }}
+                  className="rounded-lg border border-white/[0.1] bg-white/[0.04] px-2 py-1.5 text-sm text-white/80"
+                >
+                  {[10, 20, 50].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={page <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:pointer-events-none"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-white/35 tabular-nums">
+                Page {page + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs font-medium text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:pointer-events-none"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Modals */}
