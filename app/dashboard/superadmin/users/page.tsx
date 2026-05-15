@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { probationStatusBadgeClass, probationStatusShortLabel } from "@/services/probationApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,10 @@ interface CreateUserPayload {
   email: string;
   password: string;
   role: Role;
+  /** Sent when creating an employee; backend must persist for probation dashboards to list the user. */
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  probationStatus?: string | null;
 }
 
 interface ChangePasswordPayload {
@@ -77,6 +82,17 @@ function fmtShort(d: string | null | undefined) {
   } catch {
     return "—";
   }
+}
+
+/** Up to two letters for avatar chips (first + last word, or first two chars). */
+function getInitials(name: string | null | undefined): string {
+  const s = (name ?? "").trim();
+  if (!s) return "?";
+  const parts = s.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return s.slice(0, 2).toUpperCase();
 }
 
 // Matches the sidebar ROLE_COLORS exactly
@@ -140,7 +156,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="bg-[#13151e] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4"
+        className="bg-[#13151e] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-lg p-6 mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -168,28 +184,91 @@ interface UserFormModalProps {
   editUser?: UserDTO | null;
 }
 
+type UserFormState = {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  probationStartDate: string;
+  probationEndDate: string;
+  probationStatus: string;
+};
+
+function emptyUserForm(): UserFormState {
+  return {
+    name: "",
+    email: "",
+    password: "",
+    role: "EMPLOYEE",
+    probationStartDate: "",
+    probationEndDate: "",
+    probationStatus: "",
+  };
+}
+
 function UserFormModal({ open, onClose, onSave, editUser }: UserFormModalProps) {
   const isEdit = Boolean(editUser);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "EMPLOYEE" as Role });
+  const [form, setForm] = useState<UserFormState>(emptyUserForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (editUser) setForm({ name: editUser.name, email: editUser.email, password: "", role: editUser.role });
-    else setForm({ name: "", email: "", password: "", role: "EMPLOYEE" });
+    if (editUser) {
+      setForm({
+        name: editUser.name,
+        email: editUser.email,
+        password: "",
+        role: editUser.role,
+        probationStartDate: (editUser.probationStartDate ?? "").slice(0, 10),
+        probationEndDate: (editUser.probationEndDate ?? "").slice(0, 10),
+        probationStatus: editUser.probationStatus ?? "",
+      });
+    } else {
+      setForm(emptyUserForm());
+    }
     setError("");
   }, [editUser, open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(""); setLoading(true);
+    setError("");
+    setLoading(true);
     try {
-      if (isEdit) await onSave({ name: form.name, email: form.email, role: form.role });
-      else await onSave(form as CreateUserPayload);
+      if (isEdit) {
+        const payload: Partial<UserDTO> = {
+          name: form.name,
+          email: form.email,
+          role: form.role,
+        };
+        if (form.role === "EMPLOYEE") {
+          payload.probationStartDate = form.probationStartDate.trim() || null;
+          payload.probationEndDate = form.probationEndDate.trim() || null;
+          payload.probationStatus = form.probationStatus.trim() || null;
+        }
+        await onSave(payload);
+      } else {
+        const payload: CreateUserPayload = {
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+        };
+        if (form.role === "EMPLOYEE") {
+          const ps = form.probationStartDate.trim();
+          const pe = form.probationEndDate.trim();
+          const st = form.probationStatus.trim();
+          if (ps) payload.probationStartDate = ps;
+          if (pe) payload.probationEndDate = pe;
+          if (st) payload.probationStatus = st;
+        }
+        await onSave(payload);
+      }
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -228,6 +307,50 @@ function UserFormModal({ open, onClose, onSave, editUser }: UserFormModalProps) 
             <option value="EMPLOYEE">Employee</option>
           </select>
         </FormField>
+
+        {form.role === "EMPLOYEE" && (
+          <div className="mb-4 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-4">
+            <p className="text-xs font-medium text-white/50 uppercase tracking-wide">Probation (optional)</p>
+            <p className="text-[11px] text-white/30 leading-relaxed -mt-2">
+              For them to appear on the Probation dashboard, set status to <span className="text-white/45">On probation</span>{" "}
+              (your API must save these fields). Creating an account alone does not add them to that list.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Probation status</label>
+              <select
+                className={selectClass}
+                value={form.probationStatus}
+                onChange={(e) => setForm({ ...form, probationStatus: e.target.value })}
+              >
+                <option value="">Not set</option>
+                <option value="ON_PROBATION">On probation</option>
+                <option value="COMPLETED">Completed (awaiting HR)</option>
+                <option value="CONFIRMED">Confirmed permanent</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">Start date</label>
+                <input
+                  className={inputClass}
+                  type="date"
+                  value={form.probationStartDate}
+                  onChange={(e) => setForm({ ...form, probationStartDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">End date</label>
+                <input
+                  className={inputClass}
+                  type="date"
+                  value={form.probationEndDate}
+                  onChange={(e) => setForm({ ...form, probationEndDate: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && <p className="text-xs text-rose-400 mb-4 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">{error}</p>}
         <div className="flex justify-end gap-2 mt-2">
           <button type="button" onClick={onClose}
@@ -518,8 +641,16 @@ export default function UserManagementPage() {
                       </span>
                     </td>
 
-                    <td className="px-5 py-3.5 text-white/45 text-xs">
-                      {user.probationStatus ?? "—"}
+                    <td className="px-5 py-3.5 text-xs">
+                      {user.probationStatus ? (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${probationStatusBadgeClass(user.probationStatus)}`}
+                        >
+                          {probationStatusShortLabel(user.probationStatus)}
+                        </span>
+                      ) : (
+                        <span className="text-white/30">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-white/45 text-xs">
                       {fmtShort(user.probationEndDate)}

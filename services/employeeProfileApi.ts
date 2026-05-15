@@ -16,6 +16,10 @@ export interface EmployeeProfileDto {
   departmentId?: number;
   positionId?: number;
   employmentStatus?: "ACTIVE" | "INACTIVE" | "TERMINATED";
+  /** Present when the backend embeds probation on the employee-profile resource. */
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  probationStatus?: string | null;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;

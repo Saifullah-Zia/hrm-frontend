@@ -7,6 +7,13 @@ import {
   employeeProfileApi,
   EmployeeProfileDto,
 } from "@/services/employeeProfileApi";
+import {
+  formatProbationRange,
+  probationApi,
+  probationStatusBadgeClass,
+  probationStatusShortLabel,
+  type ProbationStatus,
+} from "@/services/probationApi";
 
 const inputClass =
   "w-full px-3 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/40 transition-colors";
@@ -21,6 +28,13 @@ export default function EmployeeProfilePage() {
     queryKey: ["employee-profile", userId],
     queryFn: () => employeeProfileApi.getByUserId(userId!),
     enabled: typeof userId === "number",
+  });
+
+  const probationUserQuery = useQuery({
+    queryKey: ["user-probation", userId],
+    queryFn: () => probationApi.getByUserId(userId!),
+    enabled: typeof userId === "number",
+    staleTime: 60_000,
   });
 
   const [draft, setDraft] = useState<EmployeeProfileDto | null>(null);
@@ -97,6 +111,18 @@ export default function EmployeeProfilePage() {
     setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
 
+  const pu = probationUserQuery.data;
+  const statusRaw = pu?.probationStatus ?? draft.probationStatus;
+  const status = (statusRaw ?? "").toUpperCase() as ProbationStatus | "";
+  const probationStart = pu?.probationStartDate ?? draft.probationStartDate ?? undefined;
+  const probationEnd = pu?.probationEndDate ?? draft.probationEndDate ?? undefined;
+  const showProbation =
+    status === "ON_PROBATION" ||
+    status === "COMPLETED" ||
+    status === "CONFIRMED" ||
+    !!(probationStart || probationEnd);
+  const rangeLine = formatProbationRange(probationStart, probationEnd);
+
   return (
     <div className="space-y-6 max-w-3xl">
       {toast && (
@@ -111,10 +137,45 @@ export default function EmployeeProfilePage() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl font-bold text-white/90 tracking-tight">My profile</h1>
-        <p className="text-white/40 text-sm mt-1">View and update your contact details.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold text-white/90 tracking-tight">My profile</h1>
+            {showProbation && status && (
+              <span
+                className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-xs font-medium ${probationStatusBadgeClass(status)}`}
+              >
+                {probationStatusShortLabel(status)}
+              </span>
+            )}
+          </div>
+          <p className="text-white/40 text-sm mt-1">View and update your contact details.</p>
+        </div>
       </div>
+
+      {showProbation && (
+        <div className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] px-5 py-4 text-sm text-white/70">
+          <p className="text-white/85 font-medium">Probation</p>
+          {status === "ON_PROBATION" && (
+            <p className="mt-1 text-white/55">
+              You are currently in your probation period.{rangeLine ? ` ${rangeLine}.` : ""}
+            </p>
+          )}
+          {status === "COMPLETED" && (
+            <p className="mt-1 text-white/55">
+              Your probation period has ended. HR will confirm your permanent employment when ready.
+              {rangeLine ? ` ${rangeLine}.` : ""}
+            </p>
+          )}
+          {status === "CONFIRMED" && (
+            <p className="mt-1 text-white/55">
+              Your probation is complete and your employment has been confirmed as permanent.
+              {rangeLine ? ` (${rangeLine})` : ""}
+            </p>
+          )}
+          {!status && rangeLine && <p className="mt-1 text-white/55">{rangeLine}</p>}
+        </div>
+      )}
 
       <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

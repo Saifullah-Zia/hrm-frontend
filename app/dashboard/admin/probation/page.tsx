@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { probationApi, UserWithProbationDto, ProbationStatus } from "@/services/probationApi";
+import {
+  probationApi,
+  probationStatusBadgeClass,
+  UserWithProbationDto,
+} from "@/services/probationApi";
 import { useAuthStore } from "@/store/authStore";
 
 function fmtDate(s: string | null | undefined) {
@@ -13,15 +17,22 @@ function fmtDate(s: string | null | undefined) {
   }
 }
 
-function statusBadge(status: ProbationStatus | null | undefined) {
-  const u = (status ?? "").toUpperCase() as ProbationStatus | "";
-  if (u === "ON_PROBATION")
-    return "bg-amber-500/15 text-amber-300 border border-amber-500/25";
-  if (u === "COMPLETED")
-    return "bg-sky-500/15 text-sky-300 border border-sky-500/25";
-  if (u === "CONFIRMED")
-    return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25";
-  return "bg-white/10 text-white/40 border border-white/15";
+function normProbation(s: string | null | undefined): string {
+  return (s ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+}
+
+/** Prefer dedicated probation API rows; fill gaps from `GET /api/users` when statuses match. */
+function mergeProbationLists(
+  fromEndpoint: UserWithProbationDto[],
+  fromAllUsers: UserWithProbationDto[],
+  status: "ON_PROBATION" | "COMPLETED"
+): UserWithProbationDto[] {
+  const map = new Map<number, UserWithProbationDto>();
+  for (const u of fromEndpoint) map.set(u.id, u);
+  for (const u of fromAllUsers) {
+    if (normProbation(u.probationStatus) === status && !map.has(u.id)) map.set(u.id, u);
+  }
+  return [...map.values()];
 }
 
 export default function AdminProbationPage() {
@@ -39,12 +50,13 @@ export default function AdminProbationPage() {
     setLoading(true);
     setError(null);
     try {
-      const [a, b] = await Promise.all([
+      const [a, b, allUsers] = await Promise.all([
         probationApi.getOnProbation(),
         probationApi.getPendingConfirmation(),
+        probationApi.getAllUsers(),
       ]);
-      setOnProbation(a);
-      setPending(b);
+      setOnProbation(mergeProbationLists(a, allUsers, "ON_PROBATION"));
+      setPending(mergeProbationLists(b, allUsers, "COMPLETED"));
     } catch (e: unknown) {
       const msg =
         e && typeof e === "object" && "response" in e
@@ -95,12 +107,6 @@ export default function AdminProbationPage() {
           <p className="text-white/40 text-sm mt-1">
             Track employees on probation and confirm permanent status when probation has completed.
           </p>
-          <p className="text-white/25 text-xs mt-2 max-w-2xl">
-            Backend routes:{" "}
-            <code className="text-indigo-300/80">GET /api/users/probation/on-probation</code>,{" "}
-            <code className="text-indigo-300/80">GET /api/users/probation/pending-confirmation</code>,{" "}
-            <code className="text-indigo-300/80">PUT /api/users/{"{id}"}/probation/confirm</code>
-          </p>
         </div>
 
         {toast && (
@@ -134,7 +140,13 @@ export default function AdminProbationPage() {
             </div>
           </div>
           {pending.length === 0 ? (
-            <p className="px-5 py-10 text-center text-white/35 text-sm">No employees awaiting confirmation.</p>
+            <div className="px-5 py-10 text-center text-sm text-white/35 space-y-2 max-w-lg mx-auto">
+              <p>No employees awaiting confirmation.</p>
+              <p className="text-xs text-white/25 leading-relaxed">
+                This list only includes people whose probation has finished and needs an HR confirmation step on the
+                server.
+              </p>
+            </div>
           ) : (
             <ul className="divide-y divide-white/[0.04]">
               {pending.map((row) => (
@@ -144,7 +156,7 @@ export default function AdminProbationPage() {
                     <p className="text-xs text-white/40">{row.email}</p>
                     <p className="text-xs text-white/30 mt-1">
                       Ended {fmtDate(row.probationEndDate ?? undefined)} ·{" "}
-                      <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${statusBadge(row.probationStatus)}`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${probationStatusBadgeClass(row.probationStatus)}`}>
                         {row.probationStatus ?? "—"}
                       </span>
                     </p>
@@ -170,7 +182,15 @@ export default function AdminProbationPage() {
             <p className="text-xs text-white/35 mt-0.5">Active probation periods ({onProbation.length})</p>
           </div>
           {onProbation.length === 0 ? (
-            <p className="px-5 py-10 text-center text-white/35 text-sm">No employees currently on probation.</p>
+            <div className="px-5 py-10 text-center text-sm text-white/35 space-y-2 max-w-lg mx-auto">
+              <p>No employees currently on probation.</p>
+              <p className="text-xs text-white/25 leading-relaxed">
+                Creating a login alone does not add someone here. They must be marked{" "}
+                <span className="text-white/40">ON_PROBATION</span> in your API (for example when saving the user, or
+                via a scheduled job). In User Management you can set probation status and dates for employees if your
+                backend accepts those fields.
+              </p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[520px]">
@@ -192,7 +212,7 @@ export default function AdminProbationPage() {
                       <td className="px-5 py-3 text-white/55">{fmtDate(row.probationStartDate ?? undefined)}</td>
                       <td className="px-5 py-3 text-white/55">{fmtDate(row.probationEndDate ?? undefined)}</td>
                       <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${statusBadge(row.probationStatus)}`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ${probationStatusBadgeClass(row.probationStatus)}`}>
                           {row.probationStatus ?? "—"}
                         </span>
                       </td>
