@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notificationApi } from "@/services/notificationApi";
+import { announcementApi } from "@/services/announcementApi";
 import { leaveApi } from "@/services/leaveApi";
 import { probationApi } from "@/services/probationApi";
-import { NotificationDTO } from "@/app/types/notification"; // ✅ fixed import path
+import { NotificationDTO } from "@/app/types/notification";
 import { useAuthStore } from "@/store/authStore";
+import {
+  isAnnouncementNotificationType,
+  isSyntheticAnnouncementNotification,
+  markAnnouncementsSeen,
+  mergeWithAnnouncementAlerts,
+} from "@/lib/announcementAlerts";
 
 const PAYSLIPS_HREF = "/dashboard/employee/payslips";
 
@@ -47,10 +54,17 @@ export default function NotificationsPage() {
     }
   }, [toast]);
 
+  const isEmployee = user?.role?.toUpperCase() === "EMPLOYEE";
+
   const fetchNotifications = async () => {
     try {
-      const data = await notificationApi.getNotifications();
-      setNotifications(data);
+      const [data, activeAnnouncements] = await Promise.all([
+        notificationApi.getNotifications(),
+        isEmployee ? announcementApi.getActive().catch(() => []) : Promise.resolve([]),
+      ]);
+      setNotifications(
+        isEmployee ? mergeWithAnnouncementAlerts(data, activeAnnouncements) : data
+      );
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
     } finally {
@@ -60,7 +74,12 @@ export default function NotificationsPage() {
 
   const handleMarkAsRead = async (id: number) => {
     try {
-      await notificationApi.markAsRead(id);
+      const notif = notifications.find((n) => n.id === id);
+      if (isSyntheticAnnouncementNotification(id) && notif) {
+        markAnnouncementsSeen([notif.referenceId]);
+      } else {
+        await notificationApi.markAsRead(id);
+      }
       setNotifications(prev =>
         prev.map(n => (n.id === id ? { ...n, status: "READ" } : n))
       );
@@ -71,6 +90,11 @@ export default function NotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
+      const syntheticIds = notifications
+        .filter((n) => n.status === "UNREAD" && isSyntheticAnnouncementNotification(n.id))
+        .map((n) => n.referenceId);
+      if (syntheticIds.length > 0) markAnnouncementsSeen(syntheticIds);
+
       await notificationApi.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, status: "READ" })));
     } catch (error) {
@@ -177,6 +201,7 @@ export default function NotificationsPage() {
 
   const getTypeIcon = (type: string) => {
     if (isPayrollNotification(type)) return "💰";
+    if (isAnnouncementNotificationType(type)) return "📣";
     if (isProbationType(type)) return "🎓";
     switch (type) {
       case "LEAVE_REQUEST":  return "📋";
@@ -197,7 +222,6 @@ export default function NotificationsPage() {
     }
   };
 
-  const isEmployee = user?.role?.toUpperCase() === "EMPLOYEE";
   const isHr = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
   const handleViewPayslips = async (e: React.MouseEvent, notif: NotificationDTO) => {

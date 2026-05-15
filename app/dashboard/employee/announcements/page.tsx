@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { announcementApi, AnnouncementDTO } from "@/services/announcementApi";
+import { markAnnouncementsSeen } from "@/lib/announcementAlerts";
 
 export default function EmployeeAnnouncementsPage() {
   const query = useQuery({
@@ -10,6 +12,12 @@ export default function EmployeeAnnouncementsPage() {
   });
 
   const items = query.data ?? [];
+
+  useEffect(() => {
+    if (items.length > 0) {
+      markAnnouncementsSeen(items.map((a) => a.id));
+    }
+  }, [items]);
 
   return (
     <div className="space-y-6 max-w-3xl">

@@ -2,6 +2,11 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import {
+  parseUserId,
+  readPersistedAuthUserId,
+  userIdFromJwtPayload,
+} from "@/lib/parseUserId";
 
 type UserRole = "SUPERADMIN" | "ADMIN" | "EMPLOYEE";
 
@@ -17,7 +22,10 @@ interface AuthState {
   token: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
-  setToken: (token: string) => void;
+  setToken: (
+    token: string,
+    loginMeta?: { userId?: number; email?: string; name?: string; role?: string }
+  ) => void;
   logout: () => void;
   getRedirectPath: () => string;
 }
@@ -60,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
 
-      setToken: (token: string) => {
+      setToken: (token: string, loginMeta?) => {
         const payload = decodeJwt(token);
         if (!payload) {
           console.error("[authStore] setToken: invalid or undecodable token.");
@@ -68,7 +76,7 @@ export const useAuthStore = create<AuthState>()(
         }
 
         // ✅ Normalize role to uppercase to ensure consistency
-        let role = (payload.role as string)?.toUpperCase();
+        let role = ((loginMeta?.role ?? payload.role) as string)?.toUpperCase();
         
         // ✅ Map role to valid UserRole type
         let userRole: UserRole = "EMPLOYEE";
@@ -80,13 +88,21 @@ export const useAuthStore = create<AuthState>()(
           userRole = "EMPLOYEE";
         }
 
-        console.log("[authStore] JWT payload role:", payload.role, "Normalized role:", userRole);
+        // Login body often has userId even when JWT does not — keep it (persistSession wrote it first)
+        const userId =
+          userIdFromJwtPayload(payload as Record<string, unknown>) ??
+          parseUserId(loginMeta?.userId) ??
+          readPersistedAuthUserId();
 
         const user: AuthUser = {
-          username: payload.name ?? payload.sub ?? payload.username,
+          username:
+            loginMeta?.name ??
+            payload.name ??
+            payload.sub ??
+            payload.username,
           role: userRole,
-          userId: payload.userId ?? payload.id ?? payload.user_id,
-          email: payload.email ?? payload.sub,
+          userId,
+          email: loginMeta?.email ?? payload.email ?? payload.sub,
           token,
         };
 

@@ -70,4 +70,17 @@ export const announcementApi = {
 
   delete: (id: number): Promise<void> =>
     apiFetch<void>(`/api/announcements/${id}`, { method: "DELETE" }),
+
+  /**
+   * Ask the backend to create in-app notifications for all employees (Spring:
+   * e.g. `POST /api/announcements/{id}/notify`). Safe to call if the endpoint
+   * is missing — create may already fan out notifications on the server.
+   */
+  notifyEmployees: async (id: number): Promise<void> => {
+    try {
+      await apiFetch<void>(`/api/announcements/${id}/notify`, { method: "POST" });
+    } catch {
+      // Optional endpoint; employee bell still uses announcement alerts as fallback.
+    }
+  },
 };

@@ -4,7 +4,15 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { notificationApi } from "@/services/notificationApi";
-import { NotificationDTO } from "@/app/types/notification"; // ✅ FIX 1: Correct import path
+import { announcementApi } from "@/services/announcementApi";
+import { NotificationDTO } from "@/app/types/notification";
+import {
+  countUnreadIncludingAnnouncements,
+  isAnnouncementNotificationType,
+  isSyntheticAnnouncementNotification,
+  markAnnouncementsSeen,
+  mergeWithAnnouncementAlerts,
+} from "@/lib/announcementAlerts";
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -31,12 +39,16 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const [notifs, count] = await Promise.all([
+      const [notifs, count, activeAnnouncements] = await Promise.all([
         notificationApi.getNotifications(),
         notificationApi.getUnreadCount(),
+        isEmployee() ? announcementApi.getActive().catch(() => []) : Promise.resolve([]),
       ]);
-      setNotifications(notifs.slice(0, 5));
-      setUnreadCount(count.count);
+      const merged = mergeWithAnnouncementAlerts(notifs, activeAnnouncements);
+      setNotifications(merged.slice(0, 8));
+      setUnreadCount(
+        countUnreadIncludingAnnouncements(count.count, notifs, activeAnnouncements)
+      );
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
     } finally {
@@ -46,8 +58,14 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
 
   const fetchUnreadCount = async () => {
     try {
-      const count = await notificationApi.getUnreadCount();
-      setUnreadCount(count.count);
+      const [count, notifs, activeAnnouncements] = await Promise.all([
+        notificationApi.getUnreadCount(),
+        notificationApi.getNotifications().catch(() => [] as NotificationDTO[]),
+        isEmployee() ? announcementApi.getActive().catch(() => []) : Promise.resolve([]),
+      ]);
+      setUnreadCount(
+        countUnreadIncludingAnnouncements(count.count, notifs, activeAnnouncements)
+      );
     } catch (error) {
       console.error("Failed to fetch unread count:", error);
     }
@@ -94,7 +112,11 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     if (!notif || notif.status !== "UNREAD") return;
 
     try {
-      await notificationApi.markAsRead(notificationId);
+      if (isSyntheticAnnouncementNotification(notificationId)) {
+        markAnnouncementsSeen([notif.referenceId]);
+      } else {
+        await notificationApi.markAsRead(notificationId);
+      }
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, status: "READ" } : n))
       );
@@ -112,11 +134,21 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     if (isEmployee() && isPayrollNotification(notif.type)) {
       setNotifOpen(false);
       router.push("/dashboard/employee/payslips");
+      return;
+    }
+    if (isEmployee() && isAnnouncementNotificationType(notif.type)) {
+      setNotifOpen(false);
+      router.push("/dashboard/employee/announcements");
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
+      const syntheticIds = notifications
+        .filter((n) => n.status === "UNREAD" && isSyntheticAnnouncementNotification(n.id))
+        .map((n) => n.referenceId);
+      if (syntheticIds.length > 0) markAnnouncementsSeen(syntheticIds);
+
       await notificationApi.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, status: "READ" })));
       setUnreadCount(0);
@@ -133,6 +165,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   const getNotificationIcon = (type: string) => {
     const t = (type ?? "").toUpperCase();
     if (t.includes("PAYROLL")) return "💰";
+    if (t.includes("ANNOUNCEMENT")) return "📣";
     switch (type) {
       case "LEAVE_REQUEST":  return "📋";
       case "LEAVE_APPROVED": return "✅";

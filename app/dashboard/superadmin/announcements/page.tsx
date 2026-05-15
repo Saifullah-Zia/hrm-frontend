@@ -78,10 +78,12 @@ export default function AnnouncementsPage() {
         setAnnouncements(prev =>
           prev.map(a => (a.id === editingId ? updated : a))
         );
+        if (form.active) await announcementApi.notifyEmployees(updated.id);
         setToast({ message: "✅ Announcement updated!", type: "success" });
       } else {
         const created = await announcementApi.create(form);
         setAnnouncements(prev => [created, ...prev]);
+        if (form.active) await announcementApi.notifyEmployees(created.id);
         setToast({ message: "✅ Announcement created!", type: "success" });
       }
       resetForm();

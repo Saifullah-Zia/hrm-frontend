@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import apiClient from "@/lib/apiClient";
 import {
   employeeProfileApi,
   EmployeeProfileDto,
@@ -25,6 +26,13 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
+
+type SystemUser = {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+};
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({
@@ -153,11 +161,15 @@ type ModalMode = "create" | "edit" | "view";
 const Modal = ({
   mode,
   profile,
+  employeeUsers,
+  linkedUserIds,
   onClose,
   onSave,
 }: {
   mode: ModalMode;
   profile: EmployeeProfileDto | null;
+  employeeUsers: SystemUser[];
+  linkedUserIds: Set<number>;
   onClose: () => void;
   onSave: (dto: EmployeeProfileDto) => Promise<void>;
 }) => {
@@ -207,24 +219,45 @@ const Modal = ({
 
         {/* Body */}
         <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* User ID */}
-          <div className="flex flex-col gap-1">
+          {/* Employee account */}
+          <div className="flex flex-col gap-1 sm:col-span-2">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
               <span className="text-[#FC0175]">
                 <User size={13} />
               </span>
-              User ID
+              Employee account
             </label>
-            <input
-              type="number"
-              value={form.userId || ""}
-              onChange={(e) => handle("userId", Number(e.target.value))}
-              disabled={isReadOnly || mode === "edit"}
-              placeholder="e.g. 4"
-              className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] placeholder-[#3D4065]
-                focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all
-                disabled:opacity-60 disabled:cursor-default"
-            />
+            {mode === "create" && !isReadOnly ? (
+              <select
+                value={form.userId || ""}
+                onChange={(e) => handle("userId", Number(e.target.value))}
+                required
+                className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0]
+                  focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all"
+              >
+                <option value="">Select employee login…</option>
+                {employeeUsers.map((u) => {
+                  const taken = linkedUserIds.has(u.id);
+                  return (
+                    <option key={u.id} value={u.id} disabled={taken}>
+                      {u.name} — {u.email} (User #{u.id})
+                      {taken ? " — profile exists" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <input
+                type="number"
+                value={form.userId || ""}
+                disabled
+                className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] opacity-60 cursor-default"
+              />
+            )}
+            <p className="text-[11px] text-[#6B7089] mt-0.5">
+              Must match <code className="text-[#9B9FB8]">users.id</code> — the id used in{" "}
+              <code className="text-[#9B9FB8]">GET /api/employee-profiles/user/{"{userId}"}</code>.
+            </p>
           </div>
 
           <Field
@@ -302,7 +335,7 @@ const Modal = ({
             isReadOnly={isReadOnly}
           />
 
-          {/* FIX 2: Profile Picture – file picker instead of URL input */}
+          {/* Profile Picture */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
               <span className="text-[#FC0175]">
@@ -311,7 +344,6 @@ const Modal = ({
               Profile Picture
             </label>
 
-            {/* Preview */}
             {form.profilePicture && (
               <img
                 src={form.profilePicture}
@@ -347,7 +379,7 @@ const Modal = ({
             )}
           </div>
 
-          {/* Address – full width */}
+          {/* Address */}
           <div className="sm:col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
               <span className="text-[#FC0175]">
@@ -482,6 +514,21 @@ export default function EmployeeProfilesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [employeeUsers, setEmployeeUsers] = useState<SystemUser[]>([]);
+
+  const linkedUserIds = new Set(profiles.map((p) => p.userId));
+
+  useEffect(() => {
+    apiClient
+      .get<SystemUser[]>("/api/users")
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setEmployeeUsers(
+          list.filter((u) => (u.role ?? "").toUpperCase() === "EMPLOYEE")
+        );
+      })
+      .catch(() => setEmployeeUsers([]));
+  }, []);
 
   // ── Fetch ──
   const fetchAll = async () => {
@@ -522,12 +569,19 @@ export default function EmployeeProfilesPage() {
   // ── CRUD handlers ──
   const handleSave = async (dto: EmployeeProfileDto) => {
     if (modal.mode === "create") {
+      if (!dto.userId || dto.userId <= 0) {
+        throw new Error("Select an employee account from the dropdown.");
+      }
+      if (profiles.some((p) => p.userId === dto.userId)) {
+        throw new Error("This employee already has a profile. Edit the existing one instead.");
+      }
       await employeeProfileApi.create(dto);
     } else if (modal.mode === "edit" && modal.profile?.id) {
       await employeeProfileApi.update(modal.profile.id, dto);
     }
+    // ✅ FIX: await fetchAll() first so the list is populated before the modal closes
+    await fetchAll();
     setModal({ open: false, mode: "create", profile: null });
-    fetchAll();
   };
 
   const handleDelete = async () => {
@@ -536,7 +590,7 @@ export default function EmployeeProfilesPage() {
     try {
       await employeeProfileApi.delete(deleteTarget);
       setDeleteTarget(null);
-      fetchAll();
+      await fetchAll();
     } finally {
       setDeleting(false);
     }
@@ -547,8 +601,7 @@ export default function EmployeeProfilesPage() {
     total: profiles.length,
     active: profiles.filter((p) => p.employmentStatus === "ACTIVE").length,
     inactive: profiles.filter((p) => p.employmentStatus === "INACTIVE").length,
-    terminated: profiles.filter((p) => p.employmentStatus === "TERMINATED")
-      .length,
+    terminated: profiles.filter((p) => p.employmentStatus === "TERMINATED").length,
   };
 
   return (
@@ -734,10 +787,9 @@ export default function EmployeeProfilesPage() {
                 {/* Actions */}
                 <div className="flex items-center justify-end gap-2">
                   <button
-                    onClick={() => {
-  console.log("profile to edit:", p); // ← add this
-  setModal({ open: true, mode: "edit", profile: p });
- }}
+                    onClick={() =>
+                      setModal({ open: true, mode: "view", profile: p })
+                    }
                     className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
                     title="View"
                   >
@@ -794,6 +846,8 @@ export default function EmployeeProfilesPage() {
         <Modal
           mode={modal.mode}
           profile={modal.profile}
+          employeeUsers={employeeUsers}
+          linkedUserIds={linkedUserIds}
           onClose={() => setModal({ open: false, mode: "create", profile: null })}
           onSave={handleSave}
         />

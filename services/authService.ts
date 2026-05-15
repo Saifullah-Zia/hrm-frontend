@@ -1,4 +1,5 @@
 import axios from "axios";
+import { parseUserId } from "@/lib/parseUserId";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -35,7 +36,7 @@ function persistSession(
       user: {
         username: extras.name || extras.emailFallback || "",
         role: extras.role || "EMPLOYEE",
-        userId: extras.userId,
+        userId: parseUserId(extras.userId),
         email: extras.email || extras.emailFallback,
         token: accessToken,
       },
@@ -46,23 +47,38 @@ function persistSession(
   localStorage.setItem("hrm-auth", JSON.stringify(authStoreData));
 }
 
+export type LoginSession = {
+  token: string;
+  userId?: number;
+  role?: string;
+  name?: string;
+  email?: string;
+};
+
 export async function loginUser(credentials: {
   email: string;
   password: string;
-}): Promise<string> {
+}): Promise<LoginSession> {
   const response = await api.post<LoginResponse>("/api/auth/login", credentials);
   const token = response.data.accessToken;
+  const userId = parseUserId(response.data.userId);
 
   persistSession(token, {
     refreshToken: response.data.refreshToken,
     role: response.data.role,
     name: response.data.name,
-    userId: response.data.userId,
+    userId,
     email: response.data.email,
     emailFallback: credentials.email,
   });
 
-  return token;
+  return {
+    token,
+    userId,
+    role: response.data.role,
+    name: response.data.name,
+    email: response.data.email ?? credentials.email,
+  };
 }
 
 /** Backend returns a plain text message (no JWT until email is verified). */

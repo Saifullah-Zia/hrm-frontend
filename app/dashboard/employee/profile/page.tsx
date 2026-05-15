@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
+import { parseUserId } from "@/lib/parseUserId";
 import {
   employeeProfileApi,
   EmployeeProfileDto,
+  EmployeeProfileLoadError,
 } from "@/services/employeeProfileApi";
 import {
   formatProbationRange,
@@ -20,13 +22,14 @@ const inputClass =
 
 export default function EmployeeProfilePage() {
   const { user } = useAuthStore();
-  const userId = user?.userId;
+  const userId = parseUserId(user?.userId);
   const qc = useQueryClient();
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const profileQuery = useQuery({
-    queryKey: ["employee-profile", userId],
-    queryFn: () => employeeProfileApi.getByUserId(userId!),
+    queryKey: ["employee-profile", userId, user?.email],
+    queryFn: () =>
+      employeeProfileApi.getForEmployeeAccount(userId!, { email: user?.email }),
     enabled: typeof userId === "number",
   });
 
@@ -41,7 +44,8 @@ export default function EmployeeProfilePage() {
 
   useEffect(() => {
     if (profileQuery.data) setDraft({ ...profileQuery.data });
-  }, [profileQuery.data]);
+    else if (!profileQuery.isLoading && profileQuery.isFetched) setDraft(null);
+  }, [profileQuery.data, profileQuery.isLoading, profileQuery.isFetched]);
 
   useEffect(() => {
     if (!toast) return;
@@ -95,13 +99,42 @@ export default function EmployeeProfilePage() {
     );
   }
 
-  if (profileQuery.isError || !draft) {
+  if (profileQuery.isError || (!profileQuery.isLoading && !draft)) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-bold text-white/90 tracking-tight">My profile</h1>
-        <div className="rounded-2xl border border-white/[0.08] bg-[#13151e] px-5 py-6 text-sm text-white/50">
-          No employee profile was found for your user. HR may still be setting up your record, or the backend path may
-          differ from <code className="text-indigo-300">GET /api/employee-profiles/user/{"{userId}"}</code>.
+        <div
+          className={`rounded-2xl border px-5 py-6 text-sm space-y-3 ${
+            profileQuery.error instanceof EmployeeProfileLoadError &&
+            profileQuery.error.code === "FORBIDDEN"
+              ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
+              : "border-white/[0.08] bg-[#13151e] text-white/50"
+          }`}
+        >
+          <p>
+            {profileQuery.error instanceof EmployeeProfileLoadError
+              ? profileQuery.error.message
+              : "No employee profile is linked to your login."}
+          </p>
+          {typeof userId === "number" && (
+            <p className="text-xs opacity-80">
+              Login user id: <span className="font-mono text-white/70">{userId}</span>
+              {user?.email ? <> · <span className="font-mono">{user.email}</span></> : null}
+            </p>
+          )}
+          <p className="text-xs leading-relaxed opacity-80">
+            {profileQuery.error instanceof EmployeeProfileLoadError &&
+            profileQuery.error.code === "FORBIDDEN"
+              ? "Backend must allow employees to read their profile (add GET /api/employee-profiles/me)."
+              : "Admin → Employee Profiles → select your employee account, then sign out and sign in again."}
+          </p>
+          <button
+            type="button"
+            onClick={() => profileQuery.refetch()}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

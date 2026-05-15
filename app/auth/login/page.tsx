@@ -29,14 +29,20 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const token = await loginUser({
+      const session = await loginUser({
         email: form.email,
         password: form.password,
       });
 
-      setToken(token);
+      setToken(session.token, {
+        userId: session.userId,
+        email: session.email,
+        name: session.name,
+        role: session.role,
+      });
 
-      document.cookie = `hrm-token=${token}; path=/; max-age=${7 * 24 * 60 * 60}`;
+      // ✅ FIXED: was `token` (undefined), now correctly uses `session.token`
+      document.cookie = `hrm-token=${session.token}; path=/; max-age=${7 * 24 * 60 * 60}`;
 
       router.push(getRedirectPath());
     } catch (err: unknown) {
