@@ -157,19 +157,19 @@ export const resignationApi = {
 
   /** GET /api/resignations — HR: all resignations */
   getAll: (): Promise<ResignationResponse[]> =>
-    apiFetch<ResignationResponse[]>("/api/resignations"),
+    apiFetch<ResignationResponse[]>(`/api/resignations?_t=${Date.now()}`),
 
   /** GET /api/resignations/status/{status} — filtered by status */
   getByStatus: (status: ResignationStatus): Promise<ResignationResponse[]> =>
-    apiFetch<ResignationResponse[]>(`/api/resignations/status/${status}`),
+    apiFetch<ResignationResponse[]>(`/api/resignations/status/${status}?_t=${Date.now()}`),
 
   /** GET /api/resignations/employee/{employeeId} */
   getByEmployee: (employeeId: number): Promise<ResignationResponse[]> =>
-    apiFetch<ResignationResponse[]>(`/api/resignations/employee/${employeeId}`),
+    apiFetch<ResignationResponse[]>(`/api/resignations/employee/${employeeId}?_t=${Date.now()}`),
 
   /** GET /api/resignations/{id} */
   getById: (id: number): Promise<ResignationResponse> =>
-    apiFetch<ResignationResponse>(`/api/resignations/${id}`),
+    apiFetch<ResignationResponse>(`/api/resignations/${id}?_t=${Date.now()}`),
 
   /** PUT /api/resignations/{id}/process?approvedBy={userId} — HR approves/rejects */
   process: (

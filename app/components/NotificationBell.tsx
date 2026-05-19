@@ -28,12 +28,7 @@ export default function NotificationBell() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const previousUnreadCount = useRef(0);
 
-  // Check if user is Admin or SuperAdmin
-  const isAdminOrSuperAdmin = () => {
-    const role = user?.role?.toUpperCase();
-    console.log("🔔 NotificationBell - User role:", user?.role, "Role uppercase:", role);
-    return role === "ADMIN" || role === "SUPERADMIN" || role === "SUPER_ADMIN";
-  };
+  // Removed isAdminOrSuperAdmin since employees also receive notifications
 
   // Show toast notification
   const showToast = (message: string, type: "success" | "error" | "info") => {
@@ -42,7 +37,7 @@ export default function NotificationBell() {
 
   // Fetch notifications
   const fetchNotifications = async () => {
-    if (!isAdminOrSuperAdmin()) return;
+    if (!user) return;
     
     setLoading(true);
     setError(null);
@@ -77,7 +72,7 @@ export default function NotificationBell() {
 
   // Fetch only unread count
   const fetchUnreadCount = async () => {
-    if (!isAdminOrSuperAdmin()) return;
+    if (!user) return;
     
     try {
       const count = await notificationApi.getUnreadCount();
@@ -101,12 +96,12 @@ export default function NotificationBell() {
 
   // Initial fetch and polling
   useEffect(() => {
-    if (isAdminOrSuperAdmin()) {
+    if (user) {
       fetchNotifications();
       const interval = setInterval(fetchUnreadCount, 30000);
       return () => clearInterval(interval);
     }
-  }, [user?.role]);
+  }, [user]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -165,6 +160,8 @@ export default function NotificationBell() {
         return "❌";
       case "PAYROLL":
         return "💰";
+      case "RESIGNATION":
+        return "📄";
       default:
         return "🔔";
     }
@@ -180,13 +177,15 @@ export default function NotificationBell() {
         return "bg-rose-500/15 text-rose-400 border-rose-500/20";
       case "PAYROLL":
         return "bg-indigo-500/15 text-indigo-400 border-indigo-500/20";
+      case "RESIGNATION":
+        return "bg-amber-500/15 text-amber-400 border-amber-500/20";
       default:
         return "bg-gray-500/15 text-gray-400 border-gray-500/20";
     }
   };
 
-  // Don't show notification bell for non-admin users
-  if (!isAdminOrSuperAdmin()) {
+  // Don't show notification bell if not logged in
+  if (!user) {
     return null;
   }
 
