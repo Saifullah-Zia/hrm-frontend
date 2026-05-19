@@ -26,6 +26,8 @@ function axiosStatus(err: unknown): number | undefined {
 export interface EmployeeProfileDto {
   id?: number;
   userId: number;
+  firstName?: string;
+  lastName?: string;
   phone?: string;
   address?: string;
   dateOfBirth?: string;
@@ -88,7 +90,7 @@ function findProfileForUser(
 
 export const employeeProfileApi = {
   getAll: async (): Promise<EmployeeProfileDto[]> => {
-    const res = await apiClient.get<unknown>("/api/employee-profiles");
+    const res = await apiClient.get<unknown>(`/api/employee-profiles?_t=${Date.now()}`);
     return normalizeProfilesList(res.data);
   },
 
@@ -131,7 +133,8 @@ export const employeeProfileApi = {
     } catch (err: unknown) {
       const status = axiosStatus(err);
       if (status === 403) forbidden = true;
-      else if (status && status !== 404) {
+      // 400 and 404 both mean "no profile for this user" — fall through to try /me and full list
+      else if (status && status !== 404 && status !== 400) {
         throw new EmployeeProfileLoadError(
           "NETWORK",
           "Could not load your profile. Check your connection or try again.",

@@ -143,6 +143,8 @@ const Field = ({
 // ─── Profile Modal (Create / Edit) ────────────────────────────────────────────
 const EMPTY: EmployeeProfileDto = {
   userId: 0,
+  firstName: "",
+  lastName: "",
   phone: "",
   address: "",
   dateOfBirth: "",
@@ -260,6 +262,24 @@ const Modal = ({
             </p>
           </div>
 
+          <Field
+            label="First Name"
+            icon={<User size={13} />}
+            field="firstName"
+            placeholder="First name"
+            form={form}
+            handle={handle}
+            isReadOnly={isReadOnly}
+          />
+          <Field
+            label="Last Name"
+            icon={<User size={13} />}
+            field="lastName"
+            placeholder="Last name"
+            form={form}
+            handle={handle}
+            isReadOnly={isReadOnly}
+          />
           <Field
             label="Phone"
             icon={<Phone size={13} />}
@@ -591,6 +611,19 @@ export default function EmployeeProfilesPage() {
       await employeeProfileApi.delete(deleteTarget);
       setDeleteTarget(null);
       await fetchAll();
+    } catch (err: unknown) {
+      let msg = "Failed to delete profile.";
+      if (err && typeof err === "object" && "response" in err) {
+        const res = (err as { response?: { data?: unknown } }).response;
+        const data = res?.data;
+        if (typeof data === "string") msg = data;
+        else if (data && typeof data === "object" && "message" in data)
+          msg = String((data as { message?: string }).message);
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      setError(msg);
+      setDeleteTarget(null);
     } finally {
       setDeleting(false);
     }
@@ -746,24 +779,34 @@ export default function EmployeeProfilesPage() {
               >
                 {/* Employee */}
                 <div className="flex items-center gap-3 min-w-0">
-                  <Avatar
-                    name={`User ${p.userId}`}
-                    picture={p.profilePicture}
-                    size="sm"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[#E2E4F0] truncate">
-                      User ID: {p.userId}
-                    </p>
-                    <p className="text-xs text-[#8B8FA8] truncate">
-                      {p.joiningDate
-                        ? `Joined ${new Date(p.joiningDate).toLocaleDateString(
-                            "en-PK",
-                            { month: "short", year: "numeric" }
-                          )}`
-                        : "—"}
-                    </p>
-                  </div>
+                  {(() => {
+                    const uObj = employeeUsers.find((u) => u.id === p.userId);
+                    const displayName = p.firstName || p.lastName
+                      ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
+                      : (uObj?.name || `User ID: ${p.userId}`);
+                    return (
+                      <>
+                        <Avatar
+                          name={displayName}
+                          picture={p.profilePicture}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#E2E4F0] truncate" title={displayName}>
+                            {displayName}
+                          </p>
+                          <p className="text-xs text-[#8B8FA8] truncate">
+                            {p.joiningDate
+                              ? `Joined ${new Date(p.joiningDate).toLocaleDateString(
+                                  "en-PK",
+                                  { month: "short", year: "numeric" }
+                                )}`
+                              : "—"}
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Phone */}
