@@ -28,7 +28,8 @@ const formatTime = (dt: string) => {
 
 const formatDate = (d: string) => {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", {
+  // Force local-time parsing to avoid UTC-offset shifting the date back by one day
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

@@ -3,29 +3,77 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
+import apiClient from "@/lib/apiClient";
+
+/* ─── types ─────────────────────────────────────────────────────────────────── */
+
+type SystemUser = { id: number; name: string; email: string; role: string };
+
+/* ─── constants ─────────────────────────────────────────────────────────────── */
 
 const STATUS_COLORS: Record<string, string> = {
   PRESENT: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   ABSENT:  "bg-rose-500/15 text-rose-400 border-rose-500/20",
   LATE:    "bg-amber-500/15 text-amber-400 border-amber-500/20",
 };
-
 const STATUS_DOT: Record<string, string> = {
   PRESENT: "bg-emerald-400",
   ABSENT:  "bg-rose-400",
   LATE:    "bg-amber-400",
 };
 
+/* ─── helpers ────────────────────────────────────────────────────────────────── */
+
+const formatTime = (dt: string) => {
+  if (!dt) return "—";
+  return new Date(dt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+};
+const formatDate = (d: string) => {
+  if (!d) return "—";
+  // Force local-time parsing to avoid UTC-offset shifting the date back by one day
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+};
+
+/** Monday of the ISO week containing date */
+const weekStart = (date: Date): Date => {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+/** Count Mon–Fri days between start and end (inclusive) */
+const workdaysBetween = (start: Date, end: Date): number => {
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+};
+
+interface WeekBucket { label: string; dateRange: string; attended: number; absent: number; total: number; pct: number; }
+
+/* ─── component ──────────────────────────────────────────────────────────────── */
+
 export default function AttendanceOverviewPage() {
   const { user } = useAuthStore();
-  const [records, setRecords] = useState<AttendanceDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+
+  const [records, setRecords]           = useState<AttendanceDTO[]>([]);
+  const [users, setUsers]               = useState<SystemUser[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [month, setMonth]               = useState(() => new Date().toISOString().slice(0, 7));
+  const [search, setSearch]             = useState("");
+  const [idSearch, setIdSearch]         = useState("");
+  const [nameSearch, setNameSearch]     = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [actionLoading, setActionLoading]     = useState(false);
+  const [showForm, setShowForm]         = useState(false);
+  const [toast, setToast]               = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [form, setForm] = useState({
     userId: "",
     date: new Date().toISOString().split("T")[0],
@@ -39,54 +87,133 @@ export default function AttendanceOverviewPage() {
     return role === "ADMIN" || role === "SUPERADMIN";
   };
 
-  // Auto hide toast
+  /* ── auto-hide toast ── */
   useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(t);
-    }
+    if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
+  /* ── fetch attendance + users in parallel ── */
   useEffect(() => {
-    fetchRecords();
+    setLoading(true);
+    Promise.all([
+      attendanceApi.getAll(),
+      apiClient.get<SystemUser[]>("/api/users").then(r => Array.isArray(r.data) ? r.data : []),
+    ])
+      .then(([att, usr]) => { setRecords(att); setUsers(usr); })
+      .catch(() => setToast({ message: "Failed to load data", type: "error" }))
+      .finally(() => setLoading(false));
   }, []);
 
-  const fetchRecords = async () => {
-    setLoading(true);
-    try {
-      const data = await attendanceApi.getAll();
-      setRecords(data);
-    } catch (err) {
-      setToast({ message: "Failed to load attendance records", type: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* ── userId → name map ── */
+  const userMap = useMemo(() => {
+    const m = new Map<number, SystemUser>();
+    users.forEach(u => m.set(u.id, u));
+    return m;
+  }, [users]);
 
+  /* ── overall stats (all records) ── */
+  const stats = useMemo(() => {
+    const total   = records.length;
+    const present = records.filter(r => r.status === "PRESENT").length;
+    const absent  = records.filter(r => r.status === "ABSENT").length;
+    const late    = records.filter(r => r.status === "LATE").length;
+    const rate    = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+    return { total, present, absent, late, rate };
+  }, [records]);
+
+  /* ── this-week stats ── */
+  const weekStats = useMemo(() => {
+    const today = new Date();
+    const mon = weekStart(today);
+    const fri = new Date(mon); fri.setDate(mon.getDate() + 4); fri.setHours(23, 59, 59, 999);
+    const rows = records.filter(r => {
+      const d = new Date(r.date + "T00:00:00");
+      return d >= mon && d <= fri;
+    });
+    const attended = rows.filter(r => r.status === "PRESENT" || r.status === "LATE").length;
+    const absent   = rows.filter(r => r.status === "ABSENT").length;
+    const total    = rows.length;
+    const rate     = total ? Math.round((attended / total) * 100) : 0;
+    return { attended, absent, total, rate };
+  }, [records]);
+
+  /* ── monthly week-bucket breakdown ── */
+  const monthlyRecords = useMemo(() =>
+    records.filter(r => (r.date ?? "").startsWith(month)),
+  [records, month]);
+
+  const weekBuckets = useMemo((): WeekBucket[] => {
+    if (!month) return [];
+    const [y, m] = month.split("-").map(Number);
+    const firstDay = new Date(y, m - 1, 1);
+    const lastDay  = new Date(y, m, 0);
+    const buckets: WeekBucket[] = [];
+    let weekNum = 1, cur = new Date(firstDay);
+    while (cur <= lastDay) {
+      const wMon = weekStart(cur);
+      const wFri = new Date(wMon); wFri.setDate(wMon.getDate() + 4);
+      const rangeStart = wMon < firstDay ? firstDay : wMon;
+      const rangeEnd   = wFri > lastDay  ? lastDay  : wFri;
+      const rangeLabel = `${rangeStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${rangeEnd.toLocaleDateString("en-US", { day: "numeric" })}`;
+      const rows = monthlyRecords.filter(r => {
+        const d = new Date(r.date + "T00:00:00");
+        return d >= rangeStart && d <= rangeEnd;
+      });
+      const attended = rows.filter(r => r.status === "PRESENT" || r.status === "LATE").length;
+      const absent   = rows.filter(r => r.status === "ABSENT").length;
+      const total    = rows.length;
+      const pct      = total ? Math.round((attended / total) * 100) : 0;
+      buckets.push({ label: `Week ${weekNum}`, dateRange: rangeLabel, attended, absent, total, pct });
+      const nextMon = new Date(wMon); nextMon.setDate(wMon.getDate() + 7);
+      cur = nextMon; weekNum++;
+    }
+    return buckets;
+  }, [monthlyRecords, month]);
+
+  /* ── filtered records ── */
+  const filtered = useMemo(() => {
+    return records.filter(r => {
+      const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
+
+      // ID filter
+      const matchId = idSearch === "" || String(r.userId).includes(idSearch.trim());
+
+      // Name filter — look up the user name from the map
+      const userName = userMap.get(Number(r.userId))?.name ?? "";
+      const matchName = nameSearch === "" ||
+        userName.toLowerCase().includes(nameSearch.trim().toLowerCase());
+
+      // General search (date / status)
+      const matchSearch = search === "" ||
+        r.date?.includes(search) ||
+        r.status?.toLowerCase().includes(search.toLowerCase()) ||
+        String(r.userId).includes(search) ||
+        userName.toLowerCase().includes(search.toLowerCase());
+
+      return matchStatus && matchId && matchName && matchSearch;
+    });
+  }, [records, search, idSearch, nameSearch, statusFilter, userMap]);
+
+  /* ── CRUD ── */
   const handleCreate = async () => {
     if (!form.userId || !form.date) {
-      setToast({ message: "User ID and date are required", type: "error" });
-      return;
+      setToast({ message: "User ID and date are required", type: "error" }); return;
     }
     setActionLoading(true);
     try {
       const payload: Partial<AttendanceDTO> = {
-        userId: Number(form.userId),
-        date: form.date,
-        status: form.status,
-        checkIn: form.checkIn ? `${form.date}T${form.checkIn}:00` : undefined,
+        userId: Number(form.userId), date: form.date, status: form.status,
+        checkIn:  form.checkIn  ? `${form.date}T${form.checkIn}:00`  : undefined,
         checkOut: form.checkOut ? `${form.date}T${form.checkOut}:00` : undefined,
       };
       const created = await attendanceApi.create(payload);
       setRecords(prev => [created, ...prev]);
-      setToast({ message: "✅ Attendance record created!", type: "success" });
+      setToast({ message: "✅ Record created!", type: "success" });
       setShowForm(false);
       setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
     } catch (err: any) {
       setToast({ message: err.message || "Failed to create record", type: "error" });
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   };
 
   const handleDelete = async (id: number) => {
@@ -98,47 +225,12 @@ export default function AttendanceOverviewPage() {
       setDeleteConfirmId(null);
     } catch (err: any) {
       setToast({ message: err.message || "Failed to delete", type: "error" });
-    } finally {
-      setActionLoading(false);
-    }
+    } finally { setActionLoading(false); }
   };
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = records.length;
-    const present = records.filter(r => r.status === "PRESENT").length;
-    const absent = records.filter(r => r.status === "ABSENT").length;
-    const late = records.filter(r => r.status === "LATE").length;
-    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-    return { total, present, absent, late, rate };
-  }, [records]);
-
-  // Filtered records
-  const filtered = useMemo(() => {
-    return records.filter(r => {
-      const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
-      const matchSearch = search === "" ||
-        String(r.userId).includes(search) ||
-        r.date?.includes(search) ||
-        r.status?.toLowerCase().includes(search.toLowerCase());
-      return matchStatus && matchSearch;
-    });
-  }, [records, search, statusFilter]);
-
-  const formatTime = (dt: string) => {
-    if (!dt) return "—";
-    return new Date(dt).toLocaleTimeString("en-US", {
-      hour: "2-digit", minute: "2-digit", hour12: true,
-    });
-  };
-
-  const formatDate = (d: string) => {
-    if (!d) return "—";
-    return new Date(d).toLocaleDateString("en-US", {
-      weekday: "short", month: "short", day: "numeric",
-    });
-  };
-
+  /* ────────────────────────────────────────────────────────────────────────────
+     RENDER
+  ──────────────────────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-[#0f1117] p-6">
 
@@ -186,24 +278,105 @@ export default function AttendanceOverviewPage() {
             <h1 className="text-2xl font-semibold text-white/90">Attendance Overview</h1>
             <p className="text-white/40 text-sm mt-1">Track and manage employee attendance</p>
           </div>
-          {isAdminOrSuperAdmin() && (
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
-            >
-              <span className="text-lg">{showForm ? "×" : "+"}</span>
-              {showForm ? "Cancel" : "Add Record"}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {isAdminOrSuperAdmin() && (
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+              >
+                <span className="text-lg">{showForm ? "×" : "+"}</span>
+                {showForm ? "Cancel" : "Add Record"}
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* ── Weekly Summary + Monthly picker ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          {/* This week card */}
+          <div className="sm:col-span-2 bg-gradient-to-br from-indigo-600/20 to-violet-600/10 border border-indigo-500/20 rounded-2xl p-5 flex flex-col gap-3">
+            <p className="text-indigo-300/70 text-xs font-semibold uppercase tracking-widest">This Week — All Employees</p>
+            <div className="flex items-end gap-6">
+              <div>
+                <p className="text-4xl font-bold text-white/90">{weekStats.attended}</p>
+                <p className="text-white/30 text-xs mt-0.5">attended</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-rose-400/80">{weekStats.absent}</p>
+                <p className="text-white/30 text-xs mt-0.5">absent</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white/50">{weekStats.total}</p>
+                <p className="text-white/30 text-xs mt-0.5">total records</p>
+              </div>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700" style={{ width: `${weekStats.rate}%` }} />
+            </div>
+            <p className="text-indigo-300/60 text-xs">{weekStats.rate}% attendance rate this week</p>
+          </div>
+          {/* Month picker */}
+          <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5 flex flex-col justify-between">
+            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-2">Monthly View</p>
+            <input
+              type="month" value={month}
+              onChange={e => setMonth(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+            />
+            <p className="text-white/30 text-xs mt-2">{monthlyRecords.length} records in selected month</p>
+          </div>
+        </div>
+
+        {/* ── Monthly weekly bar chart ── */}
+        {weekBuckets.length > 0 && (
+          <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-white/80 font-semibold text-sm">Weekly Breakdown</p>
+                <p className="text-white/30 text-xs mt-0.5">Attendance per week for the selected month</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-white/40">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500/70 inline-block" />Attended</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500/40 inline-block" />Absent</span>
+              </div>
+            </div>
+            <div className="flex items-end gap-4 h-36">
+              {weekBuckets.map(bucket => {
+                const barMax = Math.max(...weekBuckets.map(b => b.total), 1);
+                return (
+                  <div key={bucket.label} className="flex-1 flex flex-col items-center gap-2 h-full">
+                    <div className="relative w-full flex-1 flex items-end">
+                      <div className="absolute bottom-0 left-0 right-0 rounded-lg bg-white/[0.04] border border-white/[0.06]" style={{ height: `${(bucket.total / barMax) * 100}%` }} />
+                      <div className="absolute bottom-0 left-0 right-0 rounded-lg bg-gradient-to-t from-indigo-600/80 to-violet-500/60 border border-indigo-500/30 transition-all duration-700" style={{ height: `${(bucket.attended / barMax) * 100}%` }} />
+                      <span className="relative z-10 w-full text-center text-[10px] font-bold text-white/70 mb-1">{bucket.pct}%</span>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-white/60 text-[11px] font-medium">{bucket.label}</p>
+                      <p className="text-white/25 text-[10px]">{bucket.dateRange}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${weekBuckets.length}, 1fr)` }}>
+              {weekBuckets.map(b => (
+                <div key={b.label} className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-2 py-2 text-center">
+                  <p className="text-emerald-400/80 text-[11px] font-semibold">{b.attended} att</p>
+                  <p className="text-rose-400/70 text-[10px]">{b.absent} abs</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
-            { label: "Total Records", value: stats.total, color: "text-white/90", bg: "bg-white/5" },
-            { label: "Present", value: stats.present, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-            { label: "Absent", value: stats.absent, color: "text-rose-400", bg: "bg-rose-500/10" },
-            { label: "Attendance Rate", value: `${stats.rate}%`, color: "text-indigo-400", bg: "bg-indigo-500/10" },
+            { label: "Total Records",    value: stats.total,    color: "text-white/90",   bg: "bg-white/5" },
+            { label: "Present",          value: stats.present,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
+            { label: "Late",             value: stats.late,     color: "text-amber-400",   bg: "bg-amber-500/10" },
+            { label: "Absent",           value: stats.absent,   color: "text-rose-400",    bg: "bg-rose-500/10" },
+            { label: "Attendance Rate",  value: `${stats.rate}%`, color: "text-indigo-400", bg: "bg-indigo-500/10" },
           ].map(stat => (
             <div key={stat.label} className={`${stat.bg} border border-white/[0.06] rounded-2xl p-4`}>
               <p className="text-white/40 text-xs mb-1">{stat.label}</p>
@@ -217,28 +390,23 @@ export default function AttendanceOverviewPage() {
           <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl p-6 mb-6">
             <h2 className="text-white/90 font-semibold mb-4">Add Attendance Record</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">User ID *</label>
                 <input
-                  type="number"
-                  value={form.userId}
+                  type="number" value={form.userId}
                   onChange={e => setForm(p => ({ ...p, userId: e.target.value }))}
                   placeholder="Enter user ID..."
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
                 />
               </div>
-
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Date *</label>
                 <input
-                  type="date"
-                  value={form.date}
+                  type="date" value={form.date}
                   onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
                 />
               </div>
-
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Status *</label>
                 <select
@@ -251,70 +419,104 @@ export default function AttendanceOverviewPage() {
                   <option value="LATE">Late</option>
                 </select>
               </div>
-
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Check In Time</label>
                 <input
-                  type="time"
-                  value={form.checkIn}
+                  type="time" value={form.checkIn}
                   onChange={e => setForm(p => ({ ...p, checkIn: e.target.value }))}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
                 />
               </div>
-
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Check Out Time</label>
                 <input
-                  type="time"
-                  value={form.checkOut}
+                  type="time" value={form.checkOut}
                   onChange={e => setForm(p => ({ ...p, checkOut: e.target.value }))}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
                 />
               </div>
-
             </div>
-
             <div className="flex gap-3 mt-4">
-              <button
-                onClick={handleCreate}
-                disabled={actionLoading}
-                className="px-6 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
-              >
+              <button onClick={handleCreate} disabled={actionLoading}
+                className="px-6 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50">
                 {actionLoading ? "Saving..." : "Save Record"}
               </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors"
-              >
+              <button onClick={() => setShowForm(false)}
+                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors">
                 Cancel
               </button>
             </div>
           </div>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by user ID, date or status..."
-            className="flex-1 bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
-          />
-          <div className="flex gap-2">
-            {["ALL", "PRESENT", "ABSENT", "LATE"].map(s => (
+        {/* ── Filters ── */}
+        <div className="space-y-3 mb-6">
+          {/* Row 1: specific filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Filter by ID */}
+            <div className="relative sm:w-48">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs font-semibold pointer-events-none">ID</span>
+              <input
+                type="text" value={idSearch}
+                onChange={e => setIdSearch(e.target.value)}
+                placeholder="Filter by user ID..."
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
+            {/* Filter by Name */}
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm-4 7a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <input
+                type="text" value={nameSearch}
+                onChange={e => setNameSearch(e.target.value)}
+                placeholder="Filter by employee name..."
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
+            {/* General search */}
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text" value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by date, status..."
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Row 2: status pill filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-white/30 text-xs font-medium uppercase tracking-wider">Status:</span>
+            {["ALL", "PRESENT", "LATE", "ABSENT"].map(s => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
                   statusFilter === s
-                    ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
+                    ? s === "PRESENT" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    : s === "LATE"    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                    : s === "ABSENT"  ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                    : "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
                     : "bg-white/5 text-white/40 border-white/[0.08] hover:bg-white/10"
                 }`}
               >
                 {s}
               </button>
             ))}
+            {/* clear filters */}
+            {(idSearch || nameSearch || search || statusFilter !== "ALL") && (
+              <button
+                onClick={() => { setIdSearch(""); setNameSearch(""); setSearch(""); setStatusFilter("ALL"); }}
+                className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
+              >
+                Clear all filters
+              </button>
+            )}
           </div>
         </div>
 
@@ -332,7 +534,7 @@ export default function AttendanceOverviewPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
-                    {["User ID", "Date", "Status", "Check In", "Check Out", isAdminOrSuperAdmin() ? "Actions" : ""].map(h => (
+                    {["Employee", "User ID", "Date", "Status", "Check In", "Check Out", isAdminOrSuperAdmin() ? "Actions" : ""].map(h => (
                       <th key={h} className="px-5 py-3.5 text-left text-xs font-medium text-white/30 uppercase tracking-wider">
                         {h}
                       </th>
@@ -340,53 +542,74 @@ export default function AttendanceOverviewPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
-                  {filtered.map(record => (
-                    <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">
-                            {record.userId}
-                          </div>
-                          <span className="text-white/60 text-sm">ID: {record.userId}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-white/70 text-sm">
-                        {formatDate(record.date)}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[record.status] ?? "bg-gray-400"}`} />
-                          <span className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${STATUS_COLORS[record.status] ?? "bg-gray-500/15 text-gray-400"}`}>
-                            {record.status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-white/60 text-sm font-mono">
-                        {formatTime(record.checkIn)}
-                      </td>
-                      <td className="px-5 py-4 text-white/60 text-sm font-mono">
-                        {formatTime(record.checkOut)}
-                      </td>
-                      {isAdminOrSuperAdmin() && (
+                  {filtered.map(record => {
+                    const emp = userMap.get(Number(record.userId));
+                    const initials = emp?.name
+                      ? emp.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+                      : String(record.userId).slice(0, 2);
+                    return (
+                      <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
+                        {/* Employee name + avatar */}
                         <td className="px-5 py-4">
-                          <button
-                            onClick={() => setDeleteConfirmId(record.id)}
-                            className="p-1.5 rounded-lg bg-white/5 text-white/30 hover:text-rose-400 hover:bg-rose-500/10 border border-white/[0.06] transition-colors"
-                            title="Delete"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                            </svg>
-                          </button>
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/30 to-violet-500/20 text-indigo-300 flex items-center justify-center text-xs font-bold shrink-0">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="text-white/80 text-sm font-medium leading-tight">
+                                {emp?.name ?? "—"}
+                              </p>
+                              <p className="text-white/30 text-xs">{emp?.email ?? ""}</p>
+                            </div>
+                          </div>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        {/* User ID */}
+                        <td className="px-5 py-4">
+                          <span className="text-white/50 text-sm font-mono">#{record.userId}</span>
+                        </td>
+                        {/* Date */}
+                        <td className="px-5 py-4 text-white/70 text-sm">
+                          {formatDate(record.date)}
+                        </td>
+                        {/* Status */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[record.status] ?? "bg-gray-400"}`} />
+                            <span className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${STATUS_COLORS[record.status] ?? "bg-gray-500/15 text-gray-400"}`}>
+                              {record.status}
+                            </span>
+                          </div>
+                        </td>
+                        {/* Check in */}
+                        <td className="px-5 py-4 text-white/60 text-sm font-mono">
+                          {formatTime(record.checkIn)}
+                        </td>
+                        {/* Check out */}
+                        <td className="px-5 py-4 text-white/60 text-sm font-mono">
+                          {formatTime(record.checkOut)}
+                        </td>
+                        {/* Actions */}
+                        {isAdminOrSuperAdmin() && (
+                          <td className="px-5 py-4">
+                            <button
+                              onClick={() => setDeleteConfirmId(record.id)}
+                              className="p-1.5 rounded-lg bg-white/5 text-white/30 hover:text-rose-400 hover:bg-rose-500/10 border border-white/[0.06] transition-colors"
+                              title="Delete"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                              </svg>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {/* Table Footer */}
+            {/* Footer */}
             <div className="px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
               <span className="text-white/30 text-xs">
                 Showing {filtered.length} of {records.length} records
@@ -396,10 +619,10 @@ export default function AttendanceOverviewPage() {
                   <span className="w-2 h-2 rounded-full bg-emerald-400" /> Present: {stats.present}
                 </span>
                 <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-rose-400" /> Absent: {stats.absent}
+                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Late: {stats.late}
                 </span>
                 <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Late: {stats.late}
+                  <span className="w-2 h-2 rounded-full bg-rose-400" /> Absent: {stats.absent}
                 </span>
               </div>
             </div>
