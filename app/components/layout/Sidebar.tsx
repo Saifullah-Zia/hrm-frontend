@@ -39,6 +39,7 @@ const NAV_ITEMS = {
     { label: "Probation",           href: "/dashboard/superadmin/probation",    icon: "calendar" },
     { label: "Payroll & Reports",   href: "/dashboard/superadmin/payroll",       icon: "currency" },
     { label: "Announcements",       href: "/dashboard/superadmin/announcements", icon: "bell" },
+    { label: "Document Hub",        href: "/dashboard/superadmin/documents",     icon: "document" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
     { label: "Attendance Overview", href: "/dashboard/superadmin/attendance",    icon: "clock" },
   ],
@@ -52,6 +53,7 @@ const NAV_ITEMS = {
     { label: "Office hours",        href: "/dashboard/admin/office-hours",        icon: "clock" },
     { label: "Attendance Tracking", href: "/dashboard/admin/attendance",         icon: "clock" },
     { label: "Announcements",       href: "/dashboard/admin/announcements",      icon: "bell" },
+    { label: "Document Hub",        href: "/dashboard/admin/documents",          icon: "document" },
     { label: "Department View",     href: "/dashboard/admin/departments",        icon: "building" },
   ],
   EMPLOYEE: [
@@ -60,6 +62,7 @@ const NAV_ITEMS = {
     { label: "My Resignation",      href: "/dashboard/employee/resignation",    icon: "document" },
     { label: "My Attendance",       href: "/dashboard/employee/attendance",     icon: "clock" },
     { label: "My Payslips",         href: "/dashboard/employee/payslips",       icon: "document" },
+    { label: "My Documents",        href: "/dashboard/employee/documents",      icon: "document" },
     { label: "Announcements",       href: "/dashboard/employee/announcements",  icon: "bell" },
   ],
 };

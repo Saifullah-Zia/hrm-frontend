@@ -82,7 +82,13 @@ function normalizeProfile(data: unknown): EmployeeProfileDto | null {
   const o = data as Record<string, unknown>;
   const userId = Number(o.userId ?? o.user_id);
   if (!Number.isFinite(userId) || userId <= 0) return null;
-  return { ...(o as unknown as EmployeeProfileDto), userId };
+  
+  return {
+    ...(o as unknown as EmployeeProfileDto),
+    userId,
+    firstName: (o.firstName ?? o.first_name) as string | undefined,
+    lastName: (o.lastName ?? o.last_name) as string | undefined,
+  };
 }
 
 function normalizeProfilesList(data: unknown): EmployeeProfileDto[] {
