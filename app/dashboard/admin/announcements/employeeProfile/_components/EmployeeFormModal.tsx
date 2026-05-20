@@ -44,8 +44,12 @@ export function EmployeeFormModal({
 
   if (!open) return null;
 
-  const patch = (p: Partial<EmployeeProfileDto>) =>
+  const patch = (p: Partial<EmployeeProfileDto>) => {
+    if ("cnicNumber" in p && typeof p.cnicNumber === "string") {
+      p.cnicNumber = p.cnicNumber.replace(/[^0-9-]/g, "");
+    }
     setForm((f) => ({ ...f, ...p }));
+  };
 
   async function submit() {
     setSaving(true);

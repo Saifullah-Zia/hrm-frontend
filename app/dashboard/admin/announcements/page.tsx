@@ -15,6 +15,12 @@ export default function AnnouncementsPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [form, setForm] = useState({ title: "", content: "", active: true });
 
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   const isAdminOrSuperAdmin = () => {
     const role = user?.role?.toUpperCase();
     return role === "ADMIN" || role === "SUPERADMIN";
@@ -28,18 +34,21 @@ export default function AnnouncementsPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    fetchAnnouncements();
-  }, []);
-
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = async (pageIndex = page) => {
     setLoading(true);
     try {
-      // Admins see all, employees see only active
-      const data = isAdminOrSuperAdmin()
-        ? await announcementApi.getAll()
-        : await announcementApi.getActive();
-      setAnnouncements(data);
+      if (isAdminOrSuperAdmin()) {
+        const pageData = await announcementApi.getPaginated(pageIndex, pageSize, "id", "desc");
+        setAnnouncements(pageData.content);
+        setTotalElements(pageData.totalElements);
+        setTotalPages(Math.max(1, pageData.totalPages));
+        setPage(pageIndex);
+      } else {
+        const data = await announcementApi.getActive();
+        setAnnouncements(data);
+        setTotalElements(data.length);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error("Failed to fetch announcements:", error);
       setToast({ message: "Failed to load announcements", type: "error" });
@@ -47,6 +56,10 @@ export default function AnnouncementsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [page, pageSize]);
 
   const resetForm = () => {
     setForm({ title: "", content: "", active: true });
@@ -82,7 +95,7 @@ export default function AnnouncementsPage() {
         setToast({ message: "✅ Announcement updated!", type: "success" });
       } else {
         const created = await announcementApi.create(form);
-        setAnnouncements(prev => [created, ...prev]);
+        fetchAnnouncements(0);
         if (form.active) await announcementApi.notifyEmployees(created.id);
         setToast({ message: "✅ Announcement created!", type: "success" });
       }
@@ -98,7 +111,7 @@ export default function AnnouncementsPage() {
     setActionLoading(true);
     try {
       await announcementApi.delete(id);
-      setAnnouncements(prev => prev.filter(a => a.id !== id));
+      fetchAnnouncements(page);
       setToast({ message: "🗑️ Announcement deleted!", type: "success" });
       setDeleteConfirmId(null);
     } catch (error: any) {
@@ -345,6 +358,57 @@ export default function AnnouncementsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination Footer (Admin only) */}
+        {isAdminOrSuperAdmin() && announcements.length > 0 && (
+          <div className="px-5 py-4 mt-4 bg-[#13151e] border border-white/[0.08] rounded-2xl flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-white/40 animate-[scaleIn_0.2s_ease]">
+            <div>
+              Showing <span className="text-white/70">{announcements.length}</span> page rows ·{" "}
+              <span className="text-white/70">{totalElements}</span> total
+            </div>
+
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              <label className="flex items-center gap-1.5">
+                <span>Rows</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(0);
+                  }}
+                  className="rounded-lg border border-white/[0.08] bg-[#1a1d2e] px-2 py-1 text-xs text-white/90 focus:outline-none cursor-pointer"
+                >
+                  {[10, 20, 50].map((n) => (
+                    <option key={n} value={n} className="bg-[#1a1d2e] text-white">
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="flex items-center px-1 text-white/60">
+                  Page {page + 1} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

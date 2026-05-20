@@ -69,8 +69,7 @@ export default function EmployeeDashboard() {
         <p className="text-white/40 text-sm mt-1">Welcome back, {user?.username}</p>
         {typeof userId !== "number" && (
           <p className="text-amber-400/90 text-sm mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
-            Your JWT is missing <code className="text-amber-200">userId</code>. Several modules need it — add the
-            claim in Spring <code className="text-amber-200">JwtService</code> / auth response.
+            Your session is missing required user information. Please contact support.
           </p>
         )}
       </div>

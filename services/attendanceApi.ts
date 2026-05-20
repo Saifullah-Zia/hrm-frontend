@@ -74,6 +74,16 @@ export const attendanceApi = {
   delete: (id: number): Promise<void> =>
     apiFetch<void>(`/api/attendance/${id}`, { method: "DELETE" }),
 
+  getPaginated: (
+    page = 0,
+    size = 10,
+    sortBy = "date",
+    sortDir = "desc"
+  ): Promise<AttendancePageResponse> =>
+    apiFetch<AttendancePageResponse>(
+      `/api/attendance/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
+    ),
+
   /**
    * Rows for one user. Your `AttendanceController` only exposes `GET /api/attendance` (all),
    * so this loads that list and filters client-side. Prefer adding `GET /api/attendance/user/{userId}`
@@ -84,3 +94,12 @@ export const attendanceApi = {
     return all.filter((r) => Number(r.userId) === Number(userId));
   },
 };
+
+export interface AttendancePageResponse {
+  content: AttendanceDTO[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}

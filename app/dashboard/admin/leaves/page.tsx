@@ -176,6 +176,7 @@ export default function AdminLeavePage() {
   const { user } = useAuthStore();
 
   const [leaves, setLeaves]               = useState<LeaveDto[]>([]);
+  const [pageRecords, setPageRecords]     = useState<LeaveDto[]>([]);
   const [loading, setLoading]             = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [search, setSearch]               = useState("");
@@ -183,15 +184,21 @@ export default function AdminLeavePage() {
   const [toast, setToast]                 = useState<ToastState>(null);
   const [confirm, setConfirm]             = useState<{ leave: LeaveDto; action: "APPROVE" | "REJECT" } | null>(null);
 
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  const fetchLeaves = async () => {
+  const loadData = async (pageIndex = page) => {
     setLoading(true);
     try {
-      const data = await leaveApi.getAll();
-      // Sort: PENDING first, then newest
+      // 1. Fetch total list in background for stats
+      const allData = await leaveApi.getAll();
       setLeaves(
-        data.sort((a, b) => {
+        allData.sort((a, b) => {
           const ap = normalizeLeaveStatus(a.status) === "PENDING";
           const bp = normalizeLeaveStatus(b.status) === "PENDING";
           if (ap && !bp) return -1;
@@ -199,6 +206,13 @@ export default function AdminLeavePage() {
           return 0;
         })
       );
+
+      // 2. Fetch page slice
+      const pageData = await leaveApi.getPaginated(pageIndex, pageSize, filter);
+      setPageRecords(pageData.content);
+      setTotalElements(pageData.totalElements);
+      setTotalPages(Math.max(1, pageData.totalPages));
+      setPage(pageIndex);
     } catch {
       setToast({ message: "Failed to load leave requests", type: "error" });
     } finally {
@@ -206,7 +220,9 @@ export default function AdminLeavePage() {
     }
   };
 
-  useEffect(() => { fetchLeaves(); }, []);
+  useEffect(() => {
+    loadData();
+  }, [page, pageSize, filter]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
@@ -221,7 +237,7 @@ export default function AdminLeavePage() {
   // ── Filtered list ──────────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
-    return leaves.filter((l) => {
+    return pageRecords.filter((l) => {
       const st = normalizeLeaveStatus(l.status);
       const matchFilter =
         filter === "ALL" ||
@@ -235,7 +251,7 @@ export default function AdminLeavePage() {
         l.status?.toLowerCase().includes(q);
       return matchFilter && matchSearch;
     });
-  }, [leaves, filter, search]);
+  }, [pageRecords, filter, search]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -251,6 +267,9 @@ export default function AdminLeavePage() {
           : await leaveApi.rejectLeave(leave.id);
 
       setLeaves(prev =>
+        prev.map(l => (l.id === leave.id ? { ...l, status: updated.status } : l))
+      );
+      setPageRecords(prev =>
         prev.map(l => (l.id === leave.id ? { ...l, status: updated.status } : l))
       );
 
@@ -334,18 +353,20 @@ export default function AdminLeavePage() {
 
           {/* ── Filters ─────────────────────────────────────────────────── */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name, type, reason…"
-              className="flex-1 bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
-            />
+            <div className="flex-1">
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by name, type, reason…"
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
             <div className="flex gap-2 flex-wrap">
               {/* ✅ Changed array values to match correct status strings */}
               {(["ALL", "PENDING", "APPROVED", "REJECTED", "CANCELLED"] as FilterStatus[]).map(s => (
                 <button
                   key={s}
-                  onClick={() => setFilter(s)}
+                  onClick={() => { setFilter(s); setPage(0); }}
                   className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-colors ${
                     filter === s
                       ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
@@ -493,16 +514,61 @@ export default function AdminLeavePage() {
               </div>
 
               {/* Footer */}
-              <div className="px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
-                <span className="text-white/30 text-xs">
-                  Showing {filtered.length} of {leaves.length} requests
-                </span>
-                {stats.pending > 0 && (
-                  <span className="flex items-center gap-2 text-amber-400/70 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    {stats.pending} pending review
+              <div className="px-5 py-4 border-t border-white/[0.06] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-white/40">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span>
+                    Showing <span className="text-white/70">{filtered.length}</span> of{" "}
+                    <span className="text-white/70">{pageRecords.length}</span> page rows ·{" "}
+                    <span className="text-white/70">{totalElements}</span> total
                   </span>
-                )}
+                  {stats.pending > 0 && (
+                    <span className="flex items-center gap-1.5 text-amber-400 border-t border-white/[0.06] sm:border-t-0 pt-2 sm:pt-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      {stats.pending} pending review
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <label className="flex items-center gap-1.5">
+                    <span>Rows</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setPage(0);
+                      }}
+                      className="rounded-lg border border-white/[0.08] bg-[#1a1d2e] px-2 py-1 text-xs text-white/90 focus:outline-none cursor-pointer"
+                    >
+                      {[10, 20, 50].map((n) => (
+                        <option key={n} value={n} className="bg-[#1a1d2e] text-white">
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={page <= 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="flex items-center px-1 text-white/60">
+                      Page {page + 1} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                      className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

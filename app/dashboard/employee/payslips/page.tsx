@@ -52,9 +52,7 @@ export default function EmployeePayslipsPage() {
       <div>
         <h1 className="text-2xl font-bold text-white/90 tracking-tight">My payslips</h1>
         <p className="text-white/40 text-sm mt-1">
-          Net salary and breakdown by period. Tap PDF to download when your API exposes{" "}
-          <code className="text-indigo-400/90">GET /api/payroll/{"{id}"}/pdf</code>; otherwise a print dialog opens so
-          you can save as PDF from the browser.
+          Net salary and breakdown by period. Click PDF to download or save your payslip.
         </p>
       </div>
 
@@ -62,8 +60,7 @@ export default function EmployeePayslipsPage() {
         <div className="animate-pulse h-48 rounded-2xl bg-white/[0.04]" />
       ) : payrollQuery.isError ? (
         <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-          Could not load payroll. Add or align a Spring endpoint such as{" "}
-          <code className="text-rose-100">GET /api/payroll/user/{"{userId}"}</code> (see payroll controller you share).
+          Could not load payroll records. Please contact support.
         </div>
       ) : totalElements === 0 ? (
         <p className="text-white/40 text-sm">No payroll records found for your account.</p>
@@ -121,10 +118,10 @@ export default function EmployeePayslipsPage() {
                     setPageSize(Number(e.target.value));
                     setPage(0);
                   }}
-                  className="rounded-lg border border-white/[0.1] bg-white/[0.04] px-2 py-1.5 text-sm text-white/80"
+                  className="rounded-lg border border-white/[0.1] bg-[#1a1d2e] px-2 py-1.5 text-sm text-white/90 focus:outline-none cursor-pointer"
                 >
                   {[5, 10, 20].map((n) => (
-                    <option key={n} value={n}>
+                    <option key={n} value={n} className="bg-[#1a1d2e] text-white">
                       {n}
                     </option>
                   ))}

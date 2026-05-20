@@ -81,6 +81,35 @@ export interface ResignationApprovalRequest {
   noticePeriodEndDate?: string; // ISO date
 }
 
+export interface ResignationPageResponse {
+  content: ResignationResponse[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      empty: boolean;
+      sorted: boolean;
+      unsorted: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  size: number;
+  number: number;
+  sort: {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
+  };
+  numberOfElements: number;
+  first: boolean;
+  empty: boolean;
+}
+
 export interface ResignationResponse {
   id: number;
   employeeId: number;
@@ -158,6 +187,17 @@ export const resignationApi = {
   /** GET /api/resignations — HR: all resignations */
   getAll: (): Promise<ResignationResponse[]> =>
     apiFetch<ResignationResponse[]>(`/api/resignations?_t=${Date.now()}`),
+
+  /** GET /api/resignations/paged — HR: paginated resignations */
+  getPaginated: (
+    page = 0,
+    size = 10,
+    sortBy = "id",
+    sortDir = "desc"
+  ): Promise<ResignationPageResponse> =>
+    apiFetch<ResignationPageResponse>(
+      `/api/resignations/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
+    ),
 
   /** GET /api/resignations/status/{status} — filtered by status */
   getByStatus: (status: ResignationStatus): Promise<ResignationResponse[]> =>

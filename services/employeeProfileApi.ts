@@ -48,12 +48,41 @@ export interface EmployeeProfileDto {
   updatedBy?: string;
 }
 
+export interface EmployeeProfilePageResponse {
+  content: EmployeeProfileDto[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      empty: boolean;
+      sorted: boolean;
+      unsorted: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  size: number;
+  number: number;
+  sort: {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
+  };
+  numberOfElements: number;
+  first: boolean;
+  empty: boolean;
+}
+
 function normalizeProfile(data: unknown): EmployeeProfileDto | null {
   if (!data || typeof data !== "object") return null;
   const o = data as Record<string, unknown>;
   const userId = Number(o.userId ?? o.user_id);
   if (!Number.isFinite(userId) || userId <= 0) return null;
-  return { ...(o as EmployeeProfileDto), userId };
+  return { ...(o as unknown as EmployeeProfileDto), userId };
 }
 
 function normalizeProfilesList(data: unknown): EmployeeProfileDto[] {
@@ -92,6 +121,21 @@ export const employeeProfileApi = {
   getAll: async (): Promise<EmployeeProfileDto[]> => {
     const res = await apiClient.get<unknown>(`/api/employee-profiles?_t=${Date.now()}`);
     return normalizeProfilesList(res.data);
+  },
+
+  getPaginated: async (
+    page = 0,
+    size = 10,
+    sortBy = "firstName",
+    sortDir = "asc"
+  ): Promise<EmployeeProfilePageResponse> => {
+    const res = await apiClient.get<EmployeeProfilePageResponse>(
+      `/api/employee-profiles/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
+    );
+    return {
+      ...res.data,
+      content: normalizeProfilesList(res.data.content),
+    };
   },
 
   getById: async (id: number): Promise<EmployeeProfileDto> => {

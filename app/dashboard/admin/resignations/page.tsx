@@ -11,6 +11,9 @@ import {
   resignationStatusDotClass,
   resignationTypeLabel,
 } from "@/services/resignationApi";
+import AdminOffboardingTasks from "./AdminOffboardingTasks";
+
+type SystemUser = { id: number; name: string; role: string; email: string };
 
 type ToastState = { message: string; type: "success" | "error" } | null;
 type FilterStatus = "ALL" | ResignationStatus;
@@ -121,10 +124,14 @@ function ProcessModal({
 
 function DetailDrawer({
   resignation,
+  users,
   onClose,
+  onTaskUpdate,
 }: {
   resignation: ResignationResponse;
+  users: SystemUser[];
   onClose: () => void;
+  onTaskUpdate: () => void;
 }) {
   const progress = resignation.totalTasks > 0
     ? Math.round((resignation.completedTasks / resignation.totalTasks) * 100)
@@ -196,12 +203,21 @@ function DetailDrawer({
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex gap-4 mt-3 text-xs">
+            <div className="flex gap-4 mt-3 text-xs mb-6">
               <span className="text-emerald-400">{resignation.completedTasks} done</span>
               <span className="text-amber-400">{resignation.pendingTasks} pending</span>
             </div>
           </div>
         )}
+
+        {/* Offboarding Tasks Component (Always visible so admin can add the first task) */}
+        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+          <AdminOffboardingTasks
+            resignation={resignation}
+            users={users}
+            onTaskUpdate={onTaskUpdate}
+          />
+        </div>
       </div>
     </div>
   );
@@ -223,6 +239,7 @@ export default function AdminResignationsPage() {
   const adminId = user?.userId;
 
   const [resignations, setResignations] = useState<ResignationResponse[]>([]);
+  const [pageRecords, setPageRecords] = useState<ResignationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -230,20 +247,58 @@ export default function AdminResignationsPage() {
   const [toast, setToast] = useState<ToastState>(null);
   const [selected, setSelected] = useState<ResignationResponse | null>(null);
   const [processModal, setProcessModal] = useState<{ resignation: ResignationResponse; action: "APPROVED" | "REJECTED" } | null>(null);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
 
-  const load = useCallback(async () => {
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch users for assignment dropdown
+  useEffect(() => {
+    // Basic fetch to /api/users, relying on getToken etc.
+    const token = localStorage.getItem("token") || "";
+    const raw = localStorage.getItem("hrm-auth");
+    let actualToken = token;
+    if (raw) {
+      try {
+        actualToken = JSON.parse(raw)?.state?.token ?? token;
+      } catch { }
+    }
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/api/users`, {
+      headers: { Authorization: `Bearer ${actualToken}` }
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d)) setSystemUsers(d);
+      })
+      .catch(console.error);
+  }, []);
+
+  const loadData = useCallback(async (pageIndex = page) => {
     setLoading(true);
     try {
-      const data = await resignationApi.getAll();
-      setResignations(data.sort((a, b) => (a.status === "PENDING" ? -1 : b.status === "PENDING" ? 1 : 0)));
+      // 1. Fetch total list in background for stats
+      const allData = await resignationApi.getAll();
+      setResignations(allData.sort((a, b) => (a.status === "PENDING" ? -1 : b.status === "PENDING" ? 1 : 0)));
+
+      // 2. Fetch page slice
+      const pageData = await resignationApi.getPaginated(pageIndex, pageSize, "id", "desc");
+      setPageRecords(pageData.content);
+      setTotalElements(pageData.totalElements);
+      setTotalPages(Math.max(1, pageData.totalPages));
+      setPage(pageIndex);
     } catch {
       setToast({ message: "Failed to load resignations", type: "error" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, pageSize]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    loadData();
+  }, [page, pageSize]);
 
   useEffect(() => {
     if (!toast) return;
@@ -261,14 +316,14 @@ export default function AdminResignationsPage() {
   }), [resignations]);
 
   const filtered = useMemo(() =>
-    resignations.filter(r => {
+    pageRecords.filter(r => {
       const matchStatus = filter === "ALL" || r.status === filter;
       const q = search.toLowerCase();
       const matchSearch = !q || r.employeeName.toLowerCase().includes(q) ||
         r.employeeDepartment?.toLowerCase().includes(q) ||
         r.reason.toLowerCase().includes(q);
       return matchStatus && matchSearch;
-    }), [resignations, filter, search]);
+    }), [pageRecords, filter, search]);
 
   const handleProcess = async (req: ResignationApprovalRequest) => {
     if (!processModal || adminId == null) return;
@@ -276,6 +331,7 @@ export default function AdminResignationsPage() {
     try {
       const updated = await resignationApi.process(processModal.resignation.id, req, adminId);
       setResignations(prev => prev.map(r => r.id === updated.id ? updated : r));
+      setPageRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
       setToast({ message: `Resignation ${updated.status.toLowerCase()} successfully`, type: "success" });
       setProcessModal(null);
     } catch (err: any) {
@@ -290,6 +346,7 @@ export default function AdminResignationsPage() {
     try {
       const updated = await resignationApi.complete(id);
       setResignations(prev => prev.map(r => r.id === updated.id ? updated : r));
+      setPageRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
       setToast({ message: "Offboarding marked complete", type: "success" });
     } catch (err: any) {
       setToast({ message: err.message || "Could not complete offboarding", type: "error" });
@@ -340,7 +397,17 @@ export default function AdminResignationsPage() {
 
       {/* Detail Drawer */}
       {selected && (
-        <DetailDrawer resignation={selected} onClose={() => setSelected(null)} />
+        <DetailDrawer 
+          resignation={selected} 
+          users={systemUsers}
+          onClose={() => setSelected(null)} 
+          onTaskUpdate={() => {
+            // Reload resignations to update the progress bar stats
+            loadData();
+            // Also need to update `selected` so progress bar updates locally immediately
+            resignationApi.getById(selected.id).then(setSelected).catch(console.error);
+          }}
+        />
       )}
 
       <div className="min-h-screen bg-[#0f1117] p-6">
@@ -376,12 +443,14 @@ export default function AdminResignationsPage() {
 
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by name, department, reason…"
-              className="flex-1 bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
-            />
+            <div className="flex-1">
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by name, department, reason…"
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
             <div className="flex gap-2 flex-wrap">
               {FILTERS.map(f => (
                 <button
@@ -517,14 +586,61 @@ export default function AdminResignationsPage() {
                 </table>
               </div>
 
-              <div className="px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
-                <span className="text-white/30 text-xs">Showing {filtered.length} of {resignations.length} resignations</span>
-                {stats.pending > 0 && (
-                  <span className="flex items-center gap-2 text-amber-400/70 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    {stats.pending} pending review
+              <div className="px-5 py-4 border-t border-white/[0.06] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-white/40">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <span>
+                    Showing <span className="text-white/70">{filtered.length}</span> of{" "}
+                    <span className="text-white/70">{pageRecords.length}</span> page rows ·{" "}
+                    <span className="text-white/70">{totalElements}</span> total
                   </span>
-                )}
+                  {stats.pending > 0 && (
+                    <span className="flex items-center gap-1.5 text-amber-400 border-t border-white/[0.06] sm:border-t-0 pt-2 sm:pt-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      {stats.pending} pending review
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <label className="flex items-center gap-1.5">
+                    <span>Rows</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setPage(0);
+                      }}
+                      className="rounded-lg border border-white/[0.08] bg-[#1a1d2e] px-2 py-1 text-xs text-white/90 focus:outline-none cursor-pointer"
+                    >
+                      {[10, 20, 50].map((n) => (
+                        <option key={n} value={n} className="bg-[#1a1d2e] text-white">
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={page <= 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="flex items-center px-1 text-white/60">
+                      Page {page + 1} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                      className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

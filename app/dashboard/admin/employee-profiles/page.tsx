@@ -180,8 +180,13 @@ const Modal = ({
 
   const isReadOnly = mode === "view";
 
-  const handle = (field: keyof EmployeeProfileDto, val: string | number) =>
-    setForm((f) => ({ ...f, [field]: val }));
+  const handle = (field: keyof EmployeeProfileDto, val: string | number) => {
+    let finalVal = val;
+    if (field === "cnicNumber" && typeof val === "string") {
+      finalVal = val.replace(/[^0-9-]/g, "");
+    }
+    setForm((f) => ({ ...f, [field]: finalVal }));
+  };
 
   const submit = async () => {
     setSaving(true);
@@ -257,8 +262,7 @@ const Modal = ({
               />
             )}
             <p className="text-[11px] text-[#6B7089] mt-0.5">
-              Must match <code className="text-[#9B9FB8]">users.id</code> — the id used in{" "}
-              <code className="text-[#9B9FB8]">GET /api/employee-profiles/user/{"{userId}"}</code>.
+              Must match the registered system user ID.
             </p>
           </div>
 
@@ -520,11 +524,18 @@ const DeleteConfirm = ({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function EmployeeProfilesPage() {
   const [profiles, setProfiles] = useState<EmployeeProfileDto[]>([]);
+  const [pageRecords, setPageRecords] = useState<EmployeeProfileDto[]>([]);
   const [filtered, setFiltered] = useState<EmployeeProfileDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [modal, setModal] = useState<{
     open: boolean;
@@ -551,12 +562,20 @@ export default function EmployeeProfilesPage() {
   }, []);
 
   // ── Fetch ──
-  const fetchAll = async () => {
+  const loadData = async (pageIndex = page) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await employeeProfileApi.getAll();
-      setProfiles(data);
+      // 1. Fetch total list in background for stats & linking
+      const allData = await employeeProfileApi.getAll();
+      setProfiles(allData);
+
+      // 2. Fetch active page slice
+      const pageData = await employeeProfileApi.getPaginated(pageIndex, pageSize, "firstName", "asc");
+      setPageRecords(pageData.content);
+      setTotalElements(pageData.totalElements);
+      setTotalPages(Math.max(1, pageData.totalPages));
+      setPage(pageIndex);
     } catch {
       setError("Failed to load employee profiles.");
     } finally {
@@ -565,12 +584,12 @@ export default function EmployeeProfilesPage() {
   };
 
   useEffect(() => {
-    fetchAll();
-  }, []);
+    loadData();
+  }, [page, pageSize]);
 
   // ── Filter ──
   useEffect(() => {
-    let data = [...profiles];
+    let data = [...pageRecords];
     if (statusFilter !== "ALL")
       data = data.filter((p) => p.employmentStatus === statusFilter);
     if (search.trim()) {
@@ -584,7 +603,7 @@ export default function EmployeeProfilesPage() {
       );
     }
     setFiltered(data);
-  }, [profiles, search, statusFilter]);
+  }, [pageRecords, search, statusFilter]);
 
   // ── CRUD handlers ──
   const handleSave = async (dto: EmployeeProfileDto) => {
@@ -599,8 +618,8 @@ export default function EmployeeProfilesPage() {
     } else if (modal.mode === "edit" && modal.profile?.id) {
       await employeeProfileApi.update(modal.profile.id, dto);
     }
-    // ✅ FIX: await fetchAll() first so the list is populated before the modal closes
-    await fetchAll();
+    // ✅ FIX: await loadData(0) first so the list is populated before the modal closes
+    await loadData(0);
     setModal({ open: false, mode: "create", profile: null });
   };
 
@@ -610,7 +629,7 @@ export default function EmployeeProfilesPage() {
     try {
       await employeeProfileApi.delete(deleteTarget);
       setDeleteTarget(null);
-      await fetchAll();
+      await loadData(0);
     } catch (err: unknown) {
       let msg = "Failed to delete profile.";
       if (err && typeof err === "object" && "response" in err) {
@@ -757,7 +776,7 @@ export default function EmployeeProfilesPage() {
               <AlertTriangle size={24} className="text-red-400" />
               <p className="text-sm text-red-400">{error}</p>
               <button
-                onClick={fetchAll}
+                onClick={() => loadData()}
                 className="mt-2 text-xs text-[#FC0175] hover:underline"
               >
                 Try again
@@ -860,24 +879,66 @@ export default function EmployeeProfilesPage() {
           )}
 
           {/* Footer row */}
-          {!loading && !error && filtered.length > 0 && (
-            <div className="px-5 py-3 border-t border-[#1A1D35] flex items-center justify-between">
-              <span className="text-xs text-[#8B8FA8]">
-                Showing {filtered.length} of {profiles.length} profiles
-              </span>
-              <div className="flex items-center gap-3 text-xs text-[#8B8FA8]">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-                  Active: {stats.active}
+          {!loading && !error && (
+            <div className="px-5 py-4 border-t border-[#1A1D35] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-[#8B8FA8]">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <span>
+                  Showing <span className="text-white/60">{filtered.length}</span> of{" "}
+                  <span className="text-white/60">{pageRecords.length}</span> page rows ·{" "}
+                  <span className="text-white/60">{totalElements}</span> total
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
-                  Inactive: {stats.inactive}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                  Terminated: {stats.terminated}
-                </span>
+                <div className="flex items-center gap-3 border-t border-[#2A2D45] sm:border-t-0 pt-2 sm:pt-0">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Active: {stats.active}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Inactive: {stats.inactive}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400" /> Terminated: {stats.terminated}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <label className="flex items-center gap-1.5">
+                  <span>Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(0);
+                    }}
+                    className="rounded-lg border border-[#2A2D45] bg-[#1a1d2e] px-2 py-1 text-xs text-white/90 focus:outline-none cursor-pointer"
+                  >
+                    {[10, 20, 50].map((n) => (
+                      <option key={n} value={n} className="bg-[#1a1d2e] text-white">
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={page <= 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className="px-3 py-1.5 rounded-lg border border-[#2A2D45] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="flex items-center px-1 text-white/60">
+                    Page {page + 1} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-1.5 rounded-lg border border-[#2A2D45] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
           )}

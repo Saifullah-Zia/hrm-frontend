@@ -35,7 +35,7 @@ export default function AdminOfficeHoursPage() {
         message:
           source === "server"
             ? "Office hours saved on the server. Employees will use this for late / on-time check-in."
-            : "Saved in this browser only. Add PUT /api/settings/office-hours in Spring so all users share the same times.",
+            : "Saved in this browser only.",
       });
     },
   });
@@ -57,9 +57,7 @@ export default function AdminOfficeHoursPage() {
       <div>
         <h1 className="text-2xl font-bold text-white/90 tracking-tight">Office hours</h1>
         <p className="text-white/40 text-sm mt-1">
-          Set the official start and end of the workday. Check-in after start plus the grace period is sent as{" "}
-          <code className="text-indigo-300">LATE</code> to the attendance API; on time is{" "}
-          <code className="text-indigo-300">PRESENT</code>.
+          Set the official start and end of the workday. Check-in after start plus the grace period is marked as LATE; on time is PRESENT.
         </p>
       </div>
 
@@ -121,11 +119,7 @@ export default function AdminOfficeHoursPage() {
         </div>
       </div>
 
-      <p className="text-xs text-white/30 leading-relaxed">
-        Production: implement <code className="text-white/50">GET/PUT /api/settings/office-hours</code> in Spring (single row
-        or key-value store) so all browsers share the same policy. Until then, saving still updates{" "}
-        <code className="text-white/50">localStorage</code> on this machine for testing.
-      </p>
+
     </div>
   );
 }

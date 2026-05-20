@@ -222,7 +222,7 @@ export default function EmployeeLeavePage() {
   if (typeof userId !== "number") {
     return (
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
-        Missing <code className="text-amber-100">userId</code> in your JWT — leave cannot be tied to your account.
+        Your account is missing required user information. Please contact support.
       </div>
     );
   }

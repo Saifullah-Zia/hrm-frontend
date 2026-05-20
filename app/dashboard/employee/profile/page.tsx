@@ -83,9 +83,7 @@ export default function EmployeeProfilePage() {
   if (typeof userId !== "number") {
     return (
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
-        Your account is missing <code className="text-amber-100">userId</code> in the JWT. Add a{" "}
-        <code className="text-amber-100">userId</code> (or <code className="text-amber-100">id</code>) claim in the
-        Spring token so the app can load your profile.
+        Your account is missing required user information. Please contact support.
       </div>
     );
   }
@@ -125,8 +123,8 @@ export default function EmployeeProfilePage() {
           <p className="text-xs leading-relaxed opacity-80">
             {profileQuery.error instanceof EmployeeProfileLoadError &&
             profileQuery.error.code === "FORBIDDEN"
-              ? "Backend must allow employees to read their profile (add GET /api/employee-profiles/me)."
-              : "Admin → Employee Profiles → select your employee account, then sign out and sign in again."}
+              ? "You do not have permission to access this profile. Please contact support."
+              : "Please ask an admin to link an employee profile to your user account, then sign out and sign in again."}
           </p>
           <button
             type="button"
@@ -140,8 +138,14 @@ export default function EmployeeProfilePage() {
     );
   }
 
+  if (!draft) return null;
+
   const setField = (field: keyof EmployeeProfileDto, value: string) => {
-    setDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
+    let finalVal = value;
+    if (field === "cnicNumber") {
+      finalVal = value.replace(/[^0-9-]/g, "");
+    }
+    setDraft((prev) => (prev ? { ...prev, [field]: finalVal } : prev));
   };
 
   const pu = probationUserQuery.data;

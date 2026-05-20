@@ -169,7 +169,7 @@ export default function EmployeeAttendancePage() {
   if (typeof userId !== "number") {
     return (
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
-        Missing <code className="text-amber-100">userId</code> in your JWT — attendance cannot be loaded.
+        Your account is missing required user information. Please contact support.
       </div>
     );
   }
@@ -304,8 +304,7 @@ export default function EmployeeAttendancePage() {
         <div className="animate-pulse h-48 rounded-2xl bg-white/[0.04]" />
       ) : recordsQuery.isError ? (
         <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-          Could not load attendance. Confirm you are authenticated and that{" "}
-          <code className="text-rose-100">GET /api/attendance</code> succeeds for your account.
+          Could not load attendance records. Please contact support.
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">

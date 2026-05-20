@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 
@@ -20,6 +20,15 @@ export default function AttendanceOverviewPage() {
   const { user } = useAuthStore();
   const [records, setRecords] = useState<AttendanceDTO[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Pagination State
+  const [pageRecords, setPageRecords]   = useState<AttendanceDTO[]>([]);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [page, setPage]                 = useState(0);
+  const [pageSize, setPageSize]         = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages]     = useState(1);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -47,21 +56,39 @@ export default function AttendanceOverviewPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    fetchRecords();
-  }, []);
-
-  const fetchRecords = async () => {
-    setLoading(true);
+  const fetchRecords = useCallback(async () => {
     try {
       const data = await attendanceApi.getAll();
       setRecords(data);
     } catch (err) {
       setToast({ message: "Failed to load attendance records", type: "error" });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
+
+  const loadPageRecords = useCallback(async () => {
+    setTableLoading(true);
+    try {
+      const res = await attendanceApi.getPaginated(page, pageSize, "date", "desc");
+      setPageRecords(res.content);
+      setTotalElements(res.totalElements);
+      setTotalPages(Math.max(1, res.totalPages));
+    } catch {
+      setToast({ message: "Failed to load page records", type: "error" });
+    } finally {
+      setTableLoading(false);
+    }
+  }, [page, pageSize]);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchRecords(), loadPageRecords()])
+      .finally(() => setLoading(false));
+  }, [fetchRecords, loadPageRecords]);
+
+  // Handle page/pageSize changes
+  useEffect(() => {
+    loadPageRecords();
+  }, [page, pageSize, loadPageRecords]);
 
   const handleCreate = async () => {
     if (!form.userId || !form.date) {
@@ -77,11 +104,12 @@ export default function AttendanceOverviewPage() {
         checkIn: form.checkIn ? `${form.date}T${form.checkIn}:00` : undefined,
         checkOut: form.checkOut ? `${form.date}T${form.checkOut}:00` : undefined,
       };
-      const created = await attendanceApi.create(payload);
-      setRecords(prev => [created, ...prev]);
+      await attendanceApi.create(payload);
       setToast({ message: "✅ Attendance record created!", type: "success" });
       setShowForm(false);
       setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
+      setPage(0);
+      await Promise.all([fetchRecords(), loadPageRecords()]);
     } catch (err: any) {
       setToast({ message: err.message || "Failed to create record", type: "error" });
     } finally {
@@ -93,9 +121,9 @@ export default function AttendanceOverviewPage() {
     setActionLoading(true);
     try {
       await attendanceApi.delete(id);
-      setRecords(prev => prev.filter(r => r.id !== id));
       setToast({ message: "🗑️ Record deleted!", type: "success" });
       setDeleteConfirmId(null);
+      await Promise.all([fetchRecords(), loadPageRecords()]);
     } catch (err: any) {
       setToast({ message: err.message || "Failed to delete", type: "error" });
     } finally {
@@ -115,7 +143,7 @@ export default function AttendanceOverviewPage() {
 
   // Filtered records
   const filtered = useMemo(() => {
-    return records.filter(r => {
+    return pageRecords.filter(r => {
       const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
       const matchSearch = search === "" ||
         String(r.userId).includes(search) ||
@@ -123,7 +151,7 @@ export default function AttendanceOverviewPage() {
         r.status?.toLowerCase().includes(search.toLowerCase());
       return matchStatus && matchSearch;
     });
-  }, [records, search, statusFilter]);
+  }, [pageRecords, search, statusFilter]);
 
   const formatTime = (dt: string) => {
     if (!dt) return "—";
@@ -293,33 +321,35 @@ export default function AttendanceOverviewPage() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by user ID, date or status..."
-            className="flex-1 bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
-          />
-          <div className="flex gap-2">
-            {["ALL", "PRESENT", "ABSENT", "LATE"].map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
-                  statusFilter === s
-                    ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
-                    : "bg-white/5 text-white/40 border-white/[0.08] hover:bg-white/10"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+        <div className="space-y-2 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by user ID, date or status..."
+              className="flex-1 bg-[#13151e] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+            />
+            <div className="flex gap-2">
+              {["ALL", "PRESENT", "ABSENT", "LATE"].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                    statusFilter === s
+                      ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
+                      : "bg-white/5 text-white/40 border-white/[0.08] hover:bg-white/10"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Table */}
-        {loading ? (
+        {loading || tableLoading ? (
           <div className="text-center py-16 text-white/40">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -361,10 +391,10 @@ export default function AttendanceOverviewPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-white/60 text-sm font-mono">
+                      <td className="px-5 py-4 text-white/60 text-sm font-mono font-medium">
                         {formatTime(record.checkIn)}
                       </td>
-                      <td className="px-5 py-4 text-white/60 text-sm font-mono">
+                      <td className="px-5 py-4 text-white/60 text-sm font-mono font-medium">
                         {formatTime(record.checkOut)}
                       </td>
                       {isAdminOrSuperAdmin() && (
@@ -386,21 +416,61 @@ export default function AttendanceOverviewPage() {
               </table>
             </div>
 
-            {/* Table Footer */}
-            <div className="px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="text-white/30 text-xs">
-                Showing {filtered.length} of {records.length} records
-              </span>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" /> Present: {stats.present}
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-white/[0.06] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-white/35">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <span>
+                  Showing <span className="text-white/60">{filtered.length}</span> of <span className="text-white/60">{pageRecords.length}</span> page rows · <span className="text-white/60">{totalElements}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
                 </span>
-                <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-rose-400" /> Absent: {stats.absent}
-                </span>
-                <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Late: {stats.late}
-                </span>
+                <div className="flex items-center gap-3 border-t border-white/[0.04] sm:border-t-0 pt-2 sm:pt-0">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Present: {stats.present}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Late: {stats.late}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Absent: {stats.absent}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <label className="flex items-center gap-1.5">
+                  <span>Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(0);
+                    }}
+                    className="rounded-lg border border-white/[0.08] bg-[#1a1d2e] px-2 py-1 text-xs text-white/90 focus:outline-none cursor-pointer"
+                  >
+                    {[10, 20, 50].map((n) => (
+                      <option key={n} value={n} className="bg-[#1a1d2e] text-white">
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={page <= 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className="px-3 py-1.5 rounded-lg border border-white/[0.1] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-1.5 rounded-lg border border-white/[0.1] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
           </div>

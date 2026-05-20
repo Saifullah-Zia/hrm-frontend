@@ -189,6 +189,35 @@ export interface LeaveDto {
   remainingDaysAfterRequest?: number | null;
 }
 
+export interface LeavePageResponse {
+  content: LeaveDto[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      empty: boolean;
+      sorted: boolean;
+      unsorted: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  size: number;
+  number: number;
+  sort: {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
+  };
+  numberOfElements: number;
+  first: boolean;
+  empty: boolean;
+}
+
 /** Uppercase trim — use when comparing API `status` to literals (DB may use `REJECT` vs `REJECTED`). */
 export function normalizeLeaveStatus(s: string | undefined): string {
   return (s ?? "").toString().trim().toUpperCase();
@@ -238,12 +267,26 @@ export const leaveApi = {
    * (DB may store rejected as `REJECT` while another path uses `REJECTED`).
    */
   getAll: async (): Promise<LeaveDto[]> => {
-    const statuses = ["PENDING", "APPROVED", "REJECTED", "REJECT", "CANCELLED"] as const;
+    const statuses = ["PENDING", "APPROVED", "REJECT", "CANCELLED"] as const;
     const [root, ...byStatus] = await Promise.all([
       apiFetchLeaveListQuiet("/api/leave"),
       ...statuses.map((s) => apiFetchLeaveListQuiet(`/api/leave/status/${s}`)),
     ]);
     return mergeLeaveLists([root, ...byStatus]);
+  },
+  getPaginated: (
+    page = 0,
+    size = 10,
+    status?: string
+  ): Promise<LeavePageResponse> => {
+    let cleanStatus = status;
+    if (cleanStatus === "REJECTED") {
+      cleanStatus = "REJECT";
+    }
+    const statusParam = cleanStatus && cleanStatus !== "ALL" ? `&status=${cleanStatus}` : "";
+    return apiFetch<LeavePageResponse>(
+      `/api/leave/requests/paged?page=${page}&size=${size}${statusParam}`
+    );
   },
   getByStatus: (status: string): Promise<LeaveDto[]> =>
     apiFetch<LeaveDto[]>(`/api/leave/status/${status}`),

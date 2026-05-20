@@ -49,9 +49,48 @@ export interface AnnouncementDTO {
   updatedBy: string;
 }
 
+export interface AnnouncementPageResponse {
+  content: AnnouncementDTO[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      empty: boolean;
+      sorted: boolean;
+      unsorted: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  size: number;
+  number: number;
+  sort: {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
+  };
+  numberOfElements: number;
+  first: boolean;
+  empty: boolean;
+}
+
 export const announcementApi = {
   getAll: (): Promise<AnnouncementDTO[]> =>
     apiFetch<AnnouncementDTO[]>("/api/announcements"),
+
+  getPaginated: (
+    page = 0,
+    size = 10,
+    sortBy = "id",
+    sortDir = "desc"
+  ): Promise<AnnouncementPageResponse> =>
+    apiFetch<AnnouncementPageResponse>(
+      `/api/announcements/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
+    ),
 
   getActive: (): Promise<AnnouncementDTO[]> =>
     apiFetch<AnnouncementDTO[]>("/api/announcements/active"),

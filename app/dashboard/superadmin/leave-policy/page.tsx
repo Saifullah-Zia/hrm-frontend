@@ -73,7 +73,7 @@ export default function SuperadminLeavePolicyPage() {
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-semibold text-white/90 tracking-tight">Leave policies</h1>
         <p className="text-white/40 text-sm mt-1">
-          Super Admin only — <code className="text-indigo-300/90">PUT /api/leave/policy/{"{id}"}</code>
+          Configure and manage company leave policies.
         </p>
 
         <div className="mt-8 rounded-2xl border border-white/[0.06] bg-[#13151e] overflow-hidden">

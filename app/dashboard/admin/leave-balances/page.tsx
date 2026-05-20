@@ -6,50 +6,55 @@ import { leaveApi, LeaveBalanceDto } from "@/services/leaveApi";
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 export default function AdminLeaveBalancesPage() {
-  const [rows, setRows] = useState<LeaveBalanceDto[]>([]);
+  const [allRows, setAllRows] = useState<LeaveBalanceDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const [size, setSize] = useState<number>(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await leaveApi.getAllBalancesPage(page, size);
-      setRows(res.content);
-      setTotalElements(res.totalElements);
-      setTotalPages(
-        res.totalElements === 0 ? 0 : Math.max(1, res.totalPages)
-      );
+      // Fetch ALL balances (backend returns a flat array or a single large page)
+      const balances = await leaveApi.getAllBalances();
+      setAllRows(Array.isArray(balances) ? balances : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load balances");
     } finally {
       setLoading(false);
     }
-  }, [page, size]);
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // Reset to first page when search or page size changes
   useEffect(() => {
     setPage(0);
-  }, [size]);
+  }, [size, q]);
 
+  // Filter by search query
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter(
+    if (!s) return allRows;
+    return allRows.filter(
       (r) =>
         (r.userName ?? "").toLowerCase().includes(s) ||
         (r.leaveType ?? "").toLowerCase().includes(s) ||
         String(r.userId ?? "").includes(s)
     );
-  }, [rows, q]);
+  }, [allRows, q]);
+
+  // Client-side pagination
+  const totalElements = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / size));
+  const pageSlice = useMemo(() => {
+    const start = page * size;
+    return filtered.slice(start, start + size);
+  }, [filtered, page, size]);
 
   const pageHuman = totalElements === 0 ? 0 : page + 1;
   const isFirst = page <= 0;
@@ -60,16 +65,14 @@ export default function AdminLeaveBalancesPage() {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-2xl font-semibold text-white/90 tracking-tight">Leave balances</h1>
         <p className="text-white/40 text-sm mt-1">
-          Current year —{" "}
-          <code className="text-indigo-300/90">GET /api/leave/balance/all?page=&amp;size=</code>{" "}
-          (Spring <code className="text-indigo-300/90">Page</code>)
+          Current year leave balances of all employees.
         </p>
 
         <div className="mt-6 flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between flex-wrap">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Filter this page by employee, type, or user id…"
+            placeholder="Search by employee, type, or user id…"
             className="w-full lg:max-w-md px-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
           />
           <div className="flex flex-wrap items-center gap-3">
@@ -89,17 +92,14 @@ export default function AdminLeaveBalancesPage() {
             </label>
           </div>
         </div>
-        {q.trim() && (
-          <p className="text-white/25 text-xs mt-2">Search applies only to rows on the current page.</p>
-        )}
 
         <div className="mt-6 rounded-2xl border border-white/[0.06] bg-[#13151e] overflow-hidden">
           {loading ? (
             <div className="py-20 text-center text-white/40 text-sm">Loading…</div>
           ) : error ? (
             <div className="p-6 text-rose-400 text-sm">{error}</div>
-          ) : filtered.length === 0 ? (
-            <div className="py-16 text-center text-white/40 text-sm">No balance rows on this page</div>
+          ) : pageSlice.length === 0 ? (
+            <div className="py-16 text-center text-white/40 text-sm">No balance rows found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[800px]">
@@ -116,7 +116,7 @@ export default function AdminLeaveBalancesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
-                  {filtered.map((r) => (
+                  {pageSlice.map((r) => (
                     <tr key={r.id ?? `${r.userId}-${r.leaveType}-${r.year}`} className="hover:bg-white/[0.02]">
                       <td className="px-4 py-3 text-white/80">
                         <span className="font-medium">{r.userName ?? "—"}</span>
@@ -141,14 +141,14 @@ export default function AdminLeaveBalancesPage() {
               <span>
                 Showing{" "}
                 <span className="text-white/60">
-                  {filtered.length === rows.length ? rows.length : `${filtered.length} / ${rows.length}`}
+                  {pageSlice.length}
                 </span>{" "}
                 rows ·{" "}
                 <span className="text-white/60">
                   {totalElements} total
                 </span>{" "}
                 · Page <span className="text-white/60">{pageHuman}</span> of{" "}
-                <span className="text-white/60">{Math.max(1, totalPages)}</span>
+                <span className="text-white/60">{totalPages}</span>
               </span>
               <div className="flex items-center gap-2">
                 <button

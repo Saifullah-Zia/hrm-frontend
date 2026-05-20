@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import apiClient from "@/lib/apiClient";
@@ -65,6 +65,15 @@ export default function AttendanceOverviewPage() {
   const [records, setRecords]           = useState<AttendanceDTO[]>([]);
   const [users, setUsers]               = useState<SystemUser[]>([]);
   const [loading, setLoading]           = useState(true);
+
+  // Pagination State
+  const [pageRecords, setPageRecords]   = useState<AttendanceDTO[]>([]);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [page, setPage]                 = useState(0);
+  const [pageSize, setPageSize]         = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages]     = useState(1);
+
   const [month, setMonth]               = useState(() => new Date().toISOString().slice(0, 7));
   const [search, setSearch]             = useState("");
   const [idSearch, setIdSearch]         = useState("");
@@ -92,17 +101,44 @@ export default function AttendanceOverviewPage() {
     if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
+  const fetchAllAndUsers = useCallback(async () => {
+    try {
+      const [att, usr] = await Promise.all([
+        attendanceApi.getAll(),
+        apiClient.get<SystemUser[]>("/api/users").then(r => Array.isArray(r.data) ? r.data : []),
+      ]);
+      setRecords(att);
+      setUsers(usr);
+    } catch {
+      setToast({ message: "Failed to load overall stats", type: "error" });
+    }
+  }, []);
+
+  const loadPageRecords = useCallback(async () => {
+    setTableLoading(true);
+    try {
+      const res = await attendanceApi.getPaginated(page, pageSize, "date", "desc");
+      setPageRecords(res.content);
+      setTotalElements(res.totalElements);
+      setTotalPages(Math.max(1, res.totalPages));
+    } catch {
+      setToast({ message: "Failed to load page records", type: "error" });
+    } finally {
+      setTableLoading(false);
+    }
+  }, [page, pageSize]);
+
   /* ── fetch attendance + users in parallel ── */
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      attendanceApi.getAll(),
-      apiClient.get<SystemUser[]>("/api/users").then(r => Array.isArray(r.data) ? r.data : []),
-    ])
-      .then(([att, usr]) => { setRecords(att); setUsers(usr); })
-      .catch(() => setToast({ message: "Failed to load data", type: "error" }))
+    Promise.all([fetchAllAndUsers(), loadPageRecords()])
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchAllAndUsers, loadPageRecords]);
+
+  // Handle page or size changes
+  useEffect(() => {
+    loadPageRecords();
+  }, [page, pageSize, loadPageRecords]);
 
   /* ── userId → name map ── */
   const userMap = useMemo(() => {
@@ -172,7 +208,7 @@ export default function AttendanceOverviewPage() {
 
   /* ── filtered records ── */
   const filtered = useMemo(() => {
-    return records.filter(r => {
+    return pageRecords.filter(r => {
       const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
 
       // ID filter
@@ -192,7 +228,7 @@ export default function AttendanceOverviewPage() {
 
       return matchStatus && matchId && matchName && matchSearch;
     });
-  }, [records, search, idSearch, nameSearch, statusFilter, userMap]);
+  }, [pageRecords, search, idSearch, nameSearch, statusFilter, userMap]);
 
   /* ── CRUD ── */
   const handleCreate = async () => {
@@ -206,11 +242,12 @@ export default function AttendanceOverviewPage() {
         checkIn:  form.checkIn  ? `${form.date}T${form.checkIn}:00`  : undefined,
         checkOut: form.checkOut ? `${form.date}T${form.checkOut}:00` : undefined,
       };
-      const created = await attendanceApi.create(payload);
-      setRecords(prev => [created, ...prev]);
+      await attendanceApi.create(payload);
       setToast({ message: "✅ Record created!", type: "success" });
       setShowForm(false);
       setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
+      setPage(0); // Go back to first page to see the new entry
+      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
     } catch (err: any) {
       setToast({ message: err.message || "Failed to create record", type: "error" });
     } finally { setActionLoading(false); }
@@ -220,9 +257,9 @@ export default function AttendanceOverviewPage() {
     setActionLoading(true);
     try {
       await attendanceApi.delete(id);
-      setRecords(prev => prev.filter(r => r.id !== id));
       setToast({ message: "🗑️ Record deleted!", type: "success" });
       setDeleteConfirmId(null);
+      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
     } catch (err: any) {
       setToast({ message: err.message || "Failed to delete", type: "error" });
     } finally { setActionLoading(false); }
@@ -521,7 +558,7 @@ export default function AttendanceOverviewPage() {
         </div>
 
         {/* Table */}
-        {loading ? (
+        {loading || tableLoading ? (
           <div className="text-center py-16 text-white/40">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -610,20 +647,60 @@ export default function AttendanceOverviewPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="text-white/30 text-xs">
-                Showing {filtered.length} of {records.length} records
-              </span>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" /> Present: {stats.present}
+            <div className="px-5 py-3 border-t border-white/[0.06] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-white/35">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <span>
+                  Showing <span className="text-white/60">{filtered.length}</span> of <span className="text-white/60">{pageRecords.length}</span> page rows · <span className="text-white/60">{totalElements}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
                 </span>
-                <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Late: {stats.late}
-                </span>
-                <span className="flex items-center gap-1.5 text-white/30">
-                  <span className="w-2 h-2 rounded-full bg-rose-400" /> Absent: {stats.absent}
-                </span>
+                <div className="flex items-center gap-3 border-t border-white/[0.04] sm:border-t-0 pt-2 sm:pt-0">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Present: {stats.present}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Late: {stats.late}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Absent: {stats.absent}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <label className="flex items-center gap-1.5">
+                  <span>Rows</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(0);
+                    }}
+                    className="rounded-lg border border-white/[0.08] bg-[#1a1d2e] px-2 py-1 text-xs text-white/90 focus:outline-none cursor-pointer"
+                  >
+                    {[10, 20, 50].map((n) => (
+                      <option key={n} value={n} className="bg-[#1a1d2e] text-white">
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={page <= 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className="px-3 py-1.5 rounded-lg border border-white/[0.1] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-1.5 rounded-lg border border-white/[0.1] text-white/70 font-medium hover:bg-white/[0.05] disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
           </div>

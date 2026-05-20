@@ -93,7 +93,7 @@ export default function EmployeeProfilePage() {
         <div>
           <h1 className="text-xl font-semibold text-white">Employee Profiles</h1>
           <p className="text-sm text-[#555870] mt-0.5">
-            Manage all employee records · <span className="font-mono">/api/employee-profiles</span>
+            Manage all employee records.
           </p>
         </div>
 

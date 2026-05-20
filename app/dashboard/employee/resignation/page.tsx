@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/authStore";
 import {
   resignationApi,
@@ -10,6 +10,7 @@ import {
   resignationTypeLabel,
 } from "@/services/resignationApi";
 import { employeeProfileApi } from "@/services/employeeProfileApi";
+import EmployeeOffboardingTasks from "./EmployeeOffboardingTasks";
 
 const fmt = (d?: string) =>
   d
@@ -89,9 +90,11 @@ function WithdrawModal({
 function ActiveResignationCard({
   r,
   onWithdraw,
+  onTaskUpdate,
 }: {
   r: ResignationResponse;
   onWithdraw: () => void;
+  onTaskUpdate: () => void;
 }) {
   const progress =
     r.totalTasks > 0
@@ -187,10 +190,17 @@ function ActiveResignationCard({
       {(r.status === "PENDING" || r.status === "APPROVED") && (
         <button
           onClick={onWithdraw}
-          className="text-xs text-rose-400/70 hover:text-rose-400 underline-offset-2 hover:underline transition-colors"
+          className="text-xs text-rose-400/70 hover:text-rose-400 underline-offset-2 hover:underline transition-colors mt-4 block"
         >
           Withdraw resignation
         </button>
+      )}
+
+      {/* Offboarding Tasks (rendered inline if APPROVED or tasks exist) */}
+      {(r.status === "APPROVED" || r.totalTasks > 0) && (
+        <EmployeeOffboardingTasks
+          resignation={r}
+        />
       )}
     </div>
   );
@@ -342,8 +352,7 @@ export default function EmployeeResignationPage() {
   if (authUserId == null) {
     return (
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
-        Missing <code className="text-amber-100">userId</code> in your session.
-        Please log out and log in again.
+        Your session is missing required user information. Please log out and log in again.
       </div>
     );
   }
@@ -417,6 +426,9 @@ export default function EmployeeResignationPage() {
             onWithdraw={() => {
               setWithdrawTargetId(activeResignation!.id);
               setShowWithdraw(true);
+            }}
+            onTaskUpdate={() => {
+              if (profileId) load(profileId);
             }}
           />
         ) : (
@@ -545,8 +557,9 @@ export default function EmployeeResignationPage() {
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
                   {resignations.map((r) => (
-                    <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-5 py-4 text-white/70">{fmt(r.resignationDate)}</td>
+                    <React.Fragment key={r.id}>
+                      <tr className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-5 py-4 text-white/70">{fmt(r.resignationDate)}</td>
                       <td className="px-5 py-4 text-white/60">{fmt(r.lastWorkingDay)}</td>
                       <td className="px-5 py-4 text-white/50 text-xs">{resignationTypeLabel(r.resignationType)}</td>
                       <td className="px-5 py-4">
@@ -568,9 +581,11 @@ export default function EmployeeResignationPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                    <EmployeeOffboardingTasks resignation={r} asTableRow={true} />
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
             </div>
           </div>
         )}
