@@ -75,31 +75,26 @@ export default function EmployeeDocumentsPage() {
           return;
         }
 
-        // Primary: fetch by employee profile ID
+        let docs: DocumentDtoResponse[] = [];
+
+        // Strategy 1: try getByEmployee
         try {
-          const docs = await documentApi.getByEmployee(profile.id);
-          setDocuments(docs);
-          return;
-        } catch (primaryErr: any) {
-          const status = primaryErr?.response?.status;
-          // 400 or 403 → backend may restrict this endpoint; try search by name
-          if (status === 400 || status === 403) {
-            const name = `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
-            if (name) {
-              try {
-                const docs = await documentApi.searchDocuments(name);
-                setDocuments(docs);
-                return;
-              } catch {
-                // search also failed — fall through to show no-access message
-              }
-            }
-            setDocuments([]);
-            setError(null); // show empty state rather than error
-            return;
+          docs = await documentApi.getByEmployee(profile.id);
+        } catch {
+          // Strategy 2: getAll and filter client-side by employeeId or name
+          try {
+            const allDocs = await documentApi.getAll();
+            const empName = `${profile.firstName || ""} ${profile.lastName || ""}`.trim().toLowerCase();
+            docs = allDocs.filter(d =>
+              d.employeeId === profile.id ||
+              (empName && (d.employeeName || "").toLowerCase().includes(empName))
+            );
+          } catch {
+            docs = [];
           }
-          throw primaryErr; // re-throw unexpected errors
         }
+
+        setDocuments(docs);
       } catch (err: any) {
         console.error("[MyDocuments]", err);
         setError(err.message || "Failed to load documents.");

@@ -69,27 +69,43 @@ export default function DocumentHubPage() {
       let docs: DocumentDtoResponse[] = [];
 
       if (activeTab === "EXPIRING") {
-        docs = await documentApi.getExpiringSoon(30);
-      } else if (search.trim()) {
-        // Use backend search when user has typed something
-        docs = await documentApi.searchDocuments(search.trim());
-      } else if (selectedEmployeeId !== "") {
-        // Fetch docs for a specific employee
-        docs = await documentApi.getByEmployee(Number(selectedEmployeeId));
-      } else {
-        // No search & no employee selected — fetch for ALL employees using allSettled
-        const validEmps = employees.filter(e => e.id != null);
-        if (validEmps.length === 0) {
-          setDocuments([]);
-          setLoading(false);
-          return;
+        // Try dedicated expiring endpoint, fallback to getAll + client filter
+        try {
+          docs = await documentApi.getExpiringSoon(30);
+        } catch {
+          const allDocs = await documentApi.getAll();
+          const now = new Date();
+          const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          docs = allDocs.filter(d => {
+            if (!d.expiryDate) return false;
+            const exp = new Date(d.expiryDate);
+            return exp <= thirtyDays && exp >= now;
+          });
         }
-        const results = await Promise.allSettled(
-          validEmps.map(e => documentApi.getByEmployee(e.id!))
-        );
-        docs = results
-          .filter((r): r is PromiseFulfilledResult<DocumentDtoResponse[]> => r.status === "fulfilled")
-          .flatMap(r => r.value);
+      } else if (search.trim()) {
+        // Use backend search
+        try {
+          docs = await documentApi.searchDocuments(search.trim());
+        } catch {
+          // Fallback: getAll + client filter
+          const allDocs = await documentApi.getAll();
+          const q = search.toLowerCase();
+          docs = allDocs.filter(d =>
+            d.title.toLowerCase().includes(q) ||
+            (d.employeeName || "").toLowerCase().includes(q)
+          );
+        }
+      } else if (selectedEmployeeId !== "") {
+        // Fetch docs for a specific employee — try getByEmployee, fallback to getAll + filter
+        try {
+          docs = await documentApi.getByEmployee(Number(selectedEmployeeId));
+        } catch {
+          const allDocs = await documentApi.getAll();
+          docs = allDocs.filter(d => d.employeeId === Number(selectedEmployeeId));
+        }
+      } else {
+        // Default: fetch ALL documents
+        docs = await documentApi.getAll();
       }
 
       setDocuments(docs);
@@ -99,7 +115,7 @@ export default function DocumentHubPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, search, selectedEmployeeId, employees]);
+  }, [activeTab, search, selectedEmployeeId]);
 
   useEffect(() => {
     if (!empLoading) loadDocuments();
