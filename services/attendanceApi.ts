@@ -12,14 +12,11 @@ function getToken(): string | null {
         return token;
       }
     }
-    
-    // Fallback to direct token storage
     const directToken = localStorage.getItem("token");
     if (directToken) {
       console.log("✅ Token found from direct storage");
       return directToken;
     }
-    
     console.warn("⚠️ No token found in localStorage");
     return null;
   } catch (e) {
@@ -30,6 +27,9 @@ function getToken(): string | null {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
+  console.log(`🔑 Token found: ${token ? "YES" : "NO"}`);
+  console.log(`📡 Calling: ${BASE_URL}${path}`);
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -38,10 +38,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   });
+
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(errorText || `HTTP ${res.status}`);
   }
+
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.includes("application/json")) {
     return res.json();
@@ -52,28 +54,59 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 export interface AttendanceDTO {
   id: number;
   date: string;
-  status: string;       // PRESENT, ABSENT, LATE
-  checkIn: string;
-  checkOut: string;
+  status: string;     // PRESENT, ABSENT, LATE
+  checkIn: string;    // stored as PKT, no timezone suffix
+  checkOut: string;   // stored as PKT, no timezone suffix
   userId: number;
 }
 
+export interface AttendancePageResponse {
+  content: AttendanceDTO[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
+
 export const attendanceApi = {
+
   getAll: (): Promise<AttendanceDTO[]> =>
     apiFetch<AttendanceDTO[]>("/api/attendance"),
 
   getById: (id: number): Promise<AttendanceDTO> =>
     apiFetch<AttendanceDTO>(`/api/attendance/${id}`),
 
+  // ── Admin: manual record creation ─────────────────────────────────────────
   create: (data: Partial<AttendanceDTO>): Promise<AttendanceDTO> =>
     apiFetch<AttendanceDTO>("/api/attendance", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
+  // ── Admin only: full record edit ───────────────────────────────────────────
+  adminUpdate: (id: number, data: Partial<AttendanceDTO>): Promise<AttendanceDTO> =>
+    apiFetch<AttendanceDTO>(`/api/attendance/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   delete: (id: number): Promise<void> =>
     apiFetch<void>(`/api/attendance/${id}`, { method: "DELETE" }),
 
+  // ── Employee: check-in (server stamps PKT time) ────────────────────────────
+  checkIn: (userId: number): Promise<AttendanceDTO> =>
+    apiFetch<AttendanceDTO>(`/api/attendance/checkin?userId=${userId}`, {
+      method: "POST",
+    }),
+
+  // ── Employee: check-out (server stamps PKT time) ───────────────────────────
+  checkOut: (userId: number): Promise<AttendanceDTO> =>
+    apiFetch<AttendanceDTO>(`/api/attendance/checkout?userId=${userId}`, {
+      method: "POST",
+    }),
+
+  // ── Paginated: all records (admin) ────────────────────────────────────────
   getPaginated: (
     page = 0,
     size = 10,
@@ -84,22 +117,21 @@ export const attendanceApi = {
       `/api/attendance/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
     ),
 
-  /**
-   * Rows for one user. Your `AttendanceController` only exposes `GET /api/attendance` (all),
-   * so this loads that list and filters client-side. Prefer adding `GET /api/attendance/user/{userId}`
-   * (or `/me`) on the server so employees never receive other users' rows.
-   */
-  getByUserId: async (userId: number): Promise<AttendanceDTO[]> => {
-    const all = await apiFetch<AttendanceDTO[]>("/api/attendance");
-    return all.filter((r) => Number(r.userId) === Number(userId));
-  },
-};
+  // ── Per-user: all records ─────────────────────────────────────────────────
+  getByUserId: (userId: number): Promise<AttendanceDTO[]> =>
+    apiFetch<AttendancePageResponse>(
+      `/api/attendance/user/${userId}/paged?page=0&size=1000&sortBy=date&sortDir=desc`
+    ).then((res) => res.content ?? []),
 
-export interface AttendancePageResponse {
-  content: AttendanceDTO[];
-  pageNumber: number;
-  pageSize: number;
-  totalElements: number;
-  totalPages: number;
-  last: boolean;
-}
+  // ── Per-user: paginated ───────────────────────────────────────────────────
+  getPaginatedByUserId: (
+    userId: number,
+    page = 0,
+    size = 10,
+    sortBy = "date",
+    sortDir = "desc"
+  ): Promise<AttendancePageResponse> =>
+    apiFetch<AttendancePageResponse>(
+      `/api/attendance/user/${userId}/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
+    ),
+};

@@ -26,7 +26,12 @@ const STATUS_DOT: Record<string, string> = {
 
 const formatTime = (dt: string) => {
   if (!dt) return "—";
-  return new Date(dt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  return new Date(dt + "+05:00").toLocaleTimeString("en-PK", {
+    timeZone: "Asia/Karachi",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 };
 const formatDate = (d: string) => {
   if (!d) return "—";

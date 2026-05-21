@@ -11,6 +11,32 @@ export default function AdminOfficeHoursPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [draft, setDraft] = useState<OfficeHoursConfig>(DEFAULT_OFFICE_HOURS);
 
+  const getBoundaryTime = (startStr: string, minutes: number) => {
+    if (!startStr) return "";
+    const [h, m] = startStr.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return "";
+    const d = new Date(2000, 0, 1, h, m + minutes);
+    let hh = d.getHours();
+    const ampm = hh >= 12 ? 'PM' : 'AM';
+    hh = hh % 12;
+    hh = hh ? hh : 12;
+    const hhStr = String(hh).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hhStr}:${mm} ${ampm}`;
+  };
+
+  const formatAmPm = (timeStr: string) => {
+    if (!timeStr) return "";
+    const [hStr, mStr] = timeStr.split(':');
+    let h = parseInt(hStr, 10);
+    if (isNaN(h)) return timeStr;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12;
+    const hh = String(h).padStart(2, '0');
+    return `${hh}:${mStr} ${ampm}`;
+  };
+
   const query = useQuery({
     queryKey: ["office-hours"],
     queryFn: () => officeHoursApi.get(),
@@ -28,16 +54,19 @@ export default function AdminOfficeHoursPage() {
 
   const saveMutation = useMutation({
     mutationFn: () => officeHoursApi.update(draft),
-    onSuccess: ({ config, source }) => {
+    onSuccess: (config) => {
       qc.setQueryData(["office-hours"], config);
       setToast({
-        type: source === "server" ? "success" : "error",
-        message:
-          source === "server"
-            ? "Office hours saved on the server. Employees will use this for late / on-time check-in."
-            : "Saved in this browser only.",
+        type: "success",
+        message: "Office hours saved to the server. All employees will see these hours.",
       });
     },
+    onError: (e) => {
+      setToast({
+        type: "error",
+        message: "Failed to save office hours to the server.",
+      });
+    }
   });
 
   return (
@@ -94,8 +123,8 @@ export default function AdminOfficeHoursPage() {
               className="mt-1.5 w-full max-w-xs px-3 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90"
             />
             <p className="text-[11px] text-white/35 mt-1">
-              Example: start 09:00 + 15 min grace → check-in by 09:15 is <span className="text-emerald-400/90">PRESENT</span>
-              ; 09:16 is <span className="text-amber-400/90">LATE</span>.
+              Example: start {formatAmPm(draft.workdayStart)} + {draft.graceMinutes} min grace → check-in by {getBoundaryTime(draft.workdayStart, draft.graceMinutes)} is <span className="text-emerald-400/90">PRESENT</span>
+              ; {getBoundaryTime(draft.workdayStart, draft.graceMinutes + 1)} is <span className="text-amber-400/90">LATE</span>.
             </p>
           </div>
         </div>

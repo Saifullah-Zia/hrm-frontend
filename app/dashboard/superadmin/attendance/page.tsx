@@ -101,7 +101,7 @@ export default function AttendanceOverviewPage() {
         userId: Number(form.userId),
         date: form.date,
         status: form.status,
-        checkIn: form.checkIn ? `${form.date}T${form.checkIn}:00` : undefined,
+        checkIn:  form.checkIn  ? `${form.date}T${form.checkIn}:00`  : undefined,
         checkOut: form.checkOut ? `${form.date}T${form.checkOut}:00` : undefined,
       };
       await attendanceApi.create(payload);
@@ -155,8 +155,11 @@ export default function AttendanceOverviewPage() {
 
   const formatTime = (dt: string) => {
     if (!dt) return "—";
-    return new Date(dt).toLocaleTimeString("en-US", {
-      hour: "2-digit", minute: "2-digit", hour12: true,
+    return new Date(dt + "+05:00").toLocaleTimeString("en-PK", {
+      timeZone: "Asia/Karachi",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
   };
 

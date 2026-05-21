@@ -17,9 +17,11 @@ const STATUS_COLORS: Record<string, string> = {
 const isAttended = (status: string) =>
   status === "PRESENT" || status === "LATE";
 
+// ✅ Fixed: appends +05:00 so browser treats time as PKT regardless of local timezone
 const formatTime = (dt: string) => {
   if (!dt) return "—";
-  return new Date(dt).toLocaleTimeString("en-US", {
+  return new Date(dt + "+05:00").toLocaleTimeString("en-PK", {
+    timeZone: "Asia/Karachi",
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
@@ -28,7 +30,6 @@ const formatTime = (dt: string) => {
 
 const formatDate = (d: string) => {
   if (!d) return "—";
-  // Force local-time parsing to avoid UTC-offset shifting the date back by one day
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -40,8 +41,8 @@ const formatDate = (d: string) => {
 /** Returns Monday of the ISO week containing `date` */
 const weekStart = (date: Date): Date => {
   const d = new Date(date);
-  const day = d.getDay(); // 0=Sun
-  const diff = (day === 0 ? -6 : 1) - day; // shift to Monday
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -60,8 +61,8 @@ const workdaysBetween = (start: Date, end: Date): number => {
 };
 
 interface WeekBucket {
-  label: string; // "Week 1", "Week 2" …
-  dateRange: string; // "May 1 – 7"
+  label: string;
+  dateRange: string;
   attended: number;
   workdays: number;
   pct: number;
@@ -73,10 +74,17 @@ export default function EmployeeAttendancePage() {
   const { user } = useAuthStore();
   const userId = user?.userId;
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [page, setPage] = useState(0);
 
   const recordsQuery = useQuery({
     queryKey: ["employee-attendance", userId],
     queryFn: () => attendanceApi.getByUserId(userId!),
+    enabled: typeof userId === "number",
+  });
+
+  const paginatedQuery = useQuery({
+    queryKey: ["employee-attendance-paginated", userId, page],
+    queryFn: () => attendanceApi.getPaginatedByUserId(userId!, page, 10),
     enabled: typeof userId === "number",
   });
 
@@ -95,17 +103,16 @@ export default function EmployeeAttendancePage() {
     return { attended, total, rate };
   }, [filtered]);
 
-  /* ── this-week stats (always uses today's real week, not month filter) ── */
+  /* ── this-week stats ── */
   const weekStats = useMemo(() => {
     const allRows = recordsQuery.data ?? [];
     const today = new Date();
     const mon = weekStart(today);
     const fri = new Date(mon);
     fri.setDate(mon.getDate() + 4);
-    fri.setHours(23, 59, 59, 999); // end of Friday
+    fri.setHours(23, 59, 59, 999);
 
     const thisWeekRows = allRows.filter((r) => {
-      // Append T00:00:00 so the string is parsed as LOCAL time, not UTC
       const d = new Date(r.date + "T00:00:00");
       return d >= mon && d <= fri;
     });
@@ -133,7 +140,6 @@ export default function EmployeeAttendancePage() {
       const wFri = new Date(wMon);
       wFri.setDate(wMon.getDate() + 4);
 
-      // Clamp to month boundaries
       const rangeStart = wMon < firstDay ? firstDay : wMon;
       const rangeEnd = wFri > lastDay ? lastDay : wFri;
 
@@ -141,21 +147,13 @@ export default function EmployeeAttendancePage() {
 
       const workdays = workdaysBetween(rangeStart, rangeEnd);
       const attended = filtered.filter((r) => {
-        // Force local-time parsing to avoid UTC-offset shifting the date
         const d = new Date(r.date + "T00:00:00");
         return d >= rangeStart && d <= rangeEnd && isAttended(r.status);
       }).length;
       const pct = workdays ? Math.round((attended / workdays) * 100) : 0;
 
-      buckets.push({
-        label: `Week ${weekNum}`,
-        dateRange: rangeLabel,
-        attended,
-        workdays,
-        pct,
-      });
+      buckets.push({ label: `Week ${weekNum}`, dateRange: rangeLabel, attended, workdays, pct });
 
-      // Move to next Monday
       const nextMon = new Date(wMon);
       nextMon.setDate(wMon.getDate() + 7);
       cur = nextMon;
@@ -199,16 +197,14 @@ export default function EmployeeAttendancePage() {
       {/* ── check-in / check-out card ── */}
       <AttendanceClockCard userId={userId} />
 
-      {/* ── stat cards: this week + monthly ── */}
+      {/* ── stat cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {/* This week */}
         <div className="col-span-2 sm:col-span-2 bg-gradient-to-br from-indigo-600/20 to-violet-600/10 border border-indigo-500/20 rounded-2xl p-5 flex flex-col gap-3">
           <p className="text-indigo-300/70 text-xs font-semibold uppercase tracking-widest">This Week</p>
           <div className="flex items-end gap-2">
             <p className="text-4xl font-bold text-white/90">{weekStats.attended}</p>
             <p className="text-white/40 text-sm mb-1">/ {weekStats.workdays} days</p>
           </div>
-          {/* mini progress bar */}
           <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700"
@@ -218,13 +214,11 @@ export default function EmployeeAttendancePage() {
           <p className="text-indigo-300/60 text-xs">{weekStats.rate}% attendance this week</p>
         </div>
 
-        {/* Days in view */}
         <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5">
           <p className="text-white/40 text-xs font-medium uppercase tracking-wider">Days in view</p>
           <p className="text-3xl font-bold text-white/80 mt-2">{monthStats.total}</p>
         </div>
 
-        {/* Monthly attendance % */}
         <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5">
           <p className="text-white/40 text-xs font-medium uppercase tracking-wider">Monthly %</p>
           <p className="text-3xl font-bold text-emerald-400/90 mt-2">{monthStats.rate}%</p>
@@ -240,7 +234,6 @@ export default function EmployeeAttendancePage() {
               <p className="text-white/80 font-semibold text-sm">Weekly Breakdown</p>
               <p className="text-white/30 text-xs mt-0.5">Attendance per week for the selected month</p>
             </div>
-            {/* legend */}
             <div className="flex items-center gap-4 text-xs text-white/40">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm bg-indigo-500/70 inline-block" />
@@ -256,24 +249,19 @@ export default function EmployeeAttendancePage() {
           <div className="flex items-end gap-4 h-40">
             {weekBuckets.map((bucket) => (
               <div key={bucket.label} className="flex-1 flex flex-col items-center gap-2 h-full">
-                {/* bar area */}
                 <div className="relative w-full flex-1 flex items-end justify-center gap-1">
-                  {/* background (total workdays) */}
                   <div
                     className="absolute bottom-0 left-0 right-0 rounded-lg bg-white/[0.04] border border-white/[0.06]"
                     style={{ height: `${(bucket.workdays / barMax) * 100}%` }}
                   />
-                  {/* foreground (attended) */}
                   <div
                     className="absolute bottom-0 left-0 right-0 rounded-lg bg-gradient-to-t from-indigo-600/80 to-violet-500/60 border border-indigo-500/30 transition-all duration-700"
                     style={{ height: `${(bucket.attended / barMax) * 100}%` }}
                   />
-                  {/* % label */}
                   <span className="relative z-10 text-[10px] font-bold text-white/70 mb-1">
                     {bucket.pct}%
                   </span>
                 </div>
-                {/* x-axis labels */}
                 <div className="text-center">
                   <p className="text-white/60 text-[11px] font-medium">{bucket.label}</p>
                   <p className="text-white/25 text-[10px]">{bucket.dateRange}</p>
@@ -282,16 +270,10 @@ export default function EmployeeAttendancePage() {
             ))}
           </div>
 
-          {/* week detail row */}
           <div className="mt-5 grid gap-2" style={{ gridTemplateColumns: `repeat(${weekBuckets.length}, 1fr)` }}>
             {weekBuckets.map((bucket) => (
-              <div
-                key={bucket.label}
-                className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-3 py-2 text-center"
-              >
-                <p className="text-white/60 text-[11px] font-semibold">
-                  {bucket.attended}/{bucket.workdays}
-                </p>
+              <div key={bucket.label} className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-3 py-2 text-center">
+                <p className="text-white/60 text-[11px] font-semibold">{bucket.attended}/{bucket.workdays}</p>
                 <p className="text-white/25 text-[10px]">days</p>
               </div>
             ))}
@@ -300,51 +282,71 @@ export default function EmployeeAttendancePage() {
       )}
 
       {/* ── attendance table ── */}
-      {recordsQuery.isLoading ? (
+      {paginatedQuery.isLoading ? (
         <div className="animate-pulse h-48 rounded-2xl bg-white/[0.04]" />
-      ) : recordsQuery.isError ? (
+      ) : paginatedQuery.isError ? (
         <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
           Could not load attendance records. Please contact support.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Check in</th>
-                <th className="px-4 py-3 font-medium">Check out</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-white/40">
-                    No attendance rows for this month.
-                  </td>
+        <>
+          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Check in</th>
+                  <th className="px-4 py-3 font-medium">Check out</th>
                 </tr>
-              ) : (
-                filtered.map((row: AttendanceDTO) => (
-                  <tr key={row.id} className="hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-white/80">{formatDate(row.date)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium border ${
-                          STATUS_COLORS[row.status] ?? "bg-white/5 text-white/50 border-white/10"
-                        }`}
-                      >
-                        {row.status}
-                      </span>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {!paginatedQuery.data?.content || paginatedQuery.data.content.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-10 text-center text-white/40">
+                      No attendance rows found.
                     </td>
-                    <td className="px-4 py-3 text-white/60">{formatTime(row.checkIn)}</td>
-                    <td className="px-4 py-3 text-white/60">{formatTime(row.checkOut)}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  paginatedQuery.data.content.map((row: AttendanceDTO) => (
+                    <tr key={row.id} className="hover:bg-white/[0.02]">
+                      <td className="px-4 py-3 text-white/80">{formatDate(row.date)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-medium border ${STATUS_COLORS[row.status] ?? "bg-white/5 text-white/50 border-white/10"}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white/60">{formatTime(row.checkIn)}</td>
+                      <td className="px-4 py-3 text-white/60">{formatTime(row.checkOut)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {paginatedQuery.data && paginatedQuery.data.totalPages > 0 && (
+            <div className="flex items-center justify-between mt-4 text-sm text-white/50 px-2">
+              <div>Page {page + 1} of {paginatedQuery.data.totalPages}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1.5 rounded-lg border border-white/[0.06] bg-[#13151e] hover:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={paginatedQuery.data.last || page >= paginatedQuery.data.totalPages - 1}
+                  className="px-3 py-1.5 rounded-lg border border-white/[0.06] bg-[#13151e] hover:bg-white/[0.04] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
