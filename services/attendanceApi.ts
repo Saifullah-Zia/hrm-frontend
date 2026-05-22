@@ -31,6 +31,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   console.log(`📡 Calling: ${BASE_URL}${path}`);
 
   const res = await fetch(`${BASE_URL}${path}`, {
+    cache: "no-store",
     ...options,
     headers: {
       "Content-Type": "application/json",

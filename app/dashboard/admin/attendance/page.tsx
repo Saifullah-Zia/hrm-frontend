@@ -456,9 +456,9 @@ export default function AttendanceOverviewPage() {
                   onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
                 >
-                  <option value="PRESENT">Present</option>
-                  <option value="ABSENT">Absent</option>
-                  <option value="LATE">Late</option>
+                  <option value="PRESENT" className="bg-[#1a1d2e] text-white">Present</option>
+                  <option value="ABSENT" className="bg-[#1a1d2e] text-white">Absent</option>
+                  <option value="LATE" className="bg-[#1a1d2e] text-white">Late</option>
                 </select>
               </div>
               <div>

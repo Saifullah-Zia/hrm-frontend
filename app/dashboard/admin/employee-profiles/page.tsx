@@ -32,6 +32,9 @@ type SystemUser = {
   name: string;
   email: string;
   role: string;
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  probationStatus?: string | null;
 };
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
@@ -185,7 +188,26 @@ const Modal = ({
     if (field === "cnicNumber" && typeof val === "string") {
       finalVal = val.replace(/[^0-9-]/g, "");
     }
-    setForm((f) => ({ ...f, [field]: finalVal }));
+    
+    setForm((f) => {
+      const next = { ...f, [field]: finalVal };
+      
+      // Auto-calculate probation dates (3 months) when joining date is set
+      if (field === "joiningDate" && typeof finalVal === "string" && finalVal) {
+        const joinDate = new Date(finalVal);
+        if (!isNaN(joinDate.getTime())) {
+          next.probationStartDate = finalVal;
+          const endDate = new Date(joinDate);
+          endDate.setMonth(endDate.getMonth() + 3);
+          next.probationEndDate = endDate.toISOString().split("T")[0];
+          
+          if (!next.probationStatus) {
+             next.probationStatus = "ON_PROBATION";
+          }
+        }
+      }
+      return next;
+    });
   };
 
   const submit = async () => {
@@ -618,6 +640,22 @@ export default function EmployeeProfilesPage() {
     } else if (modal.mode === "edit" && modal.profile?.id) {
       await employeeProfileApi.update(modal.profile.id, dto);
     }
+    
+    // Sync probation dates to the User account if they were auto-calculated
+    try {
+      const userRes = await apiClient.get<SystemUser>(`/api/users/${dto.userId}`);
+      if (userRes.data) {
+        await apiClient.put(`/api/users/${dto.userId}`, {
+          ...userRes.data,
+          probationStartDate: dto.probationStartDate || null,
+          probationEndDate: dto.probationEndDate || null,
+          probationStatus: dto.probationStatus || null,
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to sync probation dates to User account:", err);
+    }
+
     // ✅ FIX: await loadData(0) first so the list is populated before the modal closes
     await loadData(0);
     setModal({ open: false, mode: "create", profile: null });

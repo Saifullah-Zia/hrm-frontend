@@ -217,27 +217,21 @@ export default function AttendanceClockCard({ userId }: Props) {
 
       {/* Buttons */}
       <div className="flex gap-3">
-        {/* Check In — only show if not checked in yet */}
-        {!hasCheckedIn && (
-          <button
-            onClick={() => checkInMutation.mutate()}
-            disabled={isActing || isLoading}
-            className="px-5 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {checkInMutation.isPending ? "Checking in..." : "Check in"}
-          </button>
-        )}
+        <button
+          onClick={() => checkInMutation.mutate()}
+          disabled={isActing || isLoading || hasCheckedIn}
+          className="px-5 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {checkInMutation.isPending ? "Checking in..." : "Check in"}
+        </button>
 
-        {/* Check Out — only show if checked in but not yet checked out */}
-        {hasCheckedIn && !hasCheckedOut && (
-          <button
-            onClick={() => checkOutMutation.mutate()}
-            disabled={isActing}
-            className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {checkOutMutation.isPending ? "Checking out..." : "Check out"}
-          </button>
-        )}
+        <button
+          onClick={() => checkOutMutation.mutate()}
+          disabled={isActing || !hasCheckedIn || hasCheckedOut}
+          className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {checkOutMutation.isPending ? "Checking out..." : "Check out"}
+        </button>
       </div>
     </div>
   );

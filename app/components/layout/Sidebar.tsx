@@ -24,6 +24,7 @@ const ICONS = {
   document:   "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
   chart:      "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
   user:       "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+  clipboard:  "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
   logout:     "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
 };
 
@@ -42,6 +43,7 @@ const NAV_ITEMS = {
     { label: "Document Hub",        href: "/dashboard/superadmin/documents",     icon: "document" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
     { label: "Attendance Overview", href: "/dashboard/superadmin/attendance",    icon: "clock" },
+    { label: "Audit Logs",          href: "/dashboard/admin/audit-logs",         icon: "clipboard" },
   ],
   ADMIN: [
     { label: "Employee Profiles",   href: "/dashboard/admin/employee-profiles",  icon: "users" },
@@ -55,6 +57,7 @@ const NAV_ITEMS = {
     { label: "Announcements",       href: "/dashboard/admin/announcements",      icon: "bell" },
     { label: "Document Hub",        href: "/dashboard/admin/documents",          icon: "document" },
     { label: "Department View",     href: "/dashboard/admin/departments",        icon: "building" },
+    { label: "Audit Logs",          href: "/dashboard/admin/audit-logs",         icon: "clipboard" },
   ],
   EMPLOYEE: [
     { label: "My Profile",          href: "/dashboard/employee/profile",        icon: "user" },

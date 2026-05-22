@@ -49,7 +49,16 @@ async function apiFetch<T>(
     throw new Error(await res.text());
   }
 
-  return res.json();
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    return res.json();
+  }
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 const positionApi = {
