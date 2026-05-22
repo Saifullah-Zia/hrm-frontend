@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { BRAND_FULL_NAME, BRAND_LOGO_PATH } from "@/lib/branding";
+import { chatApi } from "@/services/chatApi";
 
 // ── Icons (inline SVG to avoid extra dependencies) ──────────
 const Icon = ({ d }: { d: string }) => (
@@ -25,6 +27,7 @@ const ICONS = {
   chart:      "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
   user:       "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   clipboard:  "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
+  chat:       "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
   logout:     "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
 };
 
@@ -32,6 +35,7 @@ const ICONS = {
 // Keys match the role values coming from authStore: "SUPERADMIN" | "ADMIN" | "EMPLOYEE"
 const NAV_ITEMS = {
   SUPERADMIN: [
+    { label: "Team Chat",           href: "/dashboard/chat",                    icon: "chat" },
     { label: "User Management",     href: "/dashboard/superadmin/users",        icon: "users" },
     { label: "Department CRUD",     href: "/dashboard/superadmin/departments",   icon: "building" },
     { label: "Position Management", href: "/dashboard/superadmin/positions",     icon: "briefcase" },
@@ -46,6 +50,7 @@ const NAV_ITEMS = {
     { label: "Audit Logs",          href: "/dashboard/admin/audit-logs",         icon: "clipboard" },
   ],
   ADMIN: [
+    { label: "Team Chat",           href: "/dashboard/chat",                     icon: "chat" },
     { label: "Employee Profiles",   href: "/dashboard/admin/employee-profiles",  icon: "users" },
     { label: "Leave Approvals",     href: "/dashboard/admin/leaves",             icon: "calendar" },
     { label: "Resignations",        href: "/dashboard/admin/resignations",       icon: "document" },
@@ -60,6 +65,7 @@ const NAV_ITEMS = {
     { label: "Audit Logs",          href: "/dashboard/admin/audit-logs",         icon: "clipboard" },
   ],
   EMPLOYEE: [
+    { label: "Team Chat",           href: "/dashboard/chat",                    icon: "chat" },
     { label: "My Profile",          href: "/dashboard/employee/profile",        icon: "user" },
     { label: "Apply for Leave",     href: "/dashboard/employee/leave",          icon: "calendar" },
     { label: "My Resignation",      href: "/dashboard/employee/resignation",    icon: "document" },
@@ -91,6 +97,46 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadChatCount(0);
+      return;
+    }
+
+    const fetchUnreadCount = async () => {
+      try {
+        const conversations = await chatApi.getMyConversations();
+        const totalUnread = conversations.reduce((acc, conv) => acc + (conv.unreadCount ?? 0), 0);
+        setUnreadChatCount(totalUnread);
+      } catch (err) {
+        console.error("Failed to fetch unread chat count:", err);
+      }
+    };
+
+    // Initial fetch
+    fetchUnreadCount();
+
+    // Listen for custom events dispatched from chat page
+    const handleCustomEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (customEvent.detail !== undefined) {
+        setUnreadChatCount(customEvent.detail);
+      }
+    };
+
+    window.addEventListener("unread-chat-count-changed", handleCustomEvent);
+
+    // Poll every 8 seconds
+    const interval = setInterval(fetchUnreadCount, 8000);
+
+    return () => {
+      window.removeEventListener("unread-chat-count-changed", handleCustomEvent);
+      clearInterval(interval);
+    };
+  }, [user, pathname]);
 
   const role = user?.role ?? "EMPLOYEE";
   const navItems = NAV_ITEMS[role] ?? NAV_ITEMS.EMPLOYEE;
@@ -169,8 +215,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Icon d={ICONS[item.icon as keyof typeof ICONS]} />
               </span>
               {item.label}
-              {isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
+              {item.label === "Team Chat" && unreadChatCount > 0 ? (
+                <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-500/20 transition-all duration-300">
+                  {unreadChatCount}
+                </span>
+              ) : (
+                isActive && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                )
               )}
             </Link>
           );
