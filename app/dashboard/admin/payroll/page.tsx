@@ -534,14 +534,14 @@ export default function PayrollManagementPage() {
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-7">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7">
           <div>
             <h1 className="text-xl font-semibold text-white/90">Payroll Management</h1>
             <p className="text-sm text-white/35 mt-0.5">Manage employee payroll records</p>
           </div>
           <button
             onClick={() => { setEditPayroll(null); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25"
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 shrink-0"
           >
             <Icon d={ICONS.plus} />
             Add Payroll
@@ -578,94 +578,96 @@ export default function PayrollManagementPage() {
 
         {/* Table */}
         <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/[0.06]">
-                {["Employee", "Month", "Salary", "Bonus", "Deduction", "Net Salary", "Status", ""].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className={`px-5 py-3 text-white/30 uppercase text-[11px] font-medium ${
-                        h === "" ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {h}
-                    </th>
-                  )
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[900px]">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  {["Employee", "Month", "Salary", "Bonus", "Deduction", "Net Salary", "Status", ""].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className={`px-5 py-3 text-white/30 uppercase text-[11px] font-medium ${
+                          h === "" ? "text-right" : "text-left"
+                        }`}
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-14 text-white/25">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-14 text-white/25">
+                      No payroll records found
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((p) => {
+                    const net = p.netSalary ?? p.salary + p.bonuses - p.deductions;
+                    return (
+                      <tr key={p.id} className="border-t border-white/[0.04] hover:bg-white/[0.03]">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-indigo-300">
+                              <Icon d={ICONS.wallet} className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-white/85 font-medium">{p.userName}</p>
+                              <p className="text-xs text-white/30">ID: {p.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-white/40">{p.month ?? "—"}</td>
+                        <td className="px-5 py-4 text-white/60">Rs. {fmt(p.salary)}</td>
+                        <td className="px-5 py-4 text-emerald-400">Rs. {fmt(p.bonuses)}</td>
+                        <td className="px-5 py-4 text-rose-400">Rs. {fmt(p.deductions)}</td>
+                        <td className="px-5 py-4 text-indigo-400 font-medium">
+                          Rs. {fmt(net)}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                              p.status === "PAID"
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                                : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                            }`}
+                          >
+                            {p.status || "PENDING"}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => { setEditPayroll(p); setShowForm(true); }}
+                              className="p-1.5 rounded-lg text-white/25 hover:text-indigo-400 hover:bg-indigo-500/10"
+                              title="Edit"
+                            >
+                              <Icon d={ICONS.edit} className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(p); setShowDelete(true); }}
+                              className="p-1.5 rounded-lg text-white/25 hover:text-rose-400 hover:bg-rose-500/10"
+                              title="Delete"
+                            >
+                              <Icon d={ICONS.trash} className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-14 text-white/25">
-                    Loading…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center py-14 text-white/25">
-                    No payroll records found
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((p) => {
-                  const net = p.netSalary ?? p.salary + p.bonuses - p.deductions;
-                  return (
-                    <tr key={p.id} className="border-t border-white/[0.04] hover:bg-white/[0.03]">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-indigo-300">
-                            <Icon d={ICONS.wallet} className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-white/85 font-medium">{p.userName}</p>
-                            <p className="text-xs text-white/30">ID: {p.id}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-white/40">{p.month ?? "—"}</td>
-                      <td className="px-5 py-4 text-white/60">Rs. {fmt(p.salary)}</td>
-                      <td className="px-5 py-4 text-emerald-400">Rs. {fmt(p.bonuses)}</td>
-                      <td className="px-5 py-4 text-rose-400">Rs. {fmt(p.deductions)}</td>
-                      <td className="px-5 py-4 text-indigo-400 font-medium">
-                        Rs. {fmt(net)}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                            p.status === "PAID"
-                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                              : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                          }`}
-                        >
-                          {p.status || "PENDING"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => { setEditPayroll(p); setShowForm(true); }}
-                            className="p-1.5 rounded-lg text-white/25 hover:text-indigo-400 hover:bg-indigo-500/10"
-                            title="Edit"
-                          >
-                            <Icon d={ICONS.edit} className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => { setDeleteTarget(p); setShowDelete(true); }}
-                            className="p-1.5 rounded-lg text-white/25 hover:text-rose-400 hover:bg-rose-500/10"
-                            title="Delete"
-                          >
-                            <Icon d={ICONS.trash} className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {!loading && totalElements > 0 && (

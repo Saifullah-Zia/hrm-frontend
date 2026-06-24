@@ -109,7 +109,7 @@ export const probationApi = {
 
   getOnProbation: async (): Promise<UserWithProbationDto[]> => {
     try {
-      const res = await apiClient.get<unknown>("/api/users/probation/on-probation");
+      const res = await apiClient.get<unknown>("/api/probation/on-probation");
       return normalizeUsersListPayload(res.data);
     } catch {
       return [];
@@ -118,7 +118,7 @@ export const probationApi = {
 
   getPendingConfirmation: async (): Promise<UserWithProbationDto[]> => {
     try {
-      const res = await apiClient.get<unknown>("/api/users/probation/pending-confirmation");
+      const res = await apiClient.get<unknown>("/api/probation/awaiting-confirmation");
       return normalizeUsersListPayload(res.data);
     } catch {
       return [];
@@ -130,11 +130,11 @@ export const probationApi = {
    * Optional `confirmedByAdminId` is sent as JSON if your controller expects `@RequestBody`.
    */
   confirmProbation: async (userId: number, confirmedByAdminId?: number): Promise<string> => {
-    const url = `/api/users/${userId}/probation/confirm`;
+    const url = `/api/probation/confirm/${userId}`;
     const res =
       confirmedByAdminId != null
-        ? await apiClient.put<string | { message?: string }>(url, { confirmedByAdminId })
-        : await apiClient.put<string | { message?: string }>(url);
+        ? await apiClient.post<string | { message?: string }>(url, { confirmedByAdminId })
+        : await apiClient.post<string | { message?: string }>(url);
     const d = res.data;
     if (typeof d === "string") return d;
     if (d && typeof d === "object" && "message" in d && typeof (d as { message?: string }).message === "string") {

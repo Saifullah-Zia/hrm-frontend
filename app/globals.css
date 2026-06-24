@@ -45,3 +45,249 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PREMIUM LIGHT MODE — Full contrast fix for ALL pages
+   ═══════════════════════════════════════════════════════════════ */
+html.light {
+  --background: #f4f5f8;
+  --foreground: #0f172a;
+  color-scheme: light;
+}
+
+html.light body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ── Sidebar shell ─────────────────────────────────────────── */
+html.light aside {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ── Navbar / header ───────────────────────────────────────── */
+html.light header {
+  background-color: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BACKGROUND COLOUR REMAPS
+   Tier 1 — outermost page shell backgrounds (#f4f5f8 = alabaster)
+   ───────────────────────────────────────────────────────────── */
+html.light .bg-\[\#0a0a0f\],
+html.light .bg-\[\#0f1117\],
+html.light .bg-\[\#070918\],
+html.light .bg-\[\#0e1017\],
+html.light .bg-\[\#11131c\] {
+  background-color: #f4f5f8 !important;
+}
+
+/* Tier 2 — card / panel surfaces (#ffffff) */
+html.light .bg-\[\#13151e\],
+html.light .bg-\[\#16181f\],
+html.light .bg-\[\#141724\],
+html.light .bg-\[\#161825\],
+html.light .bg-\[\#161925\],
+html.light .bg-\[\#0D0F1E\],
+html.light .bg-\[\#0d0f1e\] {
+  background-color: #ffffff !important;
+}
+
+/* Tier 3 — elevated inner panels (#eaedf1) */
+html.light .bg-\[\#1a1d28\],
+html.light .bg-\[\#1a1d2e\],
+html.light .bg-\[\#1c1f2e\],
+html.light .bg-\[\#1e2133\],
+html.light .bg-\[\#1E2140\],
+html.light .bg-\[\#1e2140\] {
+  background-color: #eaedf1 !important;
+}
+
+/* Input / form field surfaces */
+html.light .bg-\[\#0F1120\],
+html.light .bg-\[\#0f1120\] {
+  background-color: #ffffff !important;
+}
+
+/* Tailwind opacity bg utilities (inputs, skeleton loaders) */
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/\[0\.05\],
+html.light .bg-white\/\[0\.06\],
+html.light .bg-white\/5,
+html.light .bg-white\/10 {
+  background-color: #f1f3f6 !important;
+}
+
+/* ── Hover states ────────────────────────────────────────────── */
+html.light .hover\:bg-white\/\[0\.03\]:hover,
+html.light .hover\:bg-white\/\[0\.05\]:hover,
+html.light .hover\:bg-white\/\[0\.06\]:hover,
+html.light .hover\:bg-white\/\[0\.08\]:hover,
+html.light .hover\:bg-white\/10:hover {
+  background-color: rgba(15, 23, 42, 0.05) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TEXT COLOUR REMAPS (all opacity levels → Slate scale)
+   ───────────────────────────────────────────────────────────── */
+html.light .text-white              { color: #0f172a !important; }
+html.light .text-white\/90          { color: #1e293b !important; }
+html.light .text-white\/85          { color: #1e293b !important; }
+html.light .text-white\/80          { color: #334155 !important; }
+html.light .text-white\/70          { color: #475569 !important; }
+html.light .text-white\/60          { color: #475569 !important; }
+html.light .text-white\/55          { color: #475569 !important; }
+html.light .text-white\/50          { color: #475569 !important; }
+html.light .text-white\/45          { color: #64748b !important; }
+html.light .text-white\/40          { color: #64748b !important; }
+html.light .text-white\/35          { color: #64748b !important; }
+html.light .text-white\/30          { color: #64748b !important; }
+html.light .text-white\/25          { color: #64748b !important; }
+html.light .text-white\/20          { color: #64748b !important; }
+
+/* Placeholder text */
+html.light .placeholder\:text-white\/25::placeholder,
+html.light .placeholder\:text-white\/30::placeholder,
+html.light .placeholder\:text-white\/35::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BORDER / DIVIDER REMAPS
+   ───────────────────────────────────────────────────────────── */
+html.light .border-white\/\[0\.04\],
+html.light .border-white\/\[0\.06\],
+html.light .border-white\/\[0\.08\],
+html.light .border-white\/\[0\.1\],
+html.light .border-white\/10,
+html.light .border-white\/20 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+html.light .divide-white\/\[0\.04\] > :not([hidden]) ~ :not([hidden]),
+html.light .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.07) !important;
+}
+
+/* ── Shadows ─────────────────────────────────────────────────── */
+html.light .shadow-2xl {
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.05) !important;
+}
+html.light .shadow-lg {
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FAILSAFE ATTRIBUTE SELECTORS
+   Catch any runtime-generated class string that the escaped
+   class selectors above might miss.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Backgrounds ── */
+html.light [class*="bg-[#0f1117]"],
+html.light [class*="bg-[#0a0a0f]"],
+html.light [class*="bg-[#070918]"],
+html.light [class*="bg-[#0e1017]"],
+html.light [class*="bg-[#11131c]"] {
+  background-color: #f4f5f8 !important;
+}
+
+html.light [class*="bg-[#13151e]"],
+html.light [class*="bg-[#16181f]"],
+html.light [class*="bg-[#0D0F1E]"],
+html.light [class*="bg-[#0d0f1e]"],
+html.light [class*="bg-[#141724]"],
+html.light [class*="bg-[#161825]"],
+html.light [class*="bg-[#161925]"] {
+  background-color: #ffffff !important;
+}
+
+html.light [class*="bg-[#1a1d28]"],
+html.light [class*="bg-[#1a1d2e]"],
+html.light [class*="bg-[#1c1f2e]"],
+html.light [class*="bg-[#1e2133]"],
+html.light [class*="bg-[#1E2140]"],
+html.light [class*="bg-[#1e2140]"],
+html.light [class*="bg-[#111328]"] {
+  background-color: #eaedf1 !important;
+}
+
+html.light [class*="bg-[#0F1120]"],
+html.light [class*="bg-[#0f1120]"] {
+  background-color: #ffffff !important;
+}
+
+/* ── Borders ── */
+html.light [class*="border-white/"],
+html.light [class*="border-[#2A2D45]"],
+html.light [class*="border-[#2a2d45]"],
+html.light [class*="border-[#1A1D35]"],
+html.light [class*="border-[#1a1d35]"] {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+/* ── Text — all opacity variants ── */
+html.light [class*="text-white/90"] { color: #1e293b !important; }
+html.light [class*="text-white/85"] { color: #1e293b !important; }
+html.light [class*="text-white/80"] { color: #334155 !important; }
+html.light [class*="text-white/70"] { color: #475569 !important; }
+html.light [class*="text-white/60"] { color: #475569 !important; }
+html.light [class*="text-white/55"] { color: #475569 !important; }
+html.light [class*="text-white/50"] { color: #475569 !important; }
+html.light [class*="text-white/45"] { color: #64748b !important; }
+html.light [class*="text-white/40"] { color: #64748b !important; }
+html.light [class*="text-white/35"] { color: #64748b !important; }
+html.light [class*="text-white/30"] { color: #64748b !important; }
+html.light [class*="text-white/25"] { color: #64748b !important; }
+html.light [class*="text-white/20"] { color: #64748b !important; }
+
+/* ── Hardcoded hex text from employee-profiles, documents, chat ── */
+html.light [class*="text-[#E2E4F0]"],
+html.light [class*="text-[#e2e4f0]"] { color: #1e293b !important; }
+
+html.light [class*="text-[#C2C5DA]"],
+html.light [class*="text-[#c2c5da]"] { color: #334155 !important; }
+
+html.light [class*="text-[#8B8FA8]"],
+html.light [class*="text-[#8b8fa8]"] { color: #475569 !important; }
+
+html.light [class*="text-[#6B7089]"],
+html.light [class*="text-[#6b7089]"] { color: #64748b !important; }
+
+html.light [class*="text-[#555870]"],
+html.light [class*="text-[#3D4065]"],
+html.light [class*="text-[#3d4065]"] { color: #64748b !important; }
+
+html.light [class*="text-[#2A2D45]"],
+html.light [class*="text-[#2a2d45]"] { color: #94a3b8 !important; }
+
+/* ── Placeholder fallbacks ── */
+html.light [class*="placeholder:text-white/"]::placeholder { color: #94a3b8 !important; }
+html.light [class*="placeholder-[#3D4065]"]::placeholder   { color: #94a3b8 !important; }
+html.light [class*="placeholder-[#3d4065]"]::placeholder   { color: #94a3b8 !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   INPUT / FORM FIELD SURFACE FIX
+   Any input using a near-transparent dark bg becomes invisible;
+   override all inputs in light mode to a clean white surface.
+   ═══════════════════════════════════════════════════════════════ */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}

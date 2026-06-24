@@ -28,9 +28,15 @@ function mergeProbationLists(
   status: "ON_PROBATION" | "COMPLETED"
 ): UserWithProbationDto[] {
   const map = new Map<number, UserWithProbationDto>();
-  for (const u of fromEndpoint) map.set(u.id, u);
+  for (const u of fromEndpoint) {
+    const id = u.id ?? (u as any).userId;
+    if (id != null) map.set(id, { ...u, id }); // ensure 'id' is set for React keys
+  }
   for (const u of fromAllUsers) {
-    if (normProbation(u.probationStatus) === status && !map.has(u.id)) map.set(u.id, u);
+    const id = u.id ?? (u as any).userId;
+    if (normProbation(u.probationStatus) === status && id != null && !map.has(id)) {
+      map.set(id, { ...u, id });
+    }
   }
   return [...map.values()];
 }

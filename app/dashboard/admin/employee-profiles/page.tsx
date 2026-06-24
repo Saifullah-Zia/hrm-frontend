@@ -774,7 +774,7 @@ export default function EmployeeProfilesPage() {
                 focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/20 transition-all"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["ALL", "ACTIVE", "INACTIVE", "TERMINATED"].map((s) => (
               <button
                 key={s}
@@ -793,17 +793,7 @@ export default function EmployeeProfilesPage() {
 
         {/* ── Table ── */}
         <div className="bg-[#0D0F1E] border border-[#2A2D45] rounded-2xl overflow-hidden">
-          {/* Header */}
-          <div className="grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
-            <span>Employee</span>
-            <span>Phone</span>
-            <span>CNIC</span>
-            <span>Department</span>
-            <span>Status</span>
-            <span className="text-right">Actions</span>
-          </div>
-
-          {/* Body */}
+          {/* Body / Table wrapper */}
           {loading ? (
             <div className="flex items-center justify-center py-20 gap-2 text-[#8B8FA8]">
               <Loader2 size={20} className="animate-spin text-[#FC0175]" />
@@ -826,94 +816,108 @@ export default function EmployeeProfilesPage() {
               <p className="text-sm text-[#8B8FA8]">No profiles found</p>
             </div>
           ) : (
-            filtered.map((p, i) => (
-              <div
-                key={p.id}
-                className={`grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
-                  hover:bg-[#111328] transition-colors ${
-                    i < filtered.length - 1 ? "border-b border-[#1A1D35]" : ""
-                  }`}
-              >
-                {/* Employee */}
-                <div className="flex items-center gap-3 min-w-0">
-                  {(() => {
-                    const uObj = employeeUsers.find((u) => u.id === p.userId);
-                    const displayName = p.firstName || p.lastName
-                      ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
-                      : (uObj?.name || `User ID: ${p.userId}`);
-                    return (
-                      <>
-                        <Avatar
-                          name={displayName}
-                          picture={p.profilePicture}
-                          size="sm"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-[#E2E4F0] truncate" title={displayName}>
-                            {displayName}
-                          </p>
-                          <p className="text-xs text-[#8B8FA8] truncate">
-                            {p.joiningDate
-                              ? `Joined ${new Date(p.joiningDate).toLocaleDateString(
-                                  "en-PK",
-                                  { month: "short", year: "numeric" }
-                                )}`
-                              : "—"}
-                          </p>
-                        </div>
-                      </>
-                    );
-                  })()}
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                {/* Header */}
+                <div className="grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
+                  <span>Employee</span>
+                  <span>Phone</span>
+                  <span>CNIC</span>
+                  <span>Department</span>
+                  <span>Status</span>
+                  <span className="text-right">Actions</span>
                 </div>
 
-                {/* Phone */}
-                <span className="text-sm text-[#C2C5DA] truncate">
-                  {p.phone || "—"}
-                </span>
-
-                {/* CNIC */}
-                <span className="text-sm text-[#C2C5DA] font-mono truncate">
-                  {p.cnicNumber || "—"}
-                </span>
-
-                {/* Dept */}
-                <span className="text-sm text-[#C2C5DA]">
-                  {p.departmentId ? `Dept #${p.departmentId}` : "—"}
-                </span>
-
-                {/* Status */}
-                <StatusBadge status={p.employmentStatus} />
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    onClick={() =>
-                      setModal({ open: true, mode: "view", profile: p })
-                    }
-                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
-                    title="View"
+                {filtered.map((p, i) => (
+                  <div
+                    key={p.id}
+                    className={`grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
+                      hover:bg-[#111328] transition-colors ${
+                        i < filtered.length - 1 ? "border-b border-[#1A1D35]" : ""
+                      }`}
                   >
-                    <User size={15} />
-                  </button>
-                  <button
-                    onClick={() =>
-                      setModal({ open: true, mode: "edit", profile: p })
-                    }
-                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
-                    title="Edit"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(p.id!)}
-                    className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-red-400 hover:bg-red-500/10 transition-all"
-                    title="Delete"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
+                    {/* Employee */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {(() => {
+                        const uObj = employeeUsers.find((u) => u.id === p.userId);
+                        const displayName = p.firstName || p.lastName
+                          ? `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
+                          : (uObj?.name || `User ID: ${p.userId}`);
+                        return (
+                          <>
+                            <Avatar
+                              name={displayName}
+                              picture={p.profilePicture}
+                              size="sm"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-[#E2E4F0] truncate" title={displayName}>
+                                {displayName}
+                              </p>
+                              <p className="text-xs text-[#8B8FA8] truncate">
+                                {p.joiningDate
+                                  ? `Joined ${new Date(p.joiningDate).toLocaleDateString(
+                                      "en-PK",
+                                      { month: "short", year: "numeric" }
+                                    )}`
+                                  : "—"}
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Phone */}
+                    <span className="text-sm text-[#C2C5DA] truncate">
+                      {p.phone || "—"}
+                    </span>
+
+                    {/* CNIC */}
+                    <span className="text-sm text-[#C2C5DA] font-mono truncate">
+                      {p.cnicNumber || "—"}
+                    </span>
+
+                    {/* Dept */}
+                    <span className="text-sm text-[#C2C5DA]">
+                      {p.departmentId ? `Dept #${p.departmentId}` : "—"}
+                    </span>
+
+                    {/* Status */}
+                    <StatusBadge status={p.employmentStatus} />
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() =>
+                          setModal({ open: true, mode: "view", profile: p })
+                        }
+                        className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
+                        title="View"
+                      >
+                        <User size={15} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setModal({ open: true, mode: "edit", profile: p })
+                        }
+                        className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
+                        title="Edit"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(p.id!)}
+                        className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
+            </div>
           )}
 
           {/* Footer row */}
