@@ -393,16 +393,29 @@ function DeleteModal({
   onConfirm: () => Promise<void>;
   positionName: string;
 }) {
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Reset error when modal opens/closes
+  useEffect(() => {
+    if (!open) setError("");
+  }, [open]);
 
   async function handleDelete() {
     setLoading(true);
-
-    await onConfirm();
-
-    setLoading(false);
-    onClose();
+    setError("");
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete position. It may still be assigned to employees."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -425,8 +438,14 @@ function DeleteModal({
         <span className="text-white/70 font-medium">
           {positionName}
         </span>
-        ?
+        ? This will fail if any employees are currently assigned to this position.
       </p>
+
+      {error && (
+        <p className="text-xs text-rose-400 mb-4 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+          ⚠️ {error}
+        </p>
+      )}
 
       <div className="flex justify-end gap-2">
         <button
@@ -441,9 +460,7 @@ function DeleteModal({
           disabled={loading}
           className="px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-500 disabled:opacity-50 transition-colors shadow-lg shadow-red-600/20"
         >
-          {loading
-            ? "Deleting..."
-            : "Delete"}
+          {loading ? "Deleting..." : "Delete"}
         </button>
       </div>
     </Modal>
