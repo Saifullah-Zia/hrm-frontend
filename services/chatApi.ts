@@ -125,17 +125,33 @@ export const chatApi = {
     file: File
   ): Promise<{ fileUrl: string; fileName: string; messageId: string; type: string }> => {
     const token = getToken();
+    console.log("[uploadChatFile] uploading file", {
+      conversationId,
+      fileName: file.name,
+      tokenPresent: !!token,
+      tokenPreview: token ? token.substring(0, 15) + "..." : "none"
+    });
     const formData = new FormData();
     formData.append("file", file);
 
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${BASE_URL}/api/chat/upload/${conversationId}`, {
       method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: headers,
       body: formData,
     });
 
     if (!res.ok) {
       const errorText = await res.text();
+      console.error("[uploadChatFile] upload failed", {
+        status: res.status,
+        statusText: res.statusText,
+        errorText
+      });
       throw new Error(errorText || `HTTP ${res.status}`);
     }
     return res.json();
