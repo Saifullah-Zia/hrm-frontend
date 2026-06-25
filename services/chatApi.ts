@@ -119,4 +119,25 @@ export const chatApi = {
 
   searchEmployees: (query: string): Promise<EmployeeSearchDTO[]> =>
     apiFetch<EmployeeSearchDTO[]>(`/api/chat/employees/search?query=${encodeURIComponent(query)}`),
+
+  uploadChatFile: async (
+    conversationId: string,
+    file: File
+  ): Promise<{ fileUrl: string; fileName: string; messageId: string; type: string }> => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`${BASE_URL}/api/chat/upload/${conversationId}`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
 };

@@ -7,7 +7,6 @@ import {
   ConversationDTO,
   ChatMessageDTO,
   EmployeeSearchDTO,
-  MemberDTO,
 } from "@/services/chatApi";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
@@ -22,10 +21,13 @@ import {
   Image as ImageIcon,
   Check,
   CheckCheck,
-  User,
   X,
   MoreVertical,
+  Download,
+  FileText,
 } from "lucide-react";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 export default function ChatPage() {
   const { user } = useAuthStore();
@@ -51,6 +53,11 @@ export default function ChatPage() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [addMemberQuery, setAddMemberQuery] = useState("");
   const [addMemberResults, setAddMemberResults] = useState<EmployeeSearchDTO[]>([]);
+
+  // File upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Real-time states
   const [typingUsers, setTypingUsers] = useState<{ [key: string]: boolean }>({});
@@ -310,6 +317,34 @@ export default function ChatPage() {
       destination: `/app/chat.typing/${activeConv.id}`,
       body: JSON.stringify({ isTyping: false }),
     });
+  };
+
+  // File / image upload handler
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!activeConv || !e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    e.target.value = "";
+
+    setIsUploading(true);
+    try {
+      const result = await chatApi.uploadChatFile(activeConv.id, file);
+      // The backend already saved the ChatMessage. Now broadcast it via WebSocket
+      if (stompClientRef.current?.connected) {
+        stompClientRef.current.publish({
+          destination: `/app/chat.send/${activeConv.id}`,
+          body: JSON.stringify({
+            content: result.fileName,
+            messageType: result.type,   // "FILE" or "IMAGE"
+            fileUrl: result.fileUrl,
+          }),
+        });
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("File upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Typing trigger
@@ -669,6 +704,10 @@ export default function ChatPage() {
               {messages.map((msg, index) => {
                 const isMe = !!(msg.senderEmail && currentEmail && msg.senderEmail === currentEmail) || 
                              !!(msg.senderName && currentName && msg.senderName.trim().toLowerCase() === currentName.trim().toLowerCase());
+                const isImage = msg.type === "IMAGE";
+                const isFile = msg.type === "FILE";
+                const absoluteFileUrl = msg.fileUrl ? `${BASE_URL}${msg.fileUrl}` : "";
+
                 return (
                   <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                     <div className={`flex flex-col max-w-[70%] ${isMe ? "items-end" : "items-start"}`}>
@@ -679,33 +718,90 @@ export default function ChatPage() {
                         </span>
                       )}
 
-                      {/* Bubble */}
-                      <div
-                        className={`p-3 pb-4 rounded-2xl text-sm leading-relaxed shadow-lg relative min-w-[75px] ${
-                          isMe
-                            ? "bg-[#005c4b] text-[#e9edef] rounded-tr-none shadow-black/20"
-                            : "bg-[#202c33] text-[#e9edef] rounded-tl-none shadow-black/20"
-                        }`}
-                      >
-                        <div className="pr-12 whitespace-pre-wrap break-words">{msg.content}</div>
-                        <div className="absolute bottom-1 right-2 flex items-center gap-1 select-none">
-                          <span className="text-[9px] text-[#8696a0]">
-                            {new Date(msg.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                          {isMe && (
-                            <span>
-                              {msg.isRead ? (
-                                <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
-                              ) : (
-                                <Check className="w-3.5 h-3.5 text-[#8696a0]" />
-                              )}
+                      {/* Image Bubble */}
+                      {isImage && absoluteFileUrl ? (
+                        <div className={`rounded-2xl overflow-hidden shadow-lg relative ${
+                          isMe ? "rounded-tr-none" : "rounded-tl-none"
+                        }`}>
+                          <a href={absoluteFileUrl} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={absoluteFileUrl}
+                              alt={msg.content || "image"}
+                              className="max-w-[260px] max-h-[300px] w-auto h-auto object-cover block cursor-pointer hover:opacity-90 transition-opacity"
+                            />
+                          </a>
+                          {/* Timestamp overlay */}
+                          <div className="absolute bottom-1 right-2 flex items-center gap-1">
+                            <span className="text-[9px] text-white/70 drop-shadow">
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
-                          )}
+                            {isMe && (msg.isRead
+                              ? <CheckCheck className="w-3 h-3 text-[#53bdeb] drop-shadow" />
+                              : <Check className="w-3 h-3 text-white/70 drop-shadow" />)}
+                          </div>
                         </div>
-                      </div>
+                      ) : isFile && absoluteFileUrl ? (
+                        /* File Bubble */
+                        <div className={`p-3 pb-4 rounded-2xl shadow-lg relative min-w-[180px] max-w-[260px] ${
+                          isMe
+                            ? "bg-[#005c4b] text-[#e9edef] rounded-tr-none"
+                            : "bg-[#202c33] text-[#e9edef] rounded-tl-none"
+                        }`}>
+                          <a
+                            href={absoluteFileUrl}
+                            download={msg.content || "file"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                          >
+                            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                              <FileText className="w-5 h-5 text-white/80" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold truncate text-[#e9edef]">{msg.content || "File"}</p>
+                              <p className="text-[10px] text-white/50 mt-0.5">Tap to download</p>
+                            </div>
+                            <Download className="w-4 h-4 text-white/50 flex-shrink-0" />
+                          </a>
+                          <div className="absolute bottom-1 right-2 flex items-center gap-1 select-none">
+                            <span className="text-[9px] text-[#8696a0]">
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                            {isMe && (msg.isRead
+                              ? <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
+                              : <Check className="w-3.5 h-3.5 text-[#8696a0]" />)}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Regular Text Bubble */
+                        <div
+                          className={`p-3 pb-4 rounded-2xl text-sm leading-relaxed shadow-lg relative min-w-[75px] ${
+                            isMe
+                              ? "bg-[#005c4b] text-[#e9edef] rounded-tr-none shadow-black/20"
+                              : "bg-[#202c33] text-[#e9edef] rounded-tl-none shadow-black/20"
+                          }`}
+                        >
+                          <div className="pr-12 whitespace-pre-wrap break-words">{msg.content}</div>
+                          <div className="absolute bottom-1 right-2 flex items-center gap-1 select-none">
+                            <span className="text-[9px] text-[#8696a0]">
+                              {new Date(msg.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            {isMe && (
+                              <span>
+                                {msg.isRead ? (
+                                  <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5 text-[#8696a0]" />
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -734,20 +830,63 @@ export default function ChatPage() {
 
             {/* Input Bar */}
             <div className="p-3 border-t border-white/[0.05] bg-[#141724] flex items-center gap-2">
+              {/* Hidden file inputs */}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+
+              {/* Image attach button */}
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isUploading}
+                title="Send image"
+                className="p-2.5 rounded-xl text-white/40 hover:text-indigo-300 hover:bg-indigo-500/10 transition disabled:opacity-40"
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+
+              {/* File attach button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                title="Send file"
+                className="p-2.5 rounded-xl text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition disabled:opacity-40"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+
               <input
                 type="text"
                 value={inputText}
                 onChange={handleInputChange}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                placeholder="Type your message..."
-                className="flex-1 bg-[#1c1f2e] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50 transition"
+                placeholder={isUploading ? "Uploading..." : "Type your message..."}
+                disabled={isUploading}
+                className="flex-1 bg-[#1c1f2e] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50 transition disabled:opacity-50"
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputText.trim()}
+                disabled={!inputText.trim() || isUploading}
                 className="p-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 transition shadow-lg shadow-indigo-600/20"
               >
-                <Send className="w-4 h-4" />
+                {isUploading ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin block" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </button>
             </div>
           </>
