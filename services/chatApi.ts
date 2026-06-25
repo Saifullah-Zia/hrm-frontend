@@ -122,10 +122,11 @@ export const chatApi = {
 
   uploadChatFile: async (
     conversationId: string,
-    file: File
+    file: File,
+    caption?: string
   ): Promise<{ fileUrl: string; fileName: string; messageId: string; type: string }> => {
     const token = getToken();
-    console.log("[uploadChatFile] uploading file - conversationId: " + conversationId + ", fileName: " + file.name + ", tokenPresent: " + (token ? "YES" : "NO"));
+    console.log("[uploadChatFile] uploading file - conversationId: " + conversationId + ", fileName: " + file.name + ", caption: " + caption + ", tokenPresent: " + (token ? "YES" : "NO"));
     const formData = new FormData();
     formData.append("file", file);
 
@@ -134,7 +135,8 @@ export const chatApi = {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${BASE_URL}/api/chat/upload/${conversationId}`, {
+    const queryParams = caption ? `?caption=${encodeURIComponent(caption)}` : "";
+    const res = await fetch(`${BASE_URL}/api/chat/upload/${conversationId}${queryParams}`, {
       method: "POST",
       headers: headers,
       body: formData,

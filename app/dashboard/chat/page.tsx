@@ -56,6 +56,8 @@ export default function ChatPage() {
 
   // File upload state
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -73,6 +75,15 @@ export default function ChatPage() {
   useEffect(() => {
     activeConvRef.current = activeConv;
   }, [activeConv]);
+
+  // Clean up object URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+    };
+  }, [filePreviewUrl]);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -272,6 +283,7 @@ export default function ChatPage() {
     setActiveConv(conv);
     setMessages([]);
     setTypingUsers({});
+    handleClearSelectedFile();
 
     try {
       const history = await chatApi.getMessages(conv.id, 0, 50);
@@ -297,8 +309,37 @@ export default function ChatPage() {
   };
 
   // Send Chat Message
-  const handleSendMessage = () => {
-    if (!inputText.trim() || !activeConv || !stompClientRef.current?.connected) return;
+  const handleSendMessage = async () => {
+    if (!activeConv || !stompClientRef.current?.connected) return;
+
+    if (selectedFile) {
+      setIsUploading(true);
+      try {
+        const caption = inputText.trim();
+        const result = await chatApi.uploadChatFile(activeConv.id, selectedFile, caption);
+        
+        if (stompClientRef.current?.connected) {
+          stompClientRef.current.publish({
+            destination: `/app/chat.send/${activeConv.id}`,
+            body: JSON.stringify({
+              content: result.fileName,
+              messageType: result.type,   // "FILE" or "IMAGE"
+              fileUrl: result.fileUrl,
+            }),
+          });
+        }
+        handleClearSelectedFile();
+        setInputText("");
+      } catch (err) {
+        console.error("Upload failed:", err);
+        alert("File upload failed. Please try again.");
+      } finally {
+        setIsUploading(false);
+      }
+      return;
+    }
+
+    if (!inputText.trim()) return;
 
     const payload = {
       content: inputText,
@@ -319,32 +360,27 @@ export default function ChatPage() {
     });
   };
 
-  // File / image upload handler
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File / image selection handler (WhatsApp-style preview)
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!activeConv || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
     e.target.value = "";
 
-    setIsUploading(true);
-    try {
-      const result = await chatApi.uploadChatFile(activeConv.id, file);
-      // The backend already saved the ChatMessage. Now broadcast it via WebSocket
-      if (stompClientRef.current?.connected) {
-        stompClientRef.current.publish({
-          destination: `/app/chat.send/${activeConv.id}`,
-          body: JSON.stringify({
-            content: result.fileName,
-            messageType: result.type,   // "FILE" or "IMAGE"
-            fileUrl: result.fileUrl,
-          }),
-        });
-      }
-    } catch (err) {
-      console.error("Upload failed:", err);
-      alert("File upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
+    setSelectedFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setFilePreviewUrl(url);
+    } else {
+      setFilePreviewUrl(null);
     }
+  };
+
+  const handleClearSelectedFile = () => {
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
   };
 
   // Typing trigger
@@ -828,6 +864,44 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* File Preview Bar (WhatsApp-style) */}
+            {selectedFile && (
+              <div className="px-4 py-3 bg-[#161825]/90 backdrop-blur border-t border-white/[0.05] flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-200">
+                <div className="flex items-center gap-3 min-w-0">
+                  {filePreviewUrl ? (
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10 shadow-md">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={filePreviewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/60">
+                      <FileText className="w-6 h-6 text-indigo-400" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate max-w-[200px] md:max-w-md">
+                      {selectedFile.name}
+                    </p>
+                    <p className="text-xs text-white/40 mt-0.5">
+                      {(selectedFile.size / 1024).toFixed(1)} KB • Ready to send
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearSelectedFile}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/10 text-white/50 hover:text-rose-400 border border-transparent hover:border-rose-500/10 transition"
+                  title="Remove attachment"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             {/* Input Bar */}
             <div className="p-3 border-t border-white/[0.05] bg-[#141724] flex items-center gap-2">
               {/* Hidden file inputs */}
@@ -836,14 +910,14 @@ export default function ChatPage() {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleFileUpload}
+                onChange={handleFileSelect}
               />
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="*"
                 className="hidden"
-                onChange={handleFileUpload}
+                onChange={handleFileSelect}
               />
 
               {/* Image attach button */}
@@ -873,13 +947,13 @@ export default function ChatPage() {
                 value={inputText}
                 onChange={handleInputChange}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                placeholder={isUploading ? "Uploading..." : "Type your message..."}
+                placeholder={isUploading ? "Uploading..." : selectedFile ? "Add a caption..." : "Type your message..."}
                 disabled={isUploading}
                 className="flex-1 bg-[#1c1f2e] border border-white/[0.05] rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-indigo-500/50 transition disabled:opacity-50"
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputText.trim() || isUploading}
+                disabled={(!inputText.trim() && !selectedFile) || isUploading}
                 className="p-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 transition shadow-lg shadow-indigo-600/20"
               >
                 {isUploading ? (
