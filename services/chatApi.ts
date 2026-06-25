@@ -125,12 +125,7 @@ export const chatApi = {
     file: File
   ): Promise<{ fileUrl: string; fileName: string; messageId: string; type: string }> => {
     const token = getToken();
-    console.log("[uploadChatFile] uploading file", {
-      conversationId,
-      fileName: file.name,
-      tokenPresent: !!token,
-      tokenPreview: token ? token.substring(0, 15) + "..." : "none"
-    });
+    console.log("[uploadChatFile] uploading file - conversationId: " + conversationId + ", fileName: " + file.name + ", tokenPresent: " + (token ? "YES" : "NO"));
     const formData = new FormData();
     formData.append("file", file);
 
@@ -147,11 +142,7 @@ export const chatApi = {
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.error("[uploadChatFile] upload failed", {
-        status: res.status,
-        statusText: res.statusText,
-        errorText
-      });
+      console.error("[uploadChatFile] upload failed - status: " + res.status + " (" + res.statusText + "), errorBody: " + errorText);
       throw new Error(errorText || `HTTP ${res.status}`);
     }
     return res.json();
