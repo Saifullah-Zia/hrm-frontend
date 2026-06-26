@@ -286,6 +286,11 @@ export default function EmployeeResignationPage() {
 
   const hasActive = activeResignation !== null;
 
+  const historyResignations = useMemo(
+    () => resignations.filter((r) => r.id !== activeResignation?.id),
+    [resignations, activeResignation]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (profileId == null) {
@@ -539,7 +544,7 @@ export default function EmployeeResignationPage() {
         )}
 
         {/* History */}
-        {!loading && resignations.length > 0 && (
+        {!loading && historyResignations.length > 0 && (
           <div>
             <h2 className="text-sm font-semibold text-white/70 mb-3">
               Resignation History
@@ -556,7 +561,7 @@ export default function EmployeeResignationPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
-                  {resignations.map((r) => (
+                  {historyResignations.map((r) => (
                     <React.Fragment key={r.id}>
                       <tr className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-5 py-4 text-white/70">{fmt(r.resignationDate)}</td>
