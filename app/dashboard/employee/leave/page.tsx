@@ -109,13 +109,30 @@ export default function EmployeeLeavePage() {
     staleTime: 5 * 60_000,
   });
 
+  const serverBalanceQuery = useQuery({
+    queryKey: ["employee-leave-balance", userId],
+    queryFn: () => leaveApi.getBalancesForEmployee(userId!),
+    enabled: typeof userId === "number",
+  });
+
   const leaveTypes = useMemo(() => {
     const policies = policiesQuery.data;
-    if (policies && policies.length > 0) {
-      return [...policies].sort((a, b) => a.leaveType.localeCompare(b.leaveType)).map((p) => p.leaveType);
+    if (!policies || policies.length === 0) return [...FALLBACK_LEAVE_TYPES];
+
+    const allTypes = [...policies].sort((a, b) => a.leaveType.localeCompare(b.leaveType)).map((p) => p.leaveType);
+
+    // If the server has returned balance data, only show leave types that
+    // the employee actually has a balance for (e.g. ANNUAL won't appear
+    // until they've completed 1 year of service).
+    const serverBalances = serverBalanceQuery.data;
+    if (serverBalanceQuery.isSuccess && Array.isArray(serverBalances) && serverBalances.length > 0) {
+      const balanceTypes = new Set(serverBalances.map((b: LeaveBalanceDto) => b.leaveType.toUpperCase()));
+      const filtered = allTypes.filter((t) => balanceTypes.has(t.toUpperCase()));
+      return filtered.length > 0 ? filtered : allTypes;
     }
-    return [...FALLBACK_LEAVE_TYPES];
-  }, [policiesQuery.data]);
+
+    return allTypes;
+  }, [policiesQuery.data, serverBalanceQuery.isSuccess, serverBalanceQuery.data]);
 
   useEffect(() => {
     if (leaveTypes.length === 0) return;
@@ -136,11 +153,7 @@ export default function EmployeeLeavePage() {
     enabled: typeof userId === "number",
   });
 
-  const serverBalanceQuery = useQuery({
-    queryKey: ["employee-leave-balance", userId],
-    queryFn: () => leaveApi.getBalancesForEmployee(userId!),
-    enabled: typeof userId === "number",
-  });
+
 
   const defaultQuota = useMemo(() => {
     const m: Record<string, number> = {};
