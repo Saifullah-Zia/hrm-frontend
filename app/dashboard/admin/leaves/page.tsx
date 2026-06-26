@@ -9,6 +9,8 @@ import {
   isRejectedLeaveStatus,
 } from "@/services/leaveApi";
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ToastState = { message: string; type: "success" | "error" | "info" } | null;
@@ -398,7 +400,7 @@ export default function AdminLeavePage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-white/[0.06]">
-                      {["Employee", "Leave Type", "Duration", "Reason", "Status", "Actions"].map(h => (
+                      {["Employee", "Leave Type", "Duration", "Reason", "Attachment", "Status", "Actions"].map(h => (
                         <th key={h} className="px-5 py-3.5 text-left text-[11px] font-semibold text-white/30 uppercase tracking-wider">
                           {h}
                         </th>
@@ -444,6 +446,25 @@ export default function AdminLeavePage() {
                           <p className="text-white/50 text-sm truncate" title={leave.reason}>
                             {leave.reason || "—"}
                           </p>
+                        </td>
+
+                        {/* Attachment */}
+                        <td className="px-5 py-4">
+                          {leave.attachmentUrl ? (
+                            <a
+                              href={`${BASE_URL}${leave.attachmentUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 underline text-xs"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                              </svg>
+                              Attachment
+                            </a>
+                          ) : (
+                            <span className="text-white/20 text-xs">—</span>
+                          )}
                         </td>
 
                         {/* Status */}

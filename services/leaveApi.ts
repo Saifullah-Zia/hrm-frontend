@@ -185,6 +185,7 @@ export interface LeaveDto {
   userId: number;
   userName?: string;
   durationDays?: number;
+  attachmentUrl?: string | null;
   /** Populated on successful `POST /api/leave` apply. */
   remainingDaysAfterRequest?: number | null;
 }
@@ -320,6 +321,26 @@ export const leaveApi = {
       method: "POST",
       body: JSON.stringify(dto),
     }),
+  uploadAttachment: async (file: File): Promise<{ fileUrl: string; fileName: string }> => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`${BASE_URL}/api/leaves/upload`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `HTTP ${res.status}`);
+    }
+
+    return res.json();
+  },
   approveLeave: (leaveId: number): Promise<LeaveDto> =>
     apiFetch<LeaveDto>(`/api/leave/${leaveId}/approve`, { method: "PUT" }),
   rejectLeave: (leaveId: number): Promise<LeaveDto> =>

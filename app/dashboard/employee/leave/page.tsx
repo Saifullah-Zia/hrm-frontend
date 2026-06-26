@@ -11,6 +11,8 @@ import {
   LeavePolicyDto,
 } from "@/services/leaveApi";
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
 /** Shown only if policy API fails (offline / old server). */
 const FALLBACK_LEAVE_TYPES = ["SICK", "CASUAL", "ANNUAL", "EIDULFITAR", "EIDULAZHA"] as const;
 
@@ -100,6 +102,8 @@ export default function EmployeeLeavePage() {
     endDate: "",
     reason: "",
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const year = new Date().getFullYear();
 
@@ -181,18 +185,20 @@ export default function EmployeeLeavePage() {
   }, [toast]);
 
   const applyMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (attachmentUrl: string | null) =>
       leaveApi.apply({
         userId: userId!,
         leaveType: form.leaveType,
         startDate: form.startDate,
         endDate: form.endDate,
         reason: form.reason,
+        attachmentUrl: attachmentUrl || null,
       }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["employee-leaves", userId] });
       qc.invalidateQueries({ queryKey: ["employee-leave-balance", userId] });
       setForm((f) => ({ ...f, startDate: "", endDate: "", reason: "" }));
+      setSelectedFile(null);
       const extra =
         data.remainingDaysAfterRequest != null
           ? ` Remaining ${data.leaveType ?? "leave"}: ${data.remainingDaysAfterRequest} day(s).`
@@ -217,7 +223,7 @@ export default function EmployeeLeavePage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.startDate || !form.endDate || !form.reason.trim()) {
       setToast({ message: "Start date, end date, and reason are required.", type: "error" });
@@ -227,7 +233,23 @@ export default function EmployeeLeavePage() {
       setToast({ message: "End date cannot be before start date.", type: "error" });
       return;
     }
-    applyMutation.mutate();
+
+    let uploadedUrl: string | null = null;
+    if (selectedFile) {
+      setIsUploading(true);
+      try {
+        const uploadResult = await leaveApi.uploadAttachment(selectedFile);
+        uploadedUrl = uploadResult.fileUrl;
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : "File upload failed";
+        setToast({ message: `Failed to upload attachment: ${errMsg}`, type: "error" });
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    applyMutation.mutate(uploadedUrl);
   };
 
   const requestedDays = inclusiveDays(form.startDate, form.endDate);
@@ -369,14 +391,50 @@ export default function EmployeeLeavePage() {
               className="mt-1.5 w-full px-3 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 resize-none"
             />
           </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Attachment (Optional)</label>
+            <div className="mt-1.5 flex items-center gap-3">
+              <input
+                type="file"
+                id="leave-file"
+                className="hidden"
+                disabled={isUploading || applyMutation.isPending}
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    setSelectedFile(e.target.files[0]);
+                  }
+                }}
+              />
+              <label
+                htmlFor="leave-file"
+                className="cursor-pointer px-4 py-2 text-xs font-medium rounded-xl border border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/[0.08] hover:text-white transition-colors"
+              >
+                Choose File
+              </label>
+              {selectedFile ? (
+                <div className="flex items-center gap-2 text-xs text-white/70 bg-white/[0.04] px-3 py-1.5 rounded-lg border border-white/[0.05]">
+                  <span className="max-w-[200px] truncate">{selectedFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="text-white/40 hover:text-rose-400 font-semibold"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-white/30">No file selected (PDF, PNG, JPG)</span>
+              )}
+            </div>
+          </div>
         </div>
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={applyMutation.isPending}
+            disabled={isUploading || applyMutation.isPending}
             className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           >
-            {applyMutation.isPending ? "Submitting…" : "Submit request"}
+            {isUploading ? "Uploading file..." : applyMutation.isPending ? "Submitting request..." : "Submit request"}
           </button>
         </div>
       </form>
@@ -399,6 +457,7 @@ export default function EmployeeLeavePage() {
                   <th className="px-4 py-3 font-medium">Days</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Reason</th>
+                  <th className="px-4 py-3 font-medium">Attachment</th>
                   <th className="px-4 py-3 font-medium w-28"> </th>
                 </tr>
               </thead>
@@ -425,6 +484,23 @@ export default function EmployeeLeavePage() {
                       </td>
                       <td className="px-4 py-3 text-white/50 max-w-[140px] truncate" title={row.reason}>
                         {row.reason ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        {row.attachmentUrl ? (
+                          <a
+                            href={`${BASE_URL}${row.attachmentUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 underline"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                            </svg>
+                            Download
+                          </a>
+                        ) : (
+                          <span className="text-white/20">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {row.status === "PENDING" && (
