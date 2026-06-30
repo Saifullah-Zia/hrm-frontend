@@ -595,8 +595,10 @@ export default function EmployeeProfilesPage() {
       // 2. Fetch active page slice
       const pageData = await employeeProfileApi.getPaginated(pageIndex, pageSize, "firstName", "asc");
       setPageRecords(pageData.content);
-      setTotalElements(pageData.totalElements);
-      setTotalPages(Math.max(1, pageData.totalPages));
+      setTotalElements(pageData.totalElements ?? 0);
+      // Spring Boot 4 VIA_DTO serialization: totalPages may be missing — compute as fallback
+      const tPages = pageData.totalPages ?? Math.ceil((pageData.totalElements ?? 0) / pageSize) || 1;
+      setTotalPages(Math.max(1, tPages));
       setPage(pageIndex);
     } catch {
       setError("Failed to load employee profiles.");
