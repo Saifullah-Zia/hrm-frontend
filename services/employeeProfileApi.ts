@@ -77,17 +77,106 @@ export interface EmployeeProfilePageResponse {
   empty: boolean;
 }
 
-function normalizeProfile(data: unknown): EmployeeProfileDto | null {
+function extractUserId(o: Record<string, unknown>): number | null {
+  for (const key of ["userId", "user_id"]) {
+    const n = Number(o[key]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const user = o.user;
+  if (user && typeof user === "object") {
+    const u = user as Record<string, unknown>;
+    for (const key of ["id", "userId", "user_id"]) {
+      const n = Number(u[key]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  }
+  return null;
+}
+
+function optionalString(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const s = v.trim();
+  return s || undefined;
+}
+
+function optionalPositiveInt(v: unknown): number | undefined {
+  if (v === undefined || v === null || v === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** Strip fields the backend does not persist on EmployeeProfile (probation lives on User). */
+function buildProfilePayload(dto: EmployeeProfileDto): Record<string, unknown> {
+  const payload: Record<string, unknown> = { userId: dto.userId };
+
+  const firstName = optionalString(dto.firstName);
+  const lastName = optionalString(dto.lastName);
+  if (firstName) payload.firstName = firstName;
+  if (lastName) payload.lastName = lastName;
+
+  for (const [key, val] of [
+    ["phone", dto.phone],
+    ["address", dto.address],
+    ["dateOfBirth", dto.dateOfBirth],
+    ["joiningDate", dto.joiningDate],
+    ["cnicNumber", dto.cnicNumber],
+    ["profilePicture", dto.profilePicture],
+    ["emergencyContactName", dto.emergencyContactName],
+    ["emergencyContactPhone", dto.emergencyContactPhone],
+  ] as const) {
+    const s = optionalString(val);
+    if (s) payload[key] = s;
+  }
+
+  const departmentId = optionalPositiveInt(dto.departmentId);
+  const positionId = optionalPositiveInt(dto.positionId);
+  if (departmentId) payload.departmentId = departmentId;
+  if (positionId) payload.positionId = positionId;
+
+  if (dto.employmentStatus) payload.employmentStatus = dto.employmentStatus;
+
+  return payload;
+}
+
+function normalizeProfile(
+  data: unknown,
+  fallbackUserId?: number
+): EmployeeProfileDto | null {
   if (!data || typeof data !== "object") return null;
   const o = data as Record<string, unknown>;
-  const userId = Number(o.userId ?? o.user_id);
-  if (!Number.isFinite(userId) || userId <= 0) return null;
-  
+  const userId =
+    extractUserId(o) ??
+    (fallbackUserId && fallbackUserId > 0 ? fallbackUserId : null);
+  const id = Number(o.id);
+
+  if (!userId && (!Number.isFinite(id) || id <= 0)) return null;
+
+  const departmentId = optionalPositiveInt(o.departmentId ?? o.department_id);
+  const positionId = optionalPositiveInt(o.positionId ?? o.position_id);
+
   return {
     ...(o as unknown as EmployeeProfileDto),
-    userId,
-    firstName: (o.firstName ?? o.first_name) as string | undefined,
-    lastName: (o.lastName ?? o.last_name) as string | undefined,
+    id: Number.isFinite(id) && id > 0 ? id : undefined,
+    userId: userId ?? fallbackUserId ?? 0,
+    firstName: optionalString(o.firstName ?? o.first_name),
+    lastName: optionalString(o.lastName ?? o.last_name),
+    phone: optionalString(o.phone),
+    address: optionalString(o.address),
+    dateOfBirth: optionalString(o.dateOfBirth ?? o.date_of_birth),
+    joiningDate: optionalString(o.joiningDate ?? o.joining_date),
+    cnicNumber: optionalString(o.cnicNumber ?? o.cnic_number),
+    profilePicture: optionalString(o.profilePicture ?? o.profile_picture),
+    emergencyContactName: optionalString(
+      o.emergencyContactName ?? o.emergency_contact_name
+    ),
+    emergencyContactPhone: optionalString(
+      o.emergencyContactPhone ?? o.emergency_contact_phone
+    ),
+    departmentId,
+    positionId,
+    employmentStatus: (o.employmentStatus ?? o.employment_status) as
+      | EmployeeProfileDto["employmentStatus"]
+      | undefined,
   };
 }
 
@@ -100,8 +189,8 @@ function normalizeProfilesList(data: unknown): EmployeeProfileDto[] {
     else if (Array.isArray(o.data)) list = o.data;
   }
   return list
-    .map(normalizeProfile)
-    .filter((p): p is EmployeeProfileDto => p != null);
+    .map((item) => normalizeProfile(item))
+    .filter((p): p is EmployeeProfileDto => p != null && p.userId > 0);
 }
 
 function findProfileForUser(
@@ -136,7 +225,7 @@ export const employeeProfileApi = {
     sortDir = "asc"
   ): Promise<EmployeeProfilePageResponse> => {
     const res = await apiClient.get<EmployeeProfilePageResponse>(
-      `/api/employee-profiles/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
+      `/api/employee-profiles/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}&_t=${Date.now()}`
     );
     return {
       ...res.data,
@@ -145,8 +234,10 @@ export const employeeProfileApi = {
   },
 
   getById: async (id: number): Promise<EmployeeProfileDto> => {
-    const res = await apiClient.get<EmployeeProfileDto>(`/api/employee-profiles/${id}`);
-    return res.data;
+    const res = await apiClient.get<unknown>(`/api/employee-profiles/${id}`);
+    const profile = normalizeProfile(res.data);
+    if (!profile) throw new Error("Invalid profile response");
+    return profile;
   },
 
   getByUserId: async (userId: number): Promise<EmployeeProfileDto> => {
@@ -223,9 +314,26 @@ export const employeeProfileApi = {
     if (!dto.userId || dto.userId <= 0) {
       throw new Error("Select a valid employee user account (User ID must match their login).");
     }
-    const res = await apiClient.post<EmployeeProfileDto>("/api/employee-profiles", dto);
-    const profile = normalizeProfile(res.data);
-    if (!profile) throw new Error("Invalid profile response from server");
+    const payload = buildProfilePayload(dto);
+    const res = await apiClient.post<unknown>("/api/employee-profiles", payload);
+    let profile = normalizeProfile(res.data, dto.userId);
+
+    if (!profile || !profile.userId) {
+      const createdId = Number((res.data as Record<string, unknown> | null)?.id);
+      if (Number.isFinite(createdId) && createdId > 0) {
+        try {
+          profile = await employeeProfileApi.getById(createdId);
+        } catch {
+          profile = normalizeProfile({ ...dto, id: createdId }, dto.userId);
+        }
+      } else {
+        profile = normalizeProfile({ ...dto, ...(res.data as object) }, dto.userId);
+      }
+    }
+
+    if (!profile?.userId) {
+      throw new Error("Profile was saved but the server returned an unexpected response.");
+    }
     return profile;
   },
 
@@ -233,8 +341,13 @@ export const employeeProfileApi = {
     id: number,
     dto: EmployeeProfileDto
   ): Promise<EmployeeProfileDto> => {
-    const res = await apiClient.put<EmployeeProfileDto>(`/api/employee-profiles/${id}`, dto);
-    return res.data;
+    const res = await apiClient.put<unknown>(
+      `/api/employee-profiles/${id}`,
+      buildProfilePayload(dto)
+    );
+    const profile = normalizeProfile(res.data, dto.userId);
+    if (profile?.userId) return profile;
+    return employeeProfileApi.getById(id);
   },
 
   delete: async (id: number): Promise<string> => {

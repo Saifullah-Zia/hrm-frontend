@@ -205,13 +205,31 @@ const Modal = ({
   const isReadOnly = mode === "view";
 
   const handle = (field: keyof EmployeeProfileDto, val: string | number) => {
-    let finalVal = val;
+    if (field === "departmentId" || field === "positionId") {
+      const n = val === "" ? undefined : Number(val);
+      setForm((f) => ({
+        ...f,
+        [field]: n !== undefined && Number.isFinite(n) && n > 0 ? n : undefined,
+      }));
+      return;
+    }
+
+    let finalVal: string | number = val;
     if (field === "cnicNumber" && typeof val === "string") {
       finalVal = val.replace(/[^0-9-]/g, "");
     }
 
     setForm((f) => {
       const next = { ...f, [field]: finalVal };
+
+      if (field === "userId" && typeof finalVal === "number" && finalVal > 0 && mode === "create") {
+        const selected = employeeUsers.find((u) => u.id === finalVal);
+        if (selected?.name) {
+          const parts = selected.name.trim().split(/\s+/);
+          next.firstName = parts[0] ?? "";
+          next.lastName = parts.slice(1).join(" ");
+        }
+      }
 
       // Auto-calculate probation dates (3 months) when joining date is set
       if (field === "joiningDate" && typeof finalVal === "string" && finalVal) {
@@ -631,7 +649,9 @@ export default function EmployeeProfilesPage() {
       .then((res) => {
         const list = Array.isArray(res.data) ? res.data : [];
         setEmployeeUsers(
-          list.filter((u) => (u.role ?? "").toUpperCase() === "EMPLOYEE")
+          list.filter(
+            (u) => (u.role ?? "").replace(/^ROLE_/, "").toUpperCase() === "EMPLOYEE"
+          )
         );
       })
       .catch(() => setEmployeeUsers([]));
@@ -720,6 +740,7 @@ export default function EmployeeProfilesPage() {
 
     // Refresh the list BEFORE closing the modal, so the new row is guaranteed
     // to be in state by the time the modal disappears.
+    setPage(0);
     await loadData(0);
     setModal({ open: false, mode: "create", profile: null });
   };
