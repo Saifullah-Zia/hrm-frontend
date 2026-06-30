@@ -270,12 +270,33 @@ export const employeeProfileApi = {
         raw.totalPages ??
         (Math.ceil(totalElements / size) || 1)
     );
+    const pageNumber = Number(pageMeta.number ?? raw.number ?? page);
+    const pageSize = Number(pageMeta.size ?? raw.size ?? size);
+    const safeTotalElements = Number.isFinite(totalElements) ? totalElements : content.length;
+    const safeTotalPages = Number.isFinite(totalPages) ? Math.max(1, totalPages) : 1;
+    const safePageNumber = Number.isFinite(pageNumber) ? pageNumber : page;
+    const safePageSize = Number.isFinite(pageSize) ? pageSize : size;
+    const defaultSort = { empty: true, sorted: false, unsorted: true };
 
     return {
-      ...(raw as EmployeeProfilePageResponse),
       content,
-      totalElements: Number.isFinite(totalElements) ? totalElements : content.length,
-      totalPages: Number.isFinite(totalPages) ? Math.max(1, totalPages) : 1,
+      totalElements: safeTotalElements,
+      totalPages: safeTotalPages,
+      size: safePageSize,
+      number: safePageNumber,
+      numberOfElements: content.length,
+      first: safePageNumber <= 0,
+      last: safeTotalPages <= 0 || safePageNumber >= safeTotalPages - 1,
+      empty: content.length === 0,
+      sort: defaultSort,
+      pageable: {
+        pageNumber: safePageNumber,
+        pageSize: safePageSize,
+        sort: defaultSort,
+        offset: safePageNumber * safePageSize,
+        paged: true,
+        unpaged: false,
+      },
     };
   },
 
