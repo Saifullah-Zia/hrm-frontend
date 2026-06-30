@@ -192,7 +192,7 @@ export default function AdminLeaveBalancesPage() {
                     <th className="px-4 py-3 font-medium">Pending</th>
                     <th className="px-4 py-3 font-medium">Remaining</th>
                     <th className="px-4 py-3 font-medium">Carry fwd</th>
-                    <th className="px-4 py-3 font-medium w-16" />
+                    <th className="px-4 py-3 font-medium sticky right-0 bg-[#13151e] z-10">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -209,15 +209,16 @@ export default function AdminLeaveBalancesPage() {
                       <td className="px-4 py-3 text-white/60">{r.pendingDays ?? 0}</td>
                       <td className="px-4 py-3 text-emerald-400/90 font-medium">{r.remainingDays}</td>
                       <td className="px-4 py-3 text-white/50">{r.carryForwardDays ?? 0}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 sticky right-0 bg-[#13151e] z-10">
                         <button
                           type="button"
                           onClick={() => openEdit(r)}
                           disabled={r.id == null}
                           title={r.id == null ? "No balance id" : "Edit balance"}
-                          className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#FC0175] border border-[#FC0175]/30 hover:bg-[#FC0175]/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
-                          <Pencil size={15} />
+                          <Pencil size={13} />
+                          Edit
                         </button>
                       </td>
                     </tr>
