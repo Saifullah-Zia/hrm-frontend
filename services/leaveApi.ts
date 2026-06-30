@@ -29,6 +29,13 @@ export interface LeaveBalanceDto {
   carryForwardDays?: number;
 }
 
+export interface LeaveBalanceUpdateRequest {
+  totalDays?: number;
+  usedDays?: number;
+  pendingDays?: number;
+  carryForwardDays?: number;
+}
+
 /** Spring `Page<LeaveBalanceDto>` JSON from `/api/leave/balance/all` and `/user/{id}`. */
 export interface LeaveBalancePage {
   content: LeaveBalanceDto[];
@@ -308,6 +315,12 @@ export const leaveApi = {
   /** @deprecated Prefer `getAllBalancesPage` — fetches a single large page (legacy callers). */
   getAllBalances: async (): Promise<LeaveBalanceDto[]> =>
     (await fetchAllLeaveBalancesPage(0, 500)).content,
+
+  updateBalance: (id: number, dto: LeaveBalanceUpdateRequest): Promise<LeaveBalanceDto> =>
+    apiFetch<LeaveBalanceDto>(`/api/leave/balance/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(dto),
+    }),
 
   /** Tries `GET /api/leave/balance/user/{id}` (paginated, merged) then `GET /api/leave/my-balance?userId=`. */
   async getBalancesForEmployee(userId: number): Promise<LeaveBalanceDto[] | null> {
