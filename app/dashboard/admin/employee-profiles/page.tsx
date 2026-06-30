@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import apiClient from "@/lib/apiClient";
 import {
   employeeProfileApi,
   EmployeeProfileDto,
+  mergeProfiles,
 } from "@/services/employeeProfileApi";
 import {
   User,
@@ -660,8 +661,6 @@ const DeleteConfirm = ({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function EmployeeProfilesPage() {
   const [profiles, setProfiles] = useState<EmployeeProfileDto[]>([]);
-  const [pageRecords, setPageRecords] = useState<EmployeeProfileDto[]>([]);
-  const [filtered, setFiltered] = useState<EmployeeProfileDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -670,8 +669,6 @@ export default function EmployeeProfilesPage() {
   // Pagination states
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
   const [modal, setModal] = useState<{
     open: boolean;
@@ -721,57 +718,72 @@ export default function EmployeeProfilesPage() {
       });
   }, []);
 
-  // ── Fetch ──
-  const loadData = async (pageIndex = page): Promise<boolean> => {
+  // ── Fetch (single source: GET /api/employee-profiles) ──
+  const loadData = async (): Promise<EmployeeProfileDto[]> => {
     setLoading(true);
     setError(null);
     try {
       const allData = await employeeProfileApi.getAll();
       setProfiles(allData);
-
-      const pageData = await employeeProfileApi.getPaginated(pageIndex, pageSize, "firstName", "asc");
-      setPageRecords(pageData.content);
-      setTotalElements(pageData.totalElements ?? 0);
-      const tPages = pageData.totalPages ?? (Math.ceil((pageData.totalElements ?? 0) / pageSize) || 1);
-      setTotalPages(Math.max(1, tPages));
-      setPage(pageIndex);
-      return true;
+      return allData;
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to load employee profiles."));
-      return false;
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]);
+    void loadData();
+  }, []);
 
-  // ── Filter ──
-  useEffect(() => {
-    let data = [...pageRecords];
-    if (statusFilter !== "ALL")
+  const filtered = useMemo(() => {
+    let data = [...profiles];
+    if (statusFilter !== "ALL") {
       data = data.filter((p) => p.employmentStatus === statusFilter);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       data = data.filter(
         (p) =>
           String(p.userId).includes(q) ||
+          (p.firstName ?? "").toLowerCase().includes(q) ||
+          (p.lastName ?? "").toLowerCase().includes(q) ||
+          `${p.firstName ?? ""} ${p.lastName ?? ""}`.toLowerCase().includes(q) ||
           p.phone?.toLowerCase().includes(q) ||
           p.cnicNumber?.toLowerCase().includes(q) ||
           p.address?.toLowerCase().includes(q)
       );
     }
-    setFiltered(data);
-  }, [pageRecords, search, statusFilter]);
+    return data.sort((a, b) =>
+      `${a.firstName ?? ""} ${a.lastName ?? ""}`.localeCompare(
+        `${b.firstName ?? ""} ${b.lastName ?? ""}`,
+        undefined,
+        { sensitivity: "base" }
+      )
+    );
+  }, [profiles, search, statusFilter]);
+
+  const totalElements = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize) || 1);
+  const pageRows = useMemo(() => {
+    const safePage = Math.min(page, totalPages - 1);
+    const start = safePage * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize, totalPages]);
+
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
 
   // ── CRUD handlers ──
   // NOTE: this function now THROWS on failure (no try/catch swallow here).
   // The Modal component is responsible for catching and displaying the error,
   // so the modal stays open with a visible message instead of silently failing.
   const handleSave = async (dto: EmployeeProfileDto) => {
+    let saved: EmployeeProfileDto;
+
     if (modal.mode === "create") {
       if (!dto.userId || dto.userId <= 0) {
         throw new Error("Select an employee account from the dropdown.");
@@ -779,20 +791,28 @@ export default function EmployeeProfilesPage() {
       if (profiles.some((p) => p.userId === dto.userId)) {
         throw new Error("This employee already has a profile. Edit the existing one instead.");
       }
-      await employeeProfileApi.create(dto);
+      saved = await employeeProfileApi.create(dto);
     } else if (modal.mode === "edit" && modal.profile?.id) {
-      await employeeProfileApi.update(modal.profile.id, dto);
+      saved = await employeeProfileApi.update(modal.profile.id, dto);
     } else {
       throw new Error("Nothing to save.");
     }
 
-    setPage(0);
-    const refreshed = await loadData(0);
-    if (!refreshed) {
+    const fresh = await employeeProfileApi.getAll().catch(() => [] as EmployeeProfileDto[]);
+    const merged = mergeProfiles(fresh.length > 0 ? fresh : profiles, saved);
+    const isVisible = merged.some(
+      (p) =>
+        (saved.id && p.id === saved.id) ||
+        (saved.userId && p.userId === saved.userId)
+    );
+    if (!isVisible) {
       throw new Error(
-        "Profile was saved, but the list could not be refreshed. Reload the page to see it."
+        "Profile was saved, but it did not appear in the list. Reload the page or check the backend."
       );
     }
+
+    setProfiles(merged);
+    setPage(0);
 
     setToast({
       message: modal.mode === "create" ? "Employee profile created." : "Employee profile updated.",
@@ -807,7 +827,8 @@ export default function EmployeeProfilesPage() {
     try {
       await employeeProfileApi.delete(deleteTarget);
       setDeleteTarget(null);
-      await loadData(0);
+      setPage(0);
+      await loadData();
     } catch (err: unknown) {
       setError(extractErrorMessage(err, "Failed to delete profile."));
       setDeleteTarget(null);
@@ -951,7 +972,7 @@ export default function EmployeeProfilesPage() {
                 Try again
               </button>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : totalElements === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-2">
               <User size={32} className="text-[#2A2D45]" />
               <p className="text-sm text-[#8B8FA8]">No profiles found</p>
@@ -969,11 +990,11 @@ export default function EmployeeProfilesPage() {
                   <span className="text-right">Actions</span>
                 </div>
 
-                {filtered.map((p, i) => (
+                {pageRows.map((p, i) => (
                   <div
-                    key={p.id}
+                    key={p.id ?? `user-${p.userId}`}
                     className={`grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
-                      hover:bg-[#111328] transition-colors ${i < filtered.length - 1 ? "border-b border-[#1A1D35]" : ""
+                      hover:bg-[#111328] transition-colors ${i < pageRows.length - 1 ? "border-b border-[#1A1D35]" : ""
                       }`}
                   >
                     {/* Employee */}
@@ -1067,9 +1088,9 @@ export default function EmployeeProfilesPage() {
             <div className="px-5 py-4 border-t border-[#1A1D35] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-[#8B8FA8]">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <span>
-                  Showing <span className="text-white/60">{filtered.length}</span> of{" "}
-                  <span className="text-white/60">{pageRecords.length}</span> page rows ·{" "}
-                  <span className="text-white/60">{totalElements}</span> total
+                  Showing <span className="text-white/60">{pageRows.length}</span> of{" "}
+                  <span className="text-white/60">{totalElements}</span> filtered ·{" "}
+                  <span className="text-white/60">{profiles.length}</span> total
                 </span>
                 <div className="flex items-center gap-3 border-t border-[#2A2D45] sm:border-t-0 pt-2 sm:pt-0">
                   <span className="flex items-center gap-1.5">

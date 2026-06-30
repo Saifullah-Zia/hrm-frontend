@@ -216,6 +216,31 @@ function findProfileForUser(
   return null;
 }
 
+export function mergeProfiles(
+  existing: EmployeeProfileDto[],
+  ...incoming: EmployeeProfileDto[]
+): EmployeeProfileDto[] {
+  const byId = new Map<number, EmployeeProfileDto>();
+  const byUserId = new Map<number, EmployeeProfileDto>();
+
+  for (const p of existing) {
+    if (p.id) byId.set(p.id, p);
+    if (p.userId) byUserId.set(p.userId, p);
+  }
+  for (const p of incoming) {
+    if (p.id) byId.set(p.id, p);
+    if (p.userId) byUserId.set(p.userId, p);
+  }
+
+  const merged = new Map<number, EmployeeProfileDto>();
+  for (const p of byId.values()) merged.set(p.id!, p);
+  for (const p of byUserId.values()) {
+    if (p.id) merged.set(p.id, p);
+    else merged.set(-p.userId, p);
+  }
+  return Array.from(merged.values());
+}
+
 export const employeeProfileApi = {
   getAll: async (): Promise<EmployeeProfileDto[]> => {
     const res = await apiClient.get<unknown>(`/api/employee-profiles?_t=${Date.now()}`);
@@ -228,12 +253,29 @@ export const employeeProfileApi = {
     sortBy = "firstName",
     sortDir = "asc"
   ): Promise<EmployeeProfilePageResponse> => {
-    const res = await apiClient.get<EmployeeProfilePageResponse>(
+    const res = await apiClient.get<unknown>(
       `/api/employee-profiles/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}&_t=${Date.now()}`
     );
+    const raw = res.data as Record<string, unknown>;
+    const content = normalizeProfilesList(raw.content ?? raw);
+    const pageMeta =
+      raw.page && typeof raw.page === "object"
+        ? (raw.page as Record<string, unknown>)
+        : raw;
+    const totalElements = Number(
+      pageMeta.totalElements ?? raw.totalElements ?? content.length
+    );
+    const totalPages = Number(
+      pageMeta.totalPages ??
+        raw.totalPages ??
+        (Math.ceil(totalElements / size) || 1)
+    );
+
     return {
-      ...res.data,
-      content: normalizeProfilesList(res.data.content),
+      ...(raw as EmployeeProfilePageResponse),
+      content,
+      totalElements: Number.isFinite(totalElements) ? totalElements : content.length,
+      totalPages: Number.isFinite(totalPages) ? Math.max(1, totalPages) : 1,
     };
   },
 
