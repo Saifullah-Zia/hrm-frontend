@@ -32,13 +32,13 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!res.ok) throw new Error(await res.text());
-  
+
   // Handle both JSON and text responses
   const contentType = res.headers.get("content-type");
   if (contentType && contentType.includes("application/json")) {
     return res.json();
   }
-  
+
   // For non-JSON responses (like delete returning plain text)
   return res.text() as Promise<T>;
 }
@@ -56,11 +56,11 @@ const Icon = ({ d, className = "w-4 h-4" }: { d: string; className?: string }) =
 );
 
 const ICONS = {
-  plus:   "M12 4v16m8-8H4",
+  plus: "M12 4v16m8-8H4",
   search: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
-  edit:   "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
-  trash:  "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
-  close:  "M6 18L18 6M6 6l12 12",
+  edit: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
+  trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
+  close: "M6 18L18 6M6 6l12 12",
   wallet: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m0-4h4m0 0v4m0-4V9a2 2 0 00-2-2h-2",
 };
 
@@ -74,8 +74,12 @@ const selectClass =
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const fmt = (n: number) =>
-  n.toLocaleString("en-PK", { minimumFractionDigits: 0 });
+// FIX: accept null/undefined so a missing salary/bonus/deduction in the DB
+// never crashes the page. Previously this threw "Cannot read properties of
+// null (reading 'toLocaleString')" whenever any payroll record had a null
+// numeric field, which crashed the whole page render.
+const fmt = (n: number | null | undefined) =>
+  (n ?? 0).toLocaleString("en-PK", { minimumFractionDigits: 0 });
 
 // ─── Modal Shell ──────────────────────────────────────────────────────────────
 
@@ -156,12 +160,14 @@ function PayrollFormModal({
   useEffect(() => {
     if (editPayroll) {
       setForm({
-        userId:     String(editPayroll.userId),
-        salary:     String(editPayroll.salary),
-        bonuses:    String(editPayroll.bonuses),
-        deductions: String(editPayroll.deductions),
-        month:      editPayroll.month ?? "",
-        status:     editPayroll.status ?? "PAID",
+        userId: String(editPayroll.userId),
+        // FIX: guard against null so the input doesn't literally show the
+        // string "null" when a field is missing in the DB.
+        salary: String(editPayroll.salary ?? 0),
+        bonuses: String(editPayroll.bonuses ?? 0),
+        deductions: String(editPayroll.deductions ?? 0),
+        month: editPayroll.month ?? "",
+        status: editPayroll.status ?? "PAID",
       });
     } else {
       setForm(EMPTY_FORM);
@@ -180,12 +186,12 @@ function PayrollFormModal({
 
     try {
       const payload: CreatePayrollPayload = {
-        userId:     Number(form.userId),
-        salary:     Number(form.salary)     || 0,
-        bonuses:    Number(form.bonuses)    || 0,
+        userId: Number(form.userId),
+        salary: Number(form.salary) || 0,
+        bonuses: Number(form.bonuses) || 0,
         deductions: Number(form.deductions) || 0,
-        month:      form.month  || undefined,
-        status:     form.status || undefined,
+        month: form.month || undefined,
+        status: form.status || undefined,
       };
 
       await onSave(payload, editPayroll?.id);
@@ -397,14 +403,14 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PayrollManagementPage() {
-  const [payrolls, setPayrolls]       = useState<PayrollDTO[]>([]);
-  const [users, setUsers]             = useState<UserDTO[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [payrolls, setPayrolls] = useState<PayrollDTO[]>([]);
+  const [users, setUsers] = useState<UserDTO[]>([]);
+  const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [search, setSearch]           = useState("");
-  const [showForm, setShowForm]       = useState(false);
+  const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
   const [editPayroll, setEditPayroll] = useState<PayrollDTO | null>(null);
-  const [showDelete, setShowDelete]   = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PayrollDTO | null>(null);
   const [pageError, setPageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -494,7 +500,7 @@ export default function PayrollManagementPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    
+
     setDeleteLoading(true);
     try {
       const message = await payrollApi.delete(deleteTarget.id);
@@ -586,9 +592,8 @@ export default function PayrollManagementPage() {
                     (h) => (
                       <th
                         key={h}
-                        className={`px-5 py-3 text-white/30 uppercase text-[11px] font-medium ${
-                          h === "" ? "text-right" : "text-left"
-                        }`}
+                        className={`px-5 py-3 text-white/30 uppercase text-[11px] font-medium ${h === "" ? "text-right" : "text-left"
+                          }`}
                       >
                         {h}
                       </th>
@@ -611,7 +616,11 @@ export default function PayrollManagementPage() {
                   </tr>
                 ) : (
                   filtered.map((p) => {
-                    const net = p.netSalary ?? p.salary + p.bonuses - p.deductions;
+                    // FIX: guard each operand individually so a single null
+                    // field (salary/bonuses/deductions) can't blow up the
+                    // calculation or the render.
+                    const net =
+                      p.netSalary ?? (p.salary ?? 0) + (p.bonuses ?? 0) - (p.deductions ?? 0);
                     return (
                       <tr key={p.id} className="border-t border-white/[0.04] hover:bg-white/[0.03]">
                         <td className="px-5 py-4">
@@ -634,11 +643,10 @@ export default function PayrollManagementPage() {
                         </td>
                         <td className="px-5 py-4">
                           <span
-                            className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                              p.status === "PAID"
+                            className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${p.status === "PAID"
                                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
                                 : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                            }`}
+                              }`}
                           >
                             {p.status || "PENDING"}
                           </span>

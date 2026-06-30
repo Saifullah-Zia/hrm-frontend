@@ -37,6 +37,26 @@ type SystemUser = {
   probationStatus?: string | null;
 };
 
+// ─── Helper: extract a readable message from any thrown error ─────────────────
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const res = (err as { response?: { data?: unknown; status?: number } }).response;
+    const data = res?.data;
+    if (typeof data === "string" && data.trim()) return data;
+    if (data && typeof data === "object") {
+      if ("message" in data && (data as { message?: unknown }).message) {
+        return String((data as { message?: string }).message);
+      }
+      if ("error" in data && (data as { error?: unknown }).error) {
+        return String((data as { error?: string }).error);
+      }
+    }
+    if (res?.status) return `${fallback} (HTTP ${res.status})`;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 // ─── Status Badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({
   status,
@@ -180,6 +200,7 @@ const Modal = ({
 }) => {
   const [form, setForm] = useState<EmployeeProfileDto>(profile ?? EMPTY);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const isReadOnly = mode === "view";
 
@@ -188,10 +209,10 @@ const Modal = ({
     if (field === "cnicNumber" && typeof val === "string") {
       finalVal = val.replace(/[^0-9-]/g, "");
     }
-    
+
     setForm((f) => {
       const next = { ...f, [field]: finalVal };
-      
+
       // Auto-calculate probation dates (3 months) when joining date is set
       if (field === "joiningDate" && typeof finalVal === "string" && finalVal) {
         const joinDate = new Date(finalVal);
@@ -200,9 +221,9 @@ const Modal = ({
           const endDate = new Date(joinDate);
           endDate.setMonth(endDate.getMonth() + 3);
           next.probationEndDate = endDate.toISOString().split("T")[0];
-          
+
           if (!next.probationStatus) {
-             next.probationStatus = "ON_PROBATION";
+            next.probationStatus = "ON_PROBATION";
           }
         }
       }
@@ -211,9 +232,23 @@ const Modal = ({
   };
 
   const submit = async () => {
+    // Basic client-side guard so we never even hit the API with junk data
+    if (mode === "create" && (!form.userId || form.userId <= 0)) {
+      setModalError("Select an employee account from the dropdown.");
+      return;
+    }
+    if (!form.firstName?.trim() || !form.lastName?.trim()) {
+      setModalError("First name and last name are required.");
+      return;
+    }
+
+    setModalError(null);
     setSaving(true);
     try {
       await onSave(form);
+      // onSave closes the modal on success (handled by parent)
+    } catch (err: unknown) {
+      setModalError(extractErrorMessage(err, "Failed to save profile."));
     } finally {
       setSaving(false);
     }
@@ -229,13 +264,11 @@ const Modal = ({
               {mode === "create"
                 ? "Add Employee Profile"
                 : mode === "edit"
-                ? "Edit Employee Profile"
-                : "Employee Profile"}
+                  ? "Edit Employee Profile"
+                  : "Employee Profile"}
             </h2>
             <p className="text-xs text-[#8B8FA8] mt-0.5">
-              {mode === "view"
-                ? "Profile details"
-                : "Fill in the details below"}
+              {mode === "view" ? "Profile details" : "Fill in the details below"}
             </p>
           </div>
           <button
@@ -245,6 +278,14 @@ const Modal = ({
             <X size={18} />
           </button>
         </div>
+
+        {/* Error banner */}
+        {modalError && (
+          <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400 flex items-start gap-2">
+            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{modalError}</span>
+          </div>
+        )}
 
         {/* Body */}
         <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -284,7 +325,21 @@ const Modal = ({
               />
             )}
             <p className="text-[11px] text-[#6B7089] mt-0.5">
-              Must match the registered system user ID.
+              {mode === "create" && employeeUsers.length === 0 && (
+                <span className="text-amber-400">
+                  No EMPLOYEE-role users found. Create a user account with role EMPLOYEE first.
+                </span>
+              )}
+              {mode === "create" &&
+                employeeUsers.length > 0 &&
+                employeeUsers.every((u) => linkedUserIds.has(u.id)) && (
+                  <span className="text-amber-400">
+                    Every EMPLOYEE user already has a profile.
+                  </span>
+                )}
+              {mode !== "create" || employeeUsers.length === 0 ? null : (
+                <>Must match the registered system user ID.</>
+              )}
             </p>
           </div>
 
@@ -456,8 +511,7 @@ const Modal = ({
                 onChange={(e) =>
                   handle(
                     "employmentStatus",
-                    e.target.value as EmployeeProfileDto["employmentStatus"] &
-                      string
+                    e.target.value as EmployeeProfileDto["employmentStatus"] & string
                   )
                 }
                 disabled={isReadOnly}
@@ -597,7 +651,7 @@ export default function EmployeeProfilesPage() {
       setPageRecords(pageData.content);
       setTotalElements(pageData.totalElements ?? 0);
       // Spring Boot 4 VIA_DTO serialization: totalPages may be missing — compute as fallback
-      const tPages = pageData.totalPages ?? Math.ceil((pageData.totalElements ?? 0) / pageSize) || 1;
+      const tPages = pageData.totalPages ?? (Math.ceil((pageData.totalElements ?? 0) / pageSize) || 1);
       setTotalPages(Math.max(1, tPages));
       setPage(pageIndex);
     } catch {
@@ -609,6 +663,7 @@ export default function EmployeeProfilesPage() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize]);
 
   // ── Filter ──
@@ -630,6 +685,9 @@ export default function EmployeeProfilesPage() {
   }, [pageRecords, search, statusFilter]);
 
   // ── CRUD handlers ──
+  // NOTE: this function now THROWS on failure (no try/catch swallow here).
+  // The Modal component is responsible for catching and displaying the error,
+  // so the modal stays open with a visible message instead of silently failing.
   const handleSave = async (dto: EmployeeProfileDto) => {
     if (modal.mode === "create") {
       if (!dto.userId || dto.userId <= 0) {
@@ -642,8 +700,10 @@ export default function EmployeeProfilesPage() {
     } else if (modal.mode === "edit" && modal.profile?.id) {
       await employeeProfileApi.update(modal.profile.id, dto);
     }
-    
-    // Sync probation dates to the User account if they were auto-calculated
+
+    // Sync probation dates to the User account if they were auto-calculated.
+    // This is best-effort — failures here should NOT block the profile save,
+    // so they're caught and logged only, never re-thrown.
     try {
       const userRes = await apiClient.get<SystemUser>(`/api/users/${dto.userId}`);
       if (userRes.data) {
@@ -658,7 +718,8 @@ export default function EmployeeProfilesPage() {
       console.warn("Failed to sync probation dates to User account:", err);
     }
 
-    // ✅ FIX: await loadData(0) first so the list is populated before the modal closes
+    // Refresh the list BEFORE closing the modal, so the new row is guaranteed
+    // to be in state by the time the modal disappears.
     await loadData(0);
     setModal({ open: false, mode: "create", profile: null });
   };
@@ -671,17 +732,7 @@ export default function EmployeeProfilesPage() {
       setDeleteTarget(null);
       await loadData(0);
     } catch (err: unknown) {
-      let msg = "Failed to delete profile.";
-      if (err && typeof err === "object" && "response" in err) {
-        const res = (err as { response?: { data?: unknown } }).response;
-        const data = res?.data;
-        if (typeof data === "string") msg = data;
-        else if (data && typeof data === "object" && "message" in data)
-          msg = String((data as { message?: string }).message);
-      } else if (err instanceof Error) {
-        msg = err.message;
-      }
-      setError(msg);
+      setError(extractErrorMessage(err, "Failed to delete profile."));
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -781,11 +832,10 @@ export default function EmployeeProfilesPage() {
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all ${
-                  statusFilter === s
+                className={`px-3 py-2 text-xs font-medium rounded-xl border transition-all ${statusFilter === s
                     ? "bg-[#FC0175] border-[#FC0175] text-white"
                     : "bg-[#0D0F1E] border-[#2A2D45] text-[#8B8FA8] hover:border-[#FC0175] hover:text-white"
-                }`}
+                  }`}
               >
                 {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
               </button>
@@ -834,8 +884,7 @@ export default function EmployeeProfilesPage() {
                   <div
                     key={p.id}
                     className={`grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
-                      hover:bg-[#111328] transition-colors ${
-                        i < filtered.length - 1 ? "border-b border-[#1A1D35]" : ""
+                      hover:bg-[#111328] transition-colors ${i < filtered.length - 1 ? "border-b border-[#1A1D35]" : ""
                       }`}
                   >
                     {/* Employee */}
@@ -859,9 +908,9 @@ export default function EmployeeProfilesPage() {
                               <p className="text-xs text-[#8B8FA8] truncate">
                                 {p.joiningDate
                                   ? `Joined ${new Date(p.joiningDate).toLocaleDateString(
-                                      "en-PK",
-                                      { month: "short", year: "numeric" }
-                                    )}`
+                                    "en-PK",
+                                    { month: "short", year: "numeric" }
+                                  )}`
                                   : "—"}
                               </p>
                             </div>
