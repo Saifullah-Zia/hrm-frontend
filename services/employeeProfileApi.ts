@@ -107,12 +107,18 @@ function optionalPositiveInt(v: unknown): number | undefined {
 
 /** Strip fields the backend does not persist on EmployeeProfile (probation lives on User). */
 function buildProfilePayload(dto: EmployeeProfileDto): Record<string, unknown> {
-  const payload: Record<string, unknown> = { userId: dto.userId };
-
   const firstName = optionalString(dto.firstName);
   const lastName = optionalString(dto.lastName);
-  if (firstName) payload.firstName = firstName;
-  if (lastName) payload.lastName = lastName;
+  if (!firstName || !lastName) {
+    throw new Error("First name and last name are required.");
+  }
+
+  const payload: Record<string, unknown> = {
+    userId: dto.userId,
+    firstName,
+    lastName,
+    employmentStatus: dto.employmentStatus ?? "ACTIVE",
+  };
 
   for (const [key, val] of [
     ["phone", dto.phone],
@@ -132,8 +138,6 @@ function buildProfilePayload(dto: EmployeeProfileDto): Record<string, unknown> {
   const positionId = optionalPositiveInt(dto.positionId);
   if (departmentId) payload.departmentId = departmentId;
   if (positionId) payload.positionId = positionId;
-
-  if (dto.employmentStatus) payload.employmentStatus = dto.employmentStatus;
 
   return payload;
 }

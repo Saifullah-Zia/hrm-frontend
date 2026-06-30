@@ -37,23 +37,34 @@ type SystemUser = {
   probationStatus?: string | null;
 };
 
+type DepartmentOption = { id: number; name: string };
+type PositionOption = { id: number; title: string; departmentId?: number };
+
+const selectClass =
+  "bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] w-full focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all disabled:opacity-60 disabled:cursor-default";
+
 // ─── Helper: extract a readable message from any thrown error ─────────────────
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "response" in err) {
     const res = (err as { response?: { data?: unknown; status?: number } }).response;
     const data = res?.data;
-    if (typeof data === "string" && data.trim()) return data;
+    if (typeof data === "string" && data.trim()) return data.trim();
     if (data && typeof data === "object") {
-      if ("message" in data && (data as { message?: unknown }).message) {
-        return String((data as { message?: string }).message);
-      }
-      if ("error" in data && (data as { error?: unknown }).error) {
-        return String((data as { error?: string }).error);
+      const o = data as Record<string, unknown>;
+      for (const key of ["message", "error", "detail", "title"]) {
+        if (key in o && o[key]) return String(o[key]);
       }
     }
+    if (res?.status === 401) return "Session expired. Please log in again.";
+    if (res?.status === 403) return "You do not have permission for this action.";
     if (res?.status) return `${fallback} (HTTP ${res.status})`;
   }
-  if (err instanceof Error && err.message) return err.message;
+  if (err instanceof Error && err.message) {
+    if (err.message === "Network Error") {
+      return "Cannot reach the backend. Check NEXT_PUBLIC_API_URL on Vercel and backend CORS.";
+    }
+    return err.message;
+  }
   return fallback;
 }
 
@@ -187,6 +198,8 @@ const Modal = ({
   mode,
   profile,
   employeeUsers,
+  departments,
+  positions,
   linkedUserIds,
   onClose,
   onSave,
@@ -194,6 +207,8 @@ const Modal = ({
   mode: ModalMode;
   profile: EmployeeProfileDto | null;
   employeeUsers: SystemUser[];
+  departments: DepartmentOption[];
+  positions: PositionOption[];
   linkedUserIds: Set<number>;
   onClose: () => void;
   onSave: (dto: EmployeeProfileDto) => Promise<void>;
@@ -227,7 +242,7 @@ const Modal = ({
         if (selected?.name) {
           const parts = selected.name.trim().split(/\s+/);
           next.firstName = parts[0] ?? "";
-          next.lastName = parts.slice(1).join(" ");
+          next.lastName = parts.slice(1).join(" ") || parts[0] || "";
         }
       }
 
@@ -415,26 +430,53 @@ const Modal = ({
             handle={handle}
             isReadOnly={isReadOnly}
           />
-          <Field
-            label="Department ID"
-            icon={<Building2 size={13} />}
-            field="departmentId"
-            type="number"
-            placeholder="e.g. 1"
-            form={form}
-            handle={handle}
-            isReadOnly={isReadOnly}
-          />
-          <Field
-            label="Position ID"
-            icon={<Briefcase size={13} />}
-            field="positionId"
-            type="number"
-            placeholder="e.g. 2"
-            form={form}
-            handle={handle}
-            isReadOnly={isReadOnly}
-          />
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
+              <span className="text-[#FC0175]">
+                <Building2 size={13} />
+              </span>
+              Department
+            </label>
+            <select
+              value={form.departmentId ?? ""}
+              onChange={(e) => handle("departmentId", e.target.value)}
+              disabled={isReadOnly}
+              className={selectClass}
+            >
+              <option value="">— None —</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
+              <span className="text-[#FC0175]">
+                <Briefcase size={13} />
+              </span>
+              Position
+            </label>
+            <select
+              value={form.positionId ?? ""}
+              onChange={(e) => handle("positionId", e.target.value)}
+              disabled={isReadOnly}
+              className={selectClass}
+            >
+              <option value="">— None —</option>
+              {positions
+                .filter((p) => !form.departmentId || p.departmentId === form.departmentId)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+            </select>
+          </div>
+
           <Field
             label="Emergency Contact Name"
             icon={<AlertTriangle size={13} />}
@@ -640,8 +682,17 @@ export default function EmployeeProfilesPage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [employeeUsers, setEmployeeUsers] = useState<SystemUser[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [positions, setPositions] = useState<PositionOption[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const linkedUserIds = new Set(profiles.map((p) => p.userId));
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   useEffect(() => {
     apiClient
@@ -655,27 +706,39 @@ export default function EmployeeProfilesPage() {
         );
       })
       .catch(() => setEmployeeUsers([]));
+
+    Promise.all([
+      apiClient.get<DepartmentOption[]>("/api/departments"),
+      apiClient.get<PositionOption[]>("/api/positions"),
+    ])
+      .then(([deptRes, posRes]) => {
+        setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
+        setPositions(Array.isArray(posRes.data) ? posRes.data : []);
+      })
+      .catch(() => {
+        setDepartments([]);
+        setPositions([]);
+      });
   }, []);
 
   // ── Fetch ──
-  const loadData = async (pageIndex = page) => {
+  const loadData = async (pageIndex = page): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch total list in background for stats & linking
       const allData = await employeeProfileApi.getAll();
       setProfiles(allData);
 
-      // 2. Fetch active page slice
       const pageData = await employeeProfileApi.getPaginated(pageIndex, pageSize, "firstName", "asc");
       setPageRecords(pageData.content);
       setTotalElements(pageData.totalElements ?? 0);
-      // Spring Boot 4 VIA_DTO serialization: totalPages may be missing — compute as fallback
       const tPages = pageData.totalPages ?? (Math.ceil((pageData.totalElements ?? 0) / pageSize) || 1);
       setTotalPages(Math.max(1, tPages));
       setPage(pageIndex);
-    } catch {
-      setError("Failed to load employee profiles.");
+      return true;
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err, "Failed to load employee profiles."));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -719,29 +782,22 @@ export default function EmployeeProfilesPage() {
       await employeeProfileApi.create(dto);
     } else if (modal.mode === "edit" && modal.profile?.id) {
       await employeeProfileApi.update(modal.profile.id, dto);
+    } else {
+      throw new Error("Nothing to save.");
     }
 
-    // Sync probation dates to the User account if they were auto-calculated.
-    // This is best-effort — failures here should NOT block the profile save,
-    // so they're caught and logged only, never re-thrown.
-    try {
-      const userRes = await apiClient.get<SystemUser>(`/api/users/${dto.userId}`);
-      if (userRes.data) {
-        await apiClient.put(`/api/users/${dto.userId}`, {
-          ...userRes.data,
-          probationStartDate: dto.probationStartDate || null,
-          probationEndDate: dto.probationEndDate || null,
-          probationStatus: dto.probationStatus || null,
-        });
-      }
-    } catch (err) {
-      console.warn("Failed to sync probation dates to User account:", err);
-    }
-
-    // Refresh the list BEFORE closing the modal, so the new row is guaranteed
-    // to be in state by the time the modal disappears.
     setPage(0);
-    await loadData(0);
+    const refreshed = await loadData(0);
+    if (!refreshed) {
+      throw new Error(
+        "Profile was saved, but the list could not be refreshed. Reload the page to see it."
+      );
+    }
+
+    setToast({
+      message: modal.mode === "create" ? "Employee profile created." : "Employee profile updated.",
+      type: "success",
+    });
     setModal({ open: false, mode: "create", profile: null });
   };
 
@@ -789,6 +845,18 @@ export default function EmployeeProfilesPage() {
             Add Profile
           </button>
         </div>
+
+        {toast && (
+          <div
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              toast.type === "success"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-red-500/30 bg-red-500/10 text-red-400"
+            }`}
+          >
+            {toast.message}
+          </div>
+        )}
 
         {/* ── Stats Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -952,7 +1020,9 @@ export default function EmployeeProfilesPage() {
 
                     {/* Dept */}
                     <span className="text-sm text-[#C2C5DA]">
-                      {p.departmentId ? `Dept #${p.departmentId}` : "—"}
+                      {p.departmentId
+                        ? departments.find((d) => d.id === p.departmentId)?.name ?? `Dept #${p.departmentId}`
+                        : "—"}
                     </span>
 
                     {/* Status */}
@@ -1065,6 +1135,8 @@ export default function EmployeeProfilesPage() {
           mode={modal.mode}
           profile={modal.profile}
           employeeUsers={employeeUsers}
+          departments={departments}
+          positions={positions}
           linkedUserIds={linkedUserIds}
           onClose={() => setModal({ open: false, mode: "create", profile: null })}
           onSave={handleSave}
