@@ -28,6 +28,28 @@ function remainingFromForm(form: EditForm): number {
   return form.totalDays - form.usedDays - form.pendingDays;
 }
 
+/** When admin lowers total without touching used, count the drop as used (keeps original total). */
+function computeBalanceSave(
+  original: LeaveBalanceDto,
+  form: EditForm
+): EditForm {
+  const originalTotal = original.totalDays;
+  const originalUsed = original.usedDays ?? 0;
+  let { totalDays, usedDays, pendingDays, carryForwardDays } = form;
+
+  if (totalDays < originalTotal && usedDays === originalUsed) {
+    const delta = originalTotal - totalDays;
+    usedDays = originalUsed + delta;
+    totalDays = originalTotal;
+  }
+
+  return { totalDays, usedDays, pendingDays, carryForwardDays };
+}
+
+function previewForm(original: LeaveBalanceDto, form: EditForm): EditForm {
+  return computeBalanceSave(original, form);
+}
+
 export default function AdminLeaveBalancesPage() {
   const [allRows, setAllRows] = useState<LeaveBalanceDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,12 +130,8 @@ export default function AdminLeaveBalancesPage() {
     if (!editing?.id || !editForm) return;
     setSaving(true);
     try {
-      const updated = await leaveApi.updateBalance(editing.id, {
-        totalDays: editForm.totalDays,
-        usedDays: editForm.usedDays,
-        pendingDays: editForm.pendingDays,
-        carryForwardDays: editForm.carryForwardDays,
-      });
+      const payload = computeBalanceSave(editing, editForm);
+      const updated = await leaveApi.updateBalance(editing.id, payload);
       setAllRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setEditing(null);
       setEditForm(null);
@@ -125,7 +143,13 @@ export default function AdminLeaveBalancesPage() {
     }
   };
 
-  const previewRemaining = editForm ? remainingFromForm(editForm) : 0;
+  const previewRemaining = editForm && editing ? remainingFromForm(previewForm(editing, editForm)) : 0;
+  const previewSave = editing && editForm ? previewForm(editing, editForm) : null;
+  const totalReducedAsUsed =
+    editing &&
+    editForm &&
+    editForm.totalDays < editing.totalDays &&
+    editForm.usedDays === (editing.usedDays ?? 0);
 
   return (
     <div className="min-h-screen bg-[#0f1117] p-6">
@@ -294,6 +318,13 @@ export default function AdminLeaveBalancesPage() {
             <p className="text-sm text-emerald-400/90">
               Remaining (preview): <span className="font-medium">{previewRemaining}</span>
             </p>
+            {totalReducedAsUsed && previewSave && (
+              <p className="text-sm text-white/45">
+                Lowering total saves as{" "}
+                <span className="text-white/70">{previewSave.usedDays} used</span> ·{" "}
+                <span className="text-white/70">{previewSave.totalDays} total</span> on the employee view.
+              </p>
+            )}
             {previewRemaining < 0 && (
               <p className="text-sm text-rose-400">Used + pending cannot exceed total days.</p>
             )}
