@@ -17,30 +17,6 @@ function fmtDate(s: string | null | undefined) {
   }
 }
 
-function normProbation(s: string | null | undefined): string {
-  return (s ?? "").trim().toUpperCase().replace(/\s+/g, "_");
-}
-
-/** Prefer dedicated probation API rows; fill gaps from `GET /api/users` when statuses match. */
-function mergeProbationLists(
-  fromEndpoint: UserWithProbationDto[],
-  fromAllUsers: UserWithProbationDto[],
-  status: "ON_PROBATION" | "COMPLETED"
-): UserWithProbationDto[] {
-  const map = new Map<number, UserWithProbationDto>();
-  for (const u of fromEndpoint) {
-    const id = u.id ?? (u as any).userId;
-    if (id != null) map.set(id, { ...u, id }); // ensure 'id' is set for React keys
-  }
-  for (const u of fromAllUsers) {
-    const id = u.id ?? (u as any).userId;
-    if (normProbation(u.probationStatus) === status && id != null && !map.has(id)) {
-      map.set(id, { ...u, id });
-    }
-  }
-  return [...map.values()];
-}
-
 export default function AdminProbationPage() {
   const { user } = useAuthStore();
   const adminId = typeof user?.userId === "number" ? user.userId : undefined;
@@ -56,13 +32,12 @@ export default function AdminProbationPage() {
     setLoading(true);
     setError(null);
     try {
-      const [a, b, allUsers] = await Promise.all([
+      const [a, b] = await Promise.all([
         probationApi.getOnProbation(),
         probationApi.getPendingConfirmation(),
-        probationApi.getAllUsers(),
       ]);
-      setOnProbation(mergeProbationLists(a, allUsers, "ON_PROBATION"));
-      setPending(mergeProbationLists(b, allUsers, "COMPLETED"));
+      setOnProbation(a);
+      setPending(b);
     } catch (e: unknown) {
       const msg =
         e && typeof e === "object" && "response" in e

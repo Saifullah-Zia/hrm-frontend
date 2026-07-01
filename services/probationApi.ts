@@ -70,14 +70,27 @@ export function formatProbationRange(
 
 /** Spring sometimes returns a page object instead of a raw array. */
 function normalizeUsersListPayload(data: unknown): UserWithProbationDto[] {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object") {
-    const o = data as Record<string, unknown>;
-    if (Array.isArray(o.content)) return o.content as UserWithProbationDto[];
-    if (Array.isArray(o.data)) return o.data as UserWithProbationDto[];
-    if (Array.isArray(o.users)) return o.users as UserWithProbationDto[];
-  }
-  return [];
+  const raw: unknown[] = (() => {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === "object") {
+      const o = data as Record<string, unknown>;
+      if (Array.isArray(o.content)) return o.content;
+      if (Array.isArray(o.data)) return o.data;
+      if (Array.isArray(o.users)) return o.users;
+    }
+    return [];
+  })();
+
+  return raw
+    .filter((row): row is Record<string, unknown> => row != null && typeof row === "object")
+    .map((row) => {
+      const userId = Number(row.userId ?? row.id);
+      return {
+        ...(row as unknown as UserWithProbationDto),
+        id: Number.isFinite(userId) ? userId : 0,
+      };
+    })
+    .filter((row) => row.id > 0);
 }
 
 export const probationApi = {
