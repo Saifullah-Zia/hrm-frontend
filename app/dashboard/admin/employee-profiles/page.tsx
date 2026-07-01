@@ -829,9 +829,12 @@ export default function EmployeeProfilesPage() {
       setDeleteTarget(null);
       setPage(0);
       await loadData();
+      setToast({ message: "Employee profile deleted.", type: "success" });
     } catch (err: unknown) {
-      setError(extractErrorMessage(err, "Failed to delete profile."));
-      setDeleteTarget(null);
+      setToast({
+        message: extractErrorMessage(err, "Failed to delete profile."),
+        type: "error",
+      });
     } finally {
       setDeleting(false);
     }
@@ -1070,7 +1073,16 @@ export default function EmployeeProfilesPage() {
                         <Pencil size={15} />
                       </button>
                       <button
-                        onClick={() => setDeleteTarget(p.id!)}
+                        onClick={() => {
+                          if (!p.id) {
+                            setToast({
+                              message: "This profile has no ID — refresh the page and try again.",
+                              type: "error",
+                            });
+                            return;
+                          }
+                          setDeleteTarget(p.id);
+                        }}
                         className="p-1.5 rounded-lg text-[#8B8FA8] hover:text-red-400 hover:bg-red-500/10 transition-all"
                         title="Delete"
                       >
