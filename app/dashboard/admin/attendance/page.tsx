@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import apiClient from "@/lib/apiClient";
+import { exportMonthlyAttendanceCsv } from "@/lib/attendanceExport";
 
 /* ─── types ─────────────────────────────────────────────────────────────────── */
 
@@ -88,6 +89,7 @@ export default function AttendanceOverviewPage() {
   const [actionLoading, setActionLoading]     = useState(false);
   const [showForm, setShowForm]         = useState(false);
   const [toast, setToast]               = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [exporting, setExporting]       = useState(false);
   const [form, setForm] = useState({
     userId: "",
     date: new Date().toISOString().split("T")[0],
@@ -258,6 +260,26 @@ export default function AttendanceOverviewPage() {
     } finally { setActionLoading(false); }
   };
 
+  const handleExportCsv = () => {
+    if (monthlyRecords.length === 0) {
+      setToast({ message: "No attendance records for the selected month.", type: "error" });
+      return;
+    }
+    setExporting(true);
+    try {
+      const count = exportMonthlyAttendanceCsv({
+        month,
+        records: monthlyRecords,
+        users,
+      });
+      setToast({ message: `Exported ${count} record(s) for ${month}.`, type: "success" });
+    } catch {
+      setToast({ message: "Could not export attendance CSV.", type: "error" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     setActionLoading(true);
     try {
@@ -365,6 +387,19 @@ export default function AttendanceOverviewPage() {
               onChange={e => setMonth(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
             />
+            {isAdminOrSuperAdmin() && (
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                disabled={loading || exporting || monthlyRecords.length === 0}
+                className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 font-medium hover:bg-emerald-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" />
+                </svg>
+                {exporting ? "Exporting…" : "Export CSV"}
+              </button>
+            )}
             <p className="text-white/30 text-xs mt-2">{monthlyRecords.length} records in selected month</p>
           </div>
         </div>
