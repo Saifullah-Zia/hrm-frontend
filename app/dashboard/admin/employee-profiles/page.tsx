@@ -221,7 +221,7 @@ const Modal = ({
   const isReadOnly = mode === "view";
 
   const handle = (field: keyof EmployeeProfileDto, val: string | number) => {
-    if (field === "departmentId" || field === "positionId") {
+    if (field === "departmentId" || field === "positionId" || field === "biometricPersonId") {
       const n = val === "" ? undefined : Number(val);
       setForm((f) => ({
         ...f,
