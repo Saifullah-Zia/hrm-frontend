@@ -42,6 +42,7 @@ export interface EmployeeProfileDto {
   probationStartDate?: string | null;
   probationEndDate?: string | null;
   probationStatus?: string | null;
+  biometricPersonId?: number; // Hikvision device Employee ID
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;

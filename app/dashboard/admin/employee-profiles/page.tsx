@@ -497,6 +497,17 @@ const Modal = ({
             isReadOnly={isReadOnly}
           />
 
+          <Field
+            label="Hikvision Person ID"
+            icon={<User size={13} />}
+            field="biometricPersonId"
+            type="number"
+            placeholder="Device Employee ID"
+            form={form}
+            handle={handle}
+            isReadOnly={isReadOnly}
+          />
+
           {/* Profile Picture */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
