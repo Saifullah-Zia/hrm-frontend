@@ -188,6 +188,14 @@ export default function EmployeeProfilePage() {
           </div>
           <p className="text-white/40 text-sm mt-1">View and update your contact details.</p>
         </div>
+        <button
+          type="button"
+          onClick={() => profileQuery.refetch()}
+          disabled={profileQuery.isFetching}
+          className="px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-white/70 text-xs font-medium transition-colors disabled:opacity-50"
+        >
+          {profileQuery.isFetching ? "Refreshing…" : "Refresh"}
+        </button>
       </div>
 
       {showProbation && (
