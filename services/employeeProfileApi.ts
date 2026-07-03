@@ -137,8 +137,10 @@ function buildProfilePayload(dto: EmployeeProfileDto): Record<string, unknown> {
 
   const departmentId = optionalPositiveInt(dto.departmentId);
   const positionId = optionalPositiveInt(dto.positionId);
+  const biometricPersonId = optionalPositiveInt(dto.biometricPersonId);
   if (departmentId) payload.departmentId = departmentId;
   if (positionId) payload.positionId = positionId;
+  if (biometricPersonId) payload.biometricPersonId = biometricPersonId;
 
   return payload;
 }
