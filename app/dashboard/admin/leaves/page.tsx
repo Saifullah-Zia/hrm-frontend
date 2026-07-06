@@ -442,8 +442,8 @@ export default function AdminLeavePage() {
                         </td>
 
                         {/* Reason */}
-                        <td className="px-5 py-4 max-w-[200px]">
-                          <p className="text-white/50 text-sm truncate" title={leave.reason}>
+                        <td className="px-5 py-4 max-w-[300px]">
+                          <p className="text-white/50 text-sm whitespace-normal break-words" title={leave.reason}>
                             {leave.reason || "—"}
                           </p>
                         </td>
