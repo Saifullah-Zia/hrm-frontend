@@ -92,119 +92,143 @@ function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
   );
 }
 
-function ConfirmModal({
+function ViewDetailsModal({
   leave,
-  action,
   loading,
-  onConfirm,
-  onCancel,
+  onApprove,
+  onReject,
+  onClose,
 }: {
   leave: LeaveDto;
-  action: "APPROVE" | "REJECT";
   loading: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+  onClose: () => void;
 }) {
-  const isApprove = action === "APPROVE";
-
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div
-        className="bg-[#1a1d28] border border-white/[0.08] rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-[#1a1d28] border border-white/[0.08] rounded-2xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto"
         style={{ animation: "scaleIn 0.2s ease" }}
       >
-        {/* Icon */}
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4 ${
-          isApprove ? "bg-emerald-500/15" : "bg-rose-500/15"
-        }`}>
-          {isApprove ? "✅" : "❌"}
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-white/90 font-semibold text-lg">Leave Request Details</h3>
+            <p className="text-white/40 text-sm">Review the complete leave request information</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-white/5 text-white/50 hover:bg-white/10 transition-colors flex items-center justify-center"
+          >
+            ×
+          </button>
         </div>
 
-        <h3 className="text-white/90 font-semibold text-lg mb-1">
-          {isApprove ? "Approve Leave Request" : "Reject Leave Request"}
-        </h3>
-        <p className="text-white/40 text-sm mb-5">
-          {isApprove
-            ? `You're about to approve ${leave.userName}'s leave request.`
-            : `You're about to reject ${leave.userName}'s leave request.`}
-        </p>
+        {/* Leave Details */}
+        <div className="space-y-4 mb-6">
+          {/* Employee Info */}
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+            <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Employee Information</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-white/40 block text-xs">Name</span>
+                <span className="text-white/80 font-medium">{leave.userName}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">Employee ID</span>
+                <span className="text-white/80 font-medium">{leave.userId}</span>
+              </div>
+            </div>
+          </div>
 
-        {/* Leave Summary */}
-        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-4 space-y-3 text-sm">
-          <div className="flex justify-between items-center">
-            <span className="text-white/40">Employee</span>
-            <div className="text-right">
-              <span className="text-white/80 font-medium block">{leave.userName}</span>
-              <span className="text-white/30 text-xs">ID: {leave.userId}</span>
+          {/* Leave Info */}
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+            <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Leave Information</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-white/40 block text-xs">Leave Type</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{LEAVE_TYPE_ICON[leave.leaveType] ?? "📋"}</span>
+                  <span className="text-white/80 font-medium">{leave.leaveType}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">Status</span>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${
+                    STATUS_DOT[normalizeLeaveStatus(leave.status)] ??
+                    STATUS_DOT[leave.status] ??
+                    "bg-gray-400"
+                  }`} />
+                  <span className="text-white/80 font-medium">{leave.status}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">Start Date</span>
+                <span className="text-white/80 font-medium">{fmt(leave.startDate)}</span>
+              </div>
+              <div>
+                <span className="text-white/40 block text-xs">End Date</span>
+                <span className="text-white/80 font-medium">{fmt(leave.endDate)}</span>
+              </div>
             </div>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-white/40">Leave Type</span>
-            <div className="flex items-center gap-2">
-              <span className="text-base">{LEAVE_TYPE_ICON[leave.leaveType] ?? "📋"}</span>
-              <span className="text-white/80">{leave.leaveType}</span>
-            </div>
-          </div>
-          <div className="flex justify-between items-start">
-            <span className="text-white/40">Duration</span>
-            <div className="text-right">
-              <span className="text-white/80 block">
-                {fmt(leave.startDate)} → {fmt(leave.endDate)}
-              </span>
-              <span className="text-indigo-400/70 text-xs">
+            <div className="mt-3 pt-3 border-t border-white/[0.06]">
+              <span className="text-white/40 text-xs">Duration</span>
+              <span className="text-indigo-400/70 text-sm ml-2">
                 {durationForLeave(leave)} day{durationForLeave(leave) !== 1 ? "s" : ""}
               </span>
             </div>
           </div>
-        </div>
 
-        {/* Reason Section */}
-        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-4">
-          <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Reason</h4>
-          <div className="max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-            <p className="text-white/70 text-sm whitespace-pre-wrap leading-relaxed">
-              {leave.reason || "No reason provided"}
-            </p>
+          {/* Reason */}
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+            <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Reason for Leave</h4>
+            <div className="max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+              <p className="text-white/70 text-sm whitespace-pre-wrap leading-relaxed">
+                {leave.reason || "No reason provided"}
+              </p>
+            </div>
           </div>
+
+          {/* Attachment */}
+          {leave.attachmentUrl && (
+            <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+              <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Attachment</h4>
+              <a
+                href={`${BASE_URL}${leave.attachmentUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+                View Attachment
+              </a>
+            </div>
+          )}
         </div>
 
-        {/* Attachment Section */}
-        {leave.attachmentUrl && (
-          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-6">
-            <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Attachment</h4>
-            <a
-              href={`${BASE_URL}${leave.attachmentUrl}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+        {/* Actions */}
+        {normalizeLeaveStatus(leave.status) === "PENDING" && (
+          <div className="flex gap-3 pt-4 border-t border-white/[0.06]">
+            <button
+              onClick={onApprove}
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 bg-emerald-500/20 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/30"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-              </svg>
-              View Attachment
-            </a>
+              {loading ? "Approving…" : "Approve Leave"}
+            </button>
+            <button
+              onClick={onReject}
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 bg-rose-500/20 text-rose-400 border-rose-500/25 hover:bg-rose-500/30"
+            >
+              {loading ? "Rejecting…" : "Reject Leave"}
+            </button>
           </div>
         )}
-
-        <div className="flex gap-3">
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 ${
-              isApprove
-                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/30"
-                : "bg-rose-500/20 text-rose-400 border-rose-500/25 hover:bg-rose-500/30"
-            }`}
-          >
-            {loading ? (isApprove ? "Approving…" : "Rejecting…") : (isApprove ? "Yes, Approve" : "Yes, Reject")}
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl bg-white/5 text-white/50 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -222,7 +246,7 @@ export default function AdminLeavePage() {
   const [search, setSearch]               = useState("");
   const [filter, setFilter]               = useState<FilterStatus>("ALL");
   const [toast, setToast]                 = useState<ToastState>(null);
-  const [confirm, setConfirm]             = useState<{ leave: LeaveDto; action: "APPROVE" | "REJECT" } | null>(null);
+  const [viewDetails, setViewDetails]     = useState<LeaveDto | null>(null);
 
   // Pagination states
   const [page, setPage] = useState(0);
@@ -295,16 +319,10 @@ export default function AdminLeavePage() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  const handleAction = async () => {
-    if (!confirm) return;
-    const { leave, action } = confirm;
-
+  const handleApprove = async (leave: LeaveDto) => {
     setActionLoading(true);
     try {
-      const updated =
-        action === "APPROVE"
-          ? await leaveApi.approveLeave(leave.id)
-          : await leaveApi.rejectLeave(leave.id);
+      const updated = await leaveApi.approveLeave(leave.id);
 
       setLeaves(prev =>
         prev.map(l => (l.id === leave.id ? { ...l, status: updated.status } : l))
@@ -313,20 +331,47 @@ export default function AdminLeavePage() {
         prev.map(l => (l.id === leave.id ? { ...l, status: updated.status } : l))
       );
 
-      const verb = action === "APPROVE" ? "approved" : "rejected";
       setToast({
-        message: `✅ ${leave.userName}'s ${leave.leaveType} leave has been ${verb}.`,
+        message: `✅ ${leave.userName}'s ${leave.leaveType} leave has been approved.`,
         type: "success",
       });
+      setViewDetails(null);
 
     } catch (err: any) {
       setToast({
-        message: err.message || `Failed to ${action.toLowerCase()} leave`,
+        message: err.message || "Failed to approve leave",
         type: "error",
       });
     } finally {
       setActionLoading(false);
-      setConfirm(null);
+    }
+  };
+
+  const handleReject = async (leave: LeaveDto) => {
+    setActionLoading(true);
+    try {
+      const updated = await leaveApi.rejectLeave(leave.id);
+
+      setLeaves(prev =>
+        prev.map(l => (l.id === leave.id ? { ...l, status: updated.status } : l))
+      );
+      setPageRecords(prev =>
+        prev.map(l => (l.id === leave.id ? { ...l, status: updated.status } : l))
+      );
+
+      setToast({
+        message: `✅ ${leave.userName}'s ${leave.leaveType} leave has been rejected.`,
+        type: "success",
+      });
+      setViewDetails(null);
+
+    } catch (err: any) {
+      setToast({
+        message: err.message || "Failed to reject leave",
+        type: "error",
+      });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -362,14 +407,14 @@ export default function AdminLeavePage() {
       {/* Toast */}
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Confirm Modal */}
-      {confirm && (
-        <ConfirmModal
-          leave={confirm.leave}
-          action={confirm.action}
+      {/* View Details Modal */}
+      {viewDetails && (
+        <ViewDetailsModal
+          leave={viewDetails}
           loading={actionLoading}
-          onConfirm={handleAction}
-          onCancel={() => setConfirm(null)}
+          onApprove={() => handleApprove(viewDetails)}
+          onReject={() => handleReject(viewDetails)}
+          onClose={() => setViewDetails(null)}
         />
       )}
 
@@ -495,8 +540,8 @@ export default function AdminLeavePage() {
 
                         {/* Reason */}
                         <td className="px-5 py-4 max-w-[300px]">
-                          <p className="text-white/50 text-sm whitespace-normal break-words" title={leave.reason}>
-                            {leave.reason || "—"}
+                          <p className="text-white/50 text-sm truncate" title={leave.reason}>
+                            {leave.reason ? (leave.reason.length > 60 ? leave.reason.slice(0, 60) + "..." : leave.reason) : "—"}
                           </p>
                         </td>
 
@@ -543,41 +588,17 @@ export default function AdminLeavePage() {
 
                         {/* Actions */}
                         <td className="px-5 py-4">
-                          {normalizeLeaveStatus(leave.status) === "PENDING" ? (
-                            <div className="flex items-center gap-2">
-                              {/* Approve */}
-                              <button
-                                onClick={() => setConfirm({ leave, action: "APPROVE" })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-medium hover:bg-emerald-500/25 transition-colors"
-                                title="Approve leave"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                                Approve
-                              </button>
-
-                              {/* Reject */}
-                              <button
-                                onClick={() => setConfirm({ leave, action: "REJECT" })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/25 text-xs font-medium hover:bg-rose-500/25 transition-colors"
-                                title="Reject leave"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                Reject
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-white/20 text-xs italic">
-                              {normalizeLeaveStatus(leave.status) === "APPROVED"
-                                ? "Approved"
-                                : normalizeLeaveStatus(leave.status) === "CANCELLED"
-                                  ? "Cancelled"
-                                  : "Rejected"}
-                            </span>
-                          )}
+                          <button
+                            onClick={() => setViewDetails(leave)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 text-xs font-medium hover:bg-indigo-500/25 transition-colors"
+                            title="View details"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Details
+                          </button>
                         </td>
 
                       </tr>
