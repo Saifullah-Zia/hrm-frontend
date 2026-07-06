@@ -110,7 +110,7 @@ function ConfirmModal({
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div
-        className="bg-[#1a1d28] border border-white/[0.08] rounded-2xl p-6 max-w-md w-full shadow-2xl"
+        className="bg-[#1a1d28] border border-white/[0.08] rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto"
         style={{ animation: "scaleIn 0.2s ease" }}
       >
         {/* Icon */}
@@ -130,23 +130,61 @@ function ConfirmModal({
         </p>
 
         {/* Leave Summary */}
-        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-6 space-y-2 text-sm">
-          <div className="flex justify-between">
+        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-4 space-y-3 text-sm">
+          <div className="flex justify-between items-center">
             <span className="text-white/40">Employee</span>
-            <span className="text-white/80 font-medium">{leave.userName}</span>
+            <div className="text-right">
+              <span className="text-white/80 font-medium block">{leave.userName}</span>
+              <span className="text-white/30 text-xs">ID: {leave.userId}</span>
+            </div>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <span className="text-white/40">Leave Type</span>
-            <span className="text-white/80">{leave.leaveType}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base">{LEAVE_TYPE_ICON[leave.leaveType] ?? "📋"}</span>
+              <span className="text-white/80">{leave.leaveType}</span>
+            </div>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between items-start">
             <span className="text-white/40">Duration</span>
-            <span className="text-white/80">
-              {fmt(leave.startDate)} → {fmt(leave.endDate)}{" "}
-              <span className="text-white/40">({durationForLeave(leave)} day{durationForLeave(leave) !== 1 ? "s" : ""})</span>
-            </span>
+            <div className="text-right">
+              <span className="text-white/80 block">
+                {fmt(leave.startDate)} → {fmt(leave.endDate)}
+              </span>
+              <span className="text-indigo-400/70 text-xs">
+                {durationForLeave(leave)} day{durationForLeave(leave) !== 1 ? "s" : ""}
+              </span>
+            </div>
           </div>
         </div>
+
+        {/* Reason Section */}
+        <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-4">
+          <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Reason</h4>
+          <div className="max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+            <p className="text-white/70 text-sm whitespace-pre-wrap leading-relaxed">
+              {leave.reason || "No reason provided"}
+            </p>
+          </div>
+        </div>
+
+        {/* Attachment Section */}
+        {leave.attachmentUrl && (
+          <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4 mb-6">
+            <h4 className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Attachment</h4>
+            <a
+              href={`${BASE_URL}${leave.attachmentUrl}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+              View Attachment
+            </a>
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button
@@ -304,6 +342,20 @@ export default function AdminLeavePage() {
         @keyframes scaleIn {
           from { opacity: 0; transform: scale(0.95); }
           to   { opacity: 1; transform: scale(1);    }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.25);
         }
       `}</style>
 
