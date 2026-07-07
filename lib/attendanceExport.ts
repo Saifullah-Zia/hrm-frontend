@@ -40,7 +40,7 @@ function mapStatus(status: string | null | undefined): string {
 
 function isOffDay(date: Date): boolean {
   const day = date.getDay();
-  return day === 6 || day === 1; // Saturday (6) or Monday (1)
+  return day === 6 || day === 0; // Saturday (6) or Sunday (0)
 }
 
 function getDaysInMonth(year: number, month: number): Date[] {
