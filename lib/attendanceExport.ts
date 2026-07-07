@@ -68,11 +68,11 @@ export function exportMonthlyAttendanceCsv(options: {
   users: AttendanceExportUser[];
 }): number {
   const { month, records, users } = options;
-  
+
   // Parse month (format: "2024-11" or "November 2024")
   let year: number;
   let monthNum: number;
-  
+
   if (month.includes("-")) {
     const [y, m] = month.split("-");
     year = parseInt(y);
@@ -84,54 +84,54 @@ export function exportMonthlyAttendanceCsv(options: {
     monthNum = monthNames.indexOf(parts[0]) + 1;
     year = parseInt(parts[1]);
   }
-  
+
   if (!year || !monthNum) {
     console.error("Invalid month format:", month);
     return 0;
   }
-  
+
   // Get all days in the month
   const daysInMonth = getDaysInMonth(year, monthNum);
-  
+
   // Group records by employee and date
   const userById = new Map(users.map((u) => [u.id, u]));
   const recordsByUser = new Map<number, Map<string, AttendanceDTO>>();
-  
+
   records.forEach((record) => {
     if (!recordsByUser.has(record.userId)) {
       recordsByUser.set(record.userId, new Map());
     }
     recordsByUser.get(record.userId)!.set(record.date, record);
   });
-  
+
   // Generate CSV lines
   const lines: string[] = [];
-  
+
   // First header row: Day names
   const dayNamesRow = ["", "", "", ...daysInMonth.map(getDayName)];
   lines.push(dayNamesRow.map(escapeCsvCell).join(","));
-  
+
   // Second header row: Dates
   const datesRow = ["", "", "", ...daysInMonth.map(formatDateHeader)];
   lines.push(datesRow.map(escapeCsvCell).join(","));
-  
+
   // Third header row: Column headers
   const headerRow = ["Sr. No.", "Employee Name", "Designation", ...daysInMonth.map(formatDateHeader)];
   lines.push(headerRow.map(escapeCsvCell).join(","));
-  
+
   // Sort users by name
   const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
-  
+
   // Generate rows for each employee
   sortedUsers.forEach((user, index) => {
     const userRecords = recordsByUser.get(user.id) || new Map();
-    
+
     // Status row
     const statusRow: string[] = [String(index + 1), user.name, user.designation || ""];
     daysInMonth.forEach((day) => {
       const dateStr = day.toISOString().slice(0, 10);
       const record = userRecords.get(dateStr);
-      
+
       if (isOffDay(day)) {
         statusRow.push("H");
       } else if (record) {
@@ -141,24 +141,40 @@ export function exportMonthlyAttendanceCsv(options: {
       }
     });
     lines.push(statusRow.map(escapeCsvCell).join(","));
-    
-    // Timing row
-    const timingRow: string[] = ["", "", "Timing"];
+
+    // Check-In row
+    const checkInRow: string[] = ["", "", "Check In"];
     daysInMonth.forEach((day) => {
       const dateStr = day.toISOString().slice(0, 10);
       const record = userRecords.get(dateStr);
-      
+
       if (isOffDay(day)) {
-        timingRow.push("");
+        checkInRow.push("");
       } else if (record && record.checkIn) {
-        timingRow.push(formatPktTime(record.checkIn));
+        checkInRow.push(formatPktTime(record.checkIn));
       } else {
-        timingRow.push("");
+        checkInRow.push("");
       }
     });
-    lines.push(timingRow.map(escapeCsvCell).join(","));
+    lines.push(checkInRow.map(escapeCsvCell).join(","));
+
+    // Check-Out row
+    const checkOutRow: string[] = ["", "", "Check Out"];
+    daysInMonth.forEach((day) => {
+      const dateStr = day.toISOString().slice(0, 10);
+      const record = userRecords.get(dateStr);
+
+      if (isOffDay(day)) {
+        checkOutRow.push("");
+      } else if (record && record.checkOut) {
+        checkOutRow.push(formatPktTime(record.checkOut));
+      } else {
+        checkOutRow.push("");
+      }
+    });
+    lines.push(checkOutRow.map(escapeCsvCell).join(","));
   });
-  
+
   const csv = "\uFEFF" + lines.join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -167,6 +183,6 @@ export function exportMonthlyAttendanceCsv(options: {
   link.download = `attendance-matrix-${month || "export"}.csv`;
   link.click();
   URL.revokeObjectURL(url);
-  
+
   return sortedUsers.length;
 }
