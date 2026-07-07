@@ -8,7 +8,7 @@ import { exportMonthlyAttendanceCsv } from "@/lib/attendanceExport";
 
 /* ─── types ─────────────────────────────────────────────────────────────────── */
 
-type SystemUser = { id: number; name: string; email: string; role: string };
+type SystemUser = { id: number; name: string; email: string; role: string; designation?: string };
 
 /* ─── constants ─────────────────────────────────────────────────────────────── */
 

@@ -4,6 +4,7 @@ export type AttendanceExportUser = {
   id: number;
   name: string;
   email: string;
+  designation?: string;
 };
 
 function escapeCsvCell(value: string): string {
@@ -24,22 +25,22 @@ function formatPktTime(dt: string): string {
 }
 
 function mapStatus(status: string | null | undefined): string {
-  if (!status) return "Absent";
+  if (!status) return "A";
   switch (status.toUpperCase()) {
     case "PRESENT":
-      return "Present";
+      return "P";
     case "LATE":
-      return "Late";
+      return "L";
     case "ABSENT":
-      return "Absent";
+      return "A";
     default:
-      return "Absent";
+      return "A";
   }
 }
 
-function isWeekend(date: Date): boolean {
+function isOffDay(date: Date): boolean {
   const day = date.getDay();
-  return day === 0 || day === 6; // Sunday (0) or Saturday (6)
+  return day === 6 || day === 1; // Saturday (6) or Monday (1)
 }
 
 function getDaysInMonth(year: number, month: number): Date[] {
@@ -54,6 +55,11 @@ function getDaysInMonth(year: number, month: number): Date[] {
 function formatDateHeader(date: Date): string {
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${monthNames[date.getMonth()]} ${date.getDate()}`;
+}
+
+function getDayName(date: Date): string {
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return dayNames[date.getDay()];
 }
 
 export function exportMonthlyAttendanceCsv(options: {
@@ -101,9 +107,17 @@ export function exportMonthlyAttendanceCsv(options: {
   // Generate CSV lines
   const lines: string[] = [];
   
-  // Header row
-  const header = ["Sr. No.", "Employee Name", ...daysInMonth.map(formatDateHeader)];
-  lines.push(header.map(escapeCsvCell).join(","));
+  // First header row: Day names
+  const dayNamesRow = ["", "", "", ...daysInMonth.map(getDayName)];
+  lines.push(dayNamesRow.map(escapeCsvCell).join(","));
+  
+  // Second header row: Dates
+  const datesRow = ["", "", "", ...daysInMonth.map(formatDateHeader)];
+  lines.push(datesRow.map(escapeCsvCell).join(","));
+  
+  // Third header row: Column headers
+  const headerRow = ["Sr. No.", "Employee Name", "Designation", ...daysInMonth.map(formatDateHeader)];
+  lines.push(headerRow.map(escapeCsvCell).join(","));
   
   // Sort users by name
   const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
@@ -113,13 +127,13 @@ export function exportMonthlyAttendanceCsv(options: {
     const userRecords = recordsByUser.get(user.id) || new Map();
     
     // Status row
-    const statusRow: string[] = [String(index + 1), user.name];
+    const statusRow: string[] = [String(index + 1), user.name, user.designation || ""];
     daysInMonth.forEach((day) => {
       const dateStr = day.toISOString().slice(0, 10);
       const record = userRecords.get(dateStr);
       
-      if (isWeekend(day)) {
-        statusRow.push("Holiday");
+      if (isOffDay(day)) {
+        statusRow.push("H");
       } else if (record) {
         statusRow.push(mapStatus(record.status));
       } else {
@@ -129,12 +143,12 @@ export function exportMonthlyAttendanceCsv(options: {
     lines.push(statusRow.map(escapeCsvCell).join(","));
     
     // Timing row
-    const timingRow: string[] = ["Timing", ""];
+    const timingRow: string[] = ["", "", "Timing"];
     daysInMonth.forEach((day) => {
       const dateStr = day.toISOString().slice(0, 10);
       const record = userRecords.get(dateStr);
       
-      if (isWeekend(day)) {
+      if (isOffDay(day)) {
         timingRow.push("");
       } else if (record && record.checkIn) {
         timingRow.push(formatPktTime(record.checkIn));
