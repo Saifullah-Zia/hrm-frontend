@@ -19,7 +19,7 @@ function formatPktTime(dt: string): string {
     timeZone: "Asia/Karachi",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hour12: true,
   });
 }
 
@@ -123,7 +123,7 @@ export function exportMonthlyAttendanceCsv(options: {
       } else if (record) {
         statusRow.push(mapStatus(record.status));
       } else {
-        statusRow.push("Absent");
+        statusRow.push(""); // Leave blank for days with no record
       }
     });
     lines.push(statusRow.map(escapeCsvCell).join(","));
