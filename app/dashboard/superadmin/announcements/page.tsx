@@ -170,7 +170,7 @@ export default function AnnouncementsPage() {
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-semibold text-white/90">Announcements</h1>
             <p className="text-white/40 text-sm mt-1">
@@ -182,7 +182,7 @@ export default function AnnouncementsPage() {
           {isAdminOrSuperAdmin() && !showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
             >
               <span className="text-lg">+</span>
               New Announcement

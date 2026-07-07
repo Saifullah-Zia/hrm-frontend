@@ -204,8 +204,8 @@ export default function AdminLeaveBalancesPage() {
           ) : pageSlice.length === 0 ? (
             <div className="py-16 text-center text-white/40 text-sm">No balance rows found</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[860px]">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-sm min-w-[700px]">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                     <th className="px-4 py-3 font-medium">Employee</th>

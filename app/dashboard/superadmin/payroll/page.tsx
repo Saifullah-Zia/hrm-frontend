@@ -534,14 +534,14 @@ export default function PayrollManagementPage() {
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-7">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-7">
           <div>
             <h1 className="text-xl font-semibold text-white/90">Payroll Management</h1>
             <p className="text-sm text-white/35 mt-0.5">Manage employee payroll records</p>
           </div>
           <button
             onClick={() => { setEditPayroll(null); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25"
           >
             <Icon d={ICONS.plus} />
             Add Payroll

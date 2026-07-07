@@ -173,8 +173,8 @@ export default function AdminProbationPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[520px]">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-sm min-w-[480px]">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-left text-[11px] uppercase tracking-wider text-white/35">
                     <th className="px-5 py-3 font-medium">Employee</th>

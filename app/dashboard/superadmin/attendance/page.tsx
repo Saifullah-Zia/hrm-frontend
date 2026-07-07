@@ -337,16 +337,16 @@ export default function AttendanceOverviewPage() {
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-semibold text-white/90">Attendance Overview</h1>
             <p className="text-white/40 text-sm mt-1">Track and manage employee attendance</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             {isAdminOrSuperAdmin() && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
               >
                 <span className="text-lg">{showForm ? "×" : "+"}</span>
                 {showForm ? "Cancel" : "Add Record"}

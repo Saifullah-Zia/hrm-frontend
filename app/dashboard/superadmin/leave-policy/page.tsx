@@ -70,7 +70,7 @@ export default function SuperadminLeavePolicyPage() {
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-5xl mx-auto px-0 sm:px-4">
         <h1 className="text-2xl font-semibold text-white/90 tracking-tight">Leave policies</h1>
         <p className="text-white/40 text-sm mt-1">
           Configure and manage company leave policies.
@@ -80,8 +80,8 @@ export default function SuperadminLeavePolicyPage() {
           {loading ? (
             <div className="py-20 text-center text-white/40 text-sm">Loading…</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[720px]">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                     <th className="px-4 py-3 font-medium">Type</th>
