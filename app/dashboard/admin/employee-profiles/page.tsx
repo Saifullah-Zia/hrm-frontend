@@ -103,6 +103,26 @@ const StatusBadge = ({
   );
 };
 
+// ─── Probation Badge ───────────────────────────────────────────────────────────
+const ProbationBadge = () => (
+  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400 border-amber-500/30">
+    <Clock size={10} />
+    Probation
+  </span>
+);
+
+// ─── Helper: Check if user is on probation ─────────────────────────────────────
+function isOnProbation(user: SystemUser | undefined): boolean {
+  if (!user) return false;
+  const now = new Date();
+  const start = user.probationStartDate ? new Date(user.probationStartDate) : null;
+  const end = user.probationEndDate ? new Date(user.probationEndDate) : null;
+  
+  if (!start || !end) return false;
+  
+  return now >= start && now <= end;
+}
+
 // ─── Avatar ────────────────────────────────────────────────────────────────────
 const Avatar = ({
   name,
@@ -1061,7 +1081,13 @@ export default function EmployeeProfilesPage() {
                     </span>
 
                     {/* Status */}
-                    <StatusBadge status={p.employmentStatus} />
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={p.employmentStatus} />
+                      {(() => {
+                        const uObj = employeeUsers.find((u) => u.id === p.userId);
+                        return isOnProbation(uObj) ? <ProbationBadge /> : null;
+                      })()}
+                    </div>
 
                     {/* Actions */}
                     <div className="flex items-center justify-end gap-2">
