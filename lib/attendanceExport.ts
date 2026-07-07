@@ -52,6 +52,16 @@ function getDaysInMonth(year: number, month: number): Date[] {
   return days;
 }
 
+// IMPORTANT: builds the date key from the Date object's own LOCAL
+// year/month/day fields. Never use toISOString() here — that converts
+// to UTC and silently shifts every record by a day for PKT (UTC+5).
+function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function formatDateHeader(date: Date): string {
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${monthNames[date.getMonth()]} ${date.getDate()}`;
@@ -93,15 +103,19 @@ export function exportMonthlyAttendanceCsv(options: {
   // Get all days in the month
   const daysInMonth = getDaysInMonth(year, monthNum);
 
-  // Group records by employee and date
+  // Group records by employee and date.
+  // record.date is assumed to already be a "yyyy-MM-dd" string in PKT
+  // (as produced by a LocalDate on the backend). We normalize it defensively
+  // in case it ever arrives as a full ISO timestamp.
   const userById = new Map(users.map((u) => [u.id, u]));
   const recordsByUser = new Map<number, Map<string, AttendanceDTO>>();
 
   records.forEach((record) => {
+    const key = record.date.slice(0, 10);
     if (!recordsByUser.has(record.userId)) {
       recordsByUser.set(record.userId, new Map());
     }
-    recordsByUser.get(record.userId)!.set(record.date, record);
+    recordsByUser.get(record.userId)!.set(key, record);
   });
 
   // Generate CSV lines
@@ -129,7 +143,7 @@ export function exportMonthlyAttendanceCsv(options: {
     // Status row
     const statusRow: string[] = [String(index + 1), user.name, user.designation || ""];
     daysInMonth.forEach((day) => {
-      const dateStr = day.toISOString().slice(0, 10);
+      const dateStr = toDateKey(day);
       const record = userRecords.get(dateStr);
 
       if (isOffDay(day)) {
@@ -145,7 +159,7 @@ export function exportMonthlyAttendanceCsv(options: {
     // Check-In row
     const checkInRow: string[] = ["", "", "Check In"];
     daysInMonth.forEach((day) => {
-      const dateStr = day.toISOString().slice(0, 10);
+      const dateStr = toDateKey(day);
       const record = userRecords.get(dateStr);
 
       if (isOffDay(day)) {
@@ -161,7 +175,7 @@ export function exportMonthlyAttendanceCsv(options: {
     // Check-Out row
     const checkOutRow: string[] = ["", "", "Check Out"];
     daysInMonth.forEach((day) => {
-      const dateStr = day.toISOString().slice(0, 10);
+      const dateStr = toDateKey(day);
       const record = userRecords.get(dateStr);
 
       if (isOffDay(day)) {
@@ -186,3 +200,4 @@ export function exportMonthlyAttendanceCsv(options: {
 
   return sortedUsers.length;
 }
+
