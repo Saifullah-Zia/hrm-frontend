@@ -14,7 +14,7 @@ import {
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 /** Shown only if policy API fails (offline / old server). */
-const FALLBACK_LEAVE_TYPES = ["SICK", "CASUAL", "ANNUAL", "EIDULFITAR", "EIDULAZHA"] as const;
+const FALLBACK_LEAVE_TYPES = ["SICK", "CASUAL", "ANNUAL", "EIDULFITAR", "EIDULAZHA", "UNPAID"] as const;
 
 const STATUS_STYLES: Record<string, string> = {
   PENDING: "bg-amber-500/15 text-amber-400 border-amber-500/25",
@@ -56,18 +56,20 @@ function estimateBalancesFromLeaves(
     const d = overlapDaysInYear(l.startDate, l.endDate, year);
     used[t] = (used[t] ?? 0) + d;
   }
-  return types.map((type) => {
-    const entitlement = defaultQuota(type);
-    const u = used[type] ?? 0;
-    return {
-      leaveType: type,
-      totalDays: entitlement,
-      usedDays: u,
-      pendingDays: 0,
-      remainingDays: Math.max(0, entitlement - u),
-      carryForwardDays: 0,
-    };
-  });
+  return types
+    .filter((type) => type.toUpperCase() !== "UNPAID") // UNPAID has no quota/balance to estimate
+    .map((type) => {
+      const entitlement = defaultQuota(type);
+      const u = used[type] ?? 0;
+      return {
+        leaveType: type,
+        totalDays: entitlement,
+        usedDays: u,
+        pendingDays: 0,
+        remainingDays: Math.max(0, entitlement - u),
+        carryForwardDays: 0,
+      };
+    });
 }
 
 function inclusiveDays(start: string, end: string): number {
@@ -121,21 +123,38 @@ export default function EmployeeLeavePage() {
 
   const leaveTypes = useMemo(() => {
     const policies = policiesQuery.data;
-    if (!policies || policies.length === 0) return [...FALLBACK_LEAVE_TYPES];
+    let base: string[];
 
-    const allTypes = [...policies].sort((a, b) => a.leaveType.localeCompare(b.leaveType)).map((p) => p.leaveType);
+    if (!policies || policies.length === 0) {
+      base = [...FALLBACK_LEAVE_TYPES];
+    } else {
+      const allTypes = [...policies]
+        .sort((a, b) => a.leaveType.localeCompare(b.leaveType))
+        .map((p) => p.leaveType);
 
-    // If the server has returned balance data, only show leave types that
-    // the employee actually has a balance for (e.g. ANNUAL won't appear
-    // until they've completed 1 year of service).
-    const serverBalances = serverBalanceQuery.data;
-    if (serverBalanceQuery.isSuccess && Array.isArray(serverBalances) && serverBalances.length > 0) {
-      const balanceTypes = new Set(serverBalances.map((b: LeaveBalanceDto) => b.leaveType.toUpperCase()));
-      const filtered = allTypes.filter((t) => balanceTypes.has(t.toUpperCase()));
-      return filtered.length > 0 ? filtered : allTypes;
+      // If the server has returned balance data, only show leave types that
+      // the employee actually has a balance for (e.g. ANNUAL won't appear
+      // until they've completed 1 year of service).
+      const serverBalances = serverBalanceQuery.data;
+      if (serverBalanceQuery.isSuccess && Array.isArray(serverBalances) && serverBalances.length > 0) {
+        const balanceTypes = new Set(serverBalances.map((b: LeaveBalanceDto) => b.leaveType.toUpperCase()));
+        const filtered = allTypes.filter((t) => balanceTypes.has(t.toUpperCase()));
+        base = filtered.length > 0 ? filtered : allTypes;
+      } else {
+        base = allTypes;
+      }
     }
 
-    return allTypes;
+    // UNPAID has no LeavePolicy row and no LeaveBalance row on the server
+    // (nothing is deducted from any balance), so /api/leave/policy and
+    // /api/leave/balance/* never return it. Add it manually so every
+    // employee — not just those on probation — can select it, e.g. once
+    // their other balances are exhausted.
+    if (!base.some((t) => t.toUpperCase() === "UNPAID")) {
+      base = [...base, "UNPAID"];
+    }
+
+    return base;
   }, [policiesQuery.data, serverBalanceQuery.isSuccess, serverBalanceQuery.data]);
 
   useEffect(() => {
@@ -150,14 +169,13 @@ export default function EmployeeLeavePage() {
   }, [policiesQuery.data]);
 
   const selectedPolicy = policiesByType.get(form.leaveType.toUpperCase()) ?? null;
+  const isUnpaidSelected = form.leaveType.toUpperCase() === "UNPAID";
 
   const leavesQuery = useQuery({
     queryKey: ["employee-leaves", userId],
     queryFn: () => leaveApi.getByUserId(userId!),
     enabled: typeof userId === "number",
   });
-
-
 
   const defaultQuota = useMemo(() => {
     const m: Record<string, number> = {};
@@ -169,7 +187,9 @@ export default function EmployeeLeavePage() {
     const raw = serverBalanceQuery.data;
     const serverReturned = serverBalanceQuery.isSuccess && raw !== null && raw !== undefined;
     if (serverReturned) {
-      return { source: "server", rows: raw };
+      // UNPAID never has a balance row on the server — exclude it from the
+      // cards grid even if it somehow appears (nothing to display: no quota).
+      return { source: "server", rows: raw.filter((r) => r.leaveType.toUpperCase() !== "UNPAID") };
     }
     const types = leaveTypes.length ? leaveTypes : [...FALLBACK_LEAVE_TYPES];
     return {
@@ -318,6 +338,12 @@ export default function EmployeeLeavePage() {
                 )}
               </div>
             ))}
+            {/* Informational tile for UNPAID — it has no balance, so it isn't in balanceRows.rows */}
+            <div className="rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">UNPAID</p>
+              <p className="text-xl font-bold text-white/60 mt-1">∞</p>
+              <p className="text-[11px] text-white/35 mt-0.5">No quota · always available</p>
+            </div>
           </div>
         )}
       </div>
@@ -342,7 +368,7 @@ export default function EmployeeLeavePage() {
               ))}
             </select>
           </div>
-          {selectedPolicy && (
+          {selectedPolicy ? (
             <div className="sm:col-span-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-[11px] text-white/50 space-y-1">
               <p className="text-white/70 font-medium text-xs">Policy: {selectedPolicy.leaveType}</p>
               <ul className="list-disc list-inside space-y-0.5">
@@ -351,7 +377,15 @@ export default function EmployeeLeavePage() {
                 ))}
               </ul>
             </div>
-          )}
+          ) : isUnpaidSelected ? (
+            <div className="sm:col-span-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-[11px] text-white/50 space-y-1">
+              <p className="text-white/70 font-medium text-xs">Policy: UNPAID</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>No fixed quota — not deducted from any leave balance.</li>
+                <li>Available to all employees, including those on probation.</li>
+              </ul>
+            </div>
+          ) : null}
           <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Start date</label>
