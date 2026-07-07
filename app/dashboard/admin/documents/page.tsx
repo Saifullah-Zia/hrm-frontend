@@ -361,8 +361,9 @@ export default function DocumentHubPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-[#0D0F1E] border border-[#2A2D45] rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[2.5fr_1.5fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
+        <div className="bg-[#0D0F1E] border border-[#2A2D45] rounded-2xl overflow-x-auto">
+          <div className="min-w-[800px]">
+            <div className="grid grid-cols-[2.5fr_1.5fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
             <span>Title & File</span>
             <span>Employee</span>
             <span>Type</span>
@@ -451,6 +452,7 @@ export default function DocumentHubPage() {
               </div>
             ))
           )}
+          </div>
         </div>
       </div>
 

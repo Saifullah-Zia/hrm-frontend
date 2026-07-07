@@ -577,8 +577,8 @@ export default function PayrollManagementPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {["Employee", "Month", "Salary", "Bonus", "Deduction", "Net Salary", "Status", ""].map(
