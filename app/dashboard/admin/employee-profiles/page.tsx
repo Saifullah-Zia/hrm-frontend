@@ -211,6 +211,7 @@ const EMPTY: EmployeeProfileDto = {
   departmentId: undefined,
   positionId: undefined,
   employmentStatus: "ACTIVE",
+  basicSalary: undefined,
 };
 
 type ModalMode = "create" | "edit" | "view";
@@ -241,11 +242,12 @@ const Modal = ({
   const isReadOnly = mode === "view";
 
   const handle = (field: keyof EmployeeProfileDto, val: string | number) => {
-    if (field === "departmentId" || field === "positionId" || field === "biometricPersonId") {
+    if (field === "departmentId" || field === "positionId" || field === "biometricPersonId" || field === "basicSalary") {
       const n = val === "" ? undefined : Number(val);
+      const isValid = n !== undefined && Number.isFinite(n) && (field === "basicSalary" ? n >= 0 : n > 0);
       setForm((f) => ({
         ...f,
-        [field]: n !== undefined && Number.isFinite(n) && n > 0 ? n : undefined,
+        [field]: isValid ? n : undefined,
       }));
       return;
     }
@@ -523,6 +525,17 @@ const Modal = ({
             field="biometricPersonId"
             type="number"
             placeholder="Device Employee ID"
+            form={form}
+            handle={handle}
+            isReadOnly={isReadOnly}
+          />
+
+          <Field
+            label="Basic Salary (PKR)"
+            icon={<CreditCard size={13} />}
+            field="basicSalary"
+            type="number"
+            placeholder="Base monthly salary"
             form={form}
             handle={handle}
             isReadOnly={isReadOnly}
@@ -1013,13 +1026,14 @@ export default function EmployeeProfilesPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <div className="min-w-[900px]">
+              <div className="min-w-[1000px]">
                 {/* Header */}
-                <div className="grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
+                <div className="grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
                   <span>Employee</span>
                   <span>Phone</span>
                   <span>CNIC</span>
                   <span>Department</span>
+                  <span>Basic Salary</span>
                   <span>Status</span>
                   <span className="text-right">Actions</span>
                 </div>
@@ -1027,7 +1041,7 @@ export default function EmployeeProfilesPage() {
                 {pageRows.map((p, i) => (
                   <div
                     key={p.id ?? `user-${p.userId}`}
-                    className={`grid grid-cols-[2fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
+                    className={`grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-4 items-center
                       hover:bg-[#111328] transition-colors ${i < pageRows.length - 1 ? "border-b border-[#1A1D35]" : ""
                       }`}
                   >
@@ -1078,6 +1092,11 @@ export default function EmployeeProfilesPage() {
                       {p.departmentId
                         ? departments.find((d) => d.id === p.departmentId)?.name ?? `Dept #${p.departmentId}`
                         : "—"}
+                    </span>
+
+                    {/* Basic Salary */}
+                    <span className="text-sm text-[#C2C5DA] truncate">
+                      {p.basicSalary !== undefined && p.basicSalary !== null ? `PKR ${p.basicSalary.toLocaleString()}` : "—"}
                     </span>
 
                     {/* Status */}

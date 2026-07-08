@@ -308,6 +308,14 @@ export default function EmployeeProfilePage() {
             <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Hikvision Person ID</label>
             <p className="mt-1.5 text-white/50 text-sm py-2.5">{draft.biometricPersonId ?? "—"}</p>
           </div>
+          <div>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Basic Salary</label>
+            <p className="mt-1.5 text-white/70 text-sm py-2.5 font-medium">
+              {draft.basicSalary !== undefined && draft.basicSalary !== null
+                ? `PKR ${draft.basicSalary.toLocaleString()}`
+                : "—"}
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end pt-2">

@@ -43,6 +43,7 @@ export interface EmployeeProfileDto {
   probationEndDate?: string | null;
   probationStatus?: string | null;
   biometricPersonId?: number; // Hikvision device Employee ID
+  basicSalary?: number;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -142,6 +143,9 @@ function buildProfilePayload(dto: EmployeeProfileDto): Record<string, unknown> {
   if (positionId) payload.positionId = positionId;
   if (biometricPersonId) payload.biometricPersonId = biometricPersonId;
 
+  const basicSalary = dto.basicSalary !== undefined && dto.basicSalary !== null && String(dto.basicSalary).trim() !== "" ? Number(dto.basicSalary) : undefined;
+  if (basicSalary !== undefined && !isNaN(basicSalary)) payload.basicSalary = basicSalary;
+
   return payload;
 }
 
@@ -184,6 +188,7 @@ function normalizeProfile(
     employmentStatus: (o.employmentStatus ?? o.employment_status) as
       | EmployeeProfileDto["employmentStatus"]
       | undefined,
+    basicSalary: o.basicSalary !== undefined && o.basicSalary !== null ? Number(o.basicSalary) : undefined,
   };
 }
 
