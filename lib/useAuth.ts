@@ -1,20 +1,17 @@
-// lib/useAuth.js
-// ─────────────────────────────────────────────
-// Lightweight auth hook — reads JWT from localStorage,
-// decodes the role, and exposes a logout helper.
-// No external library needed (pure base64 decode).
-// ─────────────────────────────────────────────
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-/**
- * Decode a JWT payload without verifying the signature.
- * Verification is done server-side by Spring Boot.
- */
-function decodeJwt(token) {
+export interface AuthUser {
+  id: number;
+  email: string;
+  role: string;
+  exp: number;
+  [key: string]: unknown;
+}
+
+function decodeJwt(token: string): AuthUser | null {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -24,7 +21,7 @@ function decodeJwt(token) {
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
         .join("")
     );
-    return JSON.parse(json);
+    return JSON.parse(json) as AuthUser;
   } catch {
     return null;
   }
@@ -32,15 +29,14 @@ function decodeJwt(token) {
 
 export function useAuth() {
   const router = useRouter();
-  const [user, setUser] = useState(null);   // { email, role, ...claims }
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem("token");
     if (stored) {
       const payload = decodeJwt(stored);
-      // Check expiry
       if (payload && payload.exp * 1000 > Date.now()) {
         setToken(stored);
         setUser(payload);
