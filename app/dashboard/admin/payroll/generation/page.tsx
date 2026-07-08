@@ -9,6 +9,21 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+function StatusPill({ status }: { status?: string }) {
+  const styles: Record<string, string> = {
+    PAID: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    APPROVED: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    REVIEWED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    DRAFT: "bg-white/5 text-gray-400 border-white/10",
+  };
+  const cls = styles[status || "DRAFT"] || styles.DRAFT;
+  return (
+    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${cls}`}>
+      {status || "DRAFT"}
+    </span>
+  );
+}
+
 export default function PayrollGenerationPage() {
   const { user } = useAuth();
   const [periods, setPeriods] = useState<PayrollPeriodDTO[]>([]);
@@ -135,7 +150,7 @@ export default function PayrollGenerationPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
       </div>
     );
   }
@@ -143,10 +158,10 @@ export default function PayrollGenerationPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Payroll Generation</h1>
+        <h1 className="text-2xl font-bold text-white">Payroll Generation</h1>
         <button
           onClick={() => setShowCreatePeriodModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-pink-500 hover:opacity-90 transition shadow-lg shadow-pink-500/20"
         >
           + Create Payroll Period
         </button>
@@ -154,26 +169,29 @@ export default function PayrollGenerationPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Period Selection */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Select Payroll Period</h2>
+        <div className="bg-[#12131c] border border-white/10 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Select Payroll Period</h2>
           <div className="space-y-2">
-            {periods.map((period) => (
-              <button
-                key={period.id}
-                onClick={() => handlePeriodSelect(period)}
-                className={`w-full text-left px-4 py-3 rounded-lg transition ${
-                  selectedPeriod?.id === period.id
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 hover:bg-gray-200"
-                }`}
-              >
-                <div className="font-medium">{period.month} {period.year}</div>
-                <div className="text-sm opacity-75">
-                  {period.locked ? "Locked" : "Open"}
-                  {period.department && ` - ${period.department}`}
-                </div>
-              </button>
-            ))}
+            {periods.map((period) => {
+              const isSelected = selectedPeriod?.id === period.id;
+              return (
+                <button
+                  key={period.id}
+                  onClick={() => handlePeriodSelect(period)}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition border ${
+                    isSelected
+                      ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white border-transparent"
+                      : "bg-[#1a1c26] text-gray-300 border-white/5 hover:bg-white/5"
+                  }`}
+                >
+                  <div className="font-medium">{period.month} {period.year}</div>
+                  <div className={`text-sm ${isSelected ? "text-white/80" : "text-gray-500"}`}>
+                    {period.locked ? "Locked" : "Open"}
+                    {period.department && ` - ${period.department}`}
+                  </div>
+                </button>
+              );
+            })}
             {periods.length === 0 && (
               <p className="text-gray-500 text-sm">No payroll periods available</p>
             )}
@@ -183,10 +201,10 @@ export default function PayrollGenerationPage() {
         {/* Payroll Actions */}
         <div className="lg:col-span-2">
           {selectedPeriod ? (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-[#12131c] border border-white/10 rounded-xl p-6">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h2 className="text-lg font-semibold">
+                  <h2 className="text-lg font-semibold text-white">
                     {selectedPeriod.month} {selectedPeriod.year}
                   </h2>
                   <p className="text-sm text-gray-500">
@@ -198,12 +216,12 @@ export default function PayrollGenerationPage() {
                     <button
                       onClick={handleBulkGenerate}
                       disabled={generating}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
+                      className="px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-emerald-600 to-emerald-500 hover:opacity-90 disabled:opacity-50 transition"
                     >
                       {generating ? "Generating..." : "Generate Payroll"}
                     </button>
                   ) : (
-                    <span className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg">
+                    <span className="px-4 py-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-sm">
                       Period must be locked
                     </span>
                   )}
@@ -212,65 +230,58 @@ export default function PayrollGenerationPage() {
 
               {payrolls.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="min-w-full divide-y divide-white/5">
+                    <thead>
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Employee
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Basic Salary
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Present Days
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Gross Salary
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Net Salary
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="divide-y divide-white/5">
                       {payrolls.map((payroll) => (
-                        <tr key={payroll.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <tr key={payroll.id} className="hover:bg-white/[0.02]">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                             {payroll.userName || `Employee ${payroll.userId}`}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                             PKR {payroll.basicSalary?.toLocaleString() || 0}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                             {payroll.presentDays || 0}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                             PKR {payroll.grossSalary?.toLocaleString() || 0}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                             PKR {payroll.netSalary?.toLocaleString() || 0}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              payroll.status === "PAID" ? "bg-green-100 text-green-800" :
-                              payroll.status === "APPROVED" ? "bg-blue-100 text-blue-800" :
-                              payroll.status === "REVIEWED" ? "bg-yellow-100 text-yellow-800" :
-                              "bg-gray-100 text-gray-800"
-                            }`}>
-                              {payroll.status}
-                            </span>
+                            <StatusPill status={payroll.status} />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             {payroll.status === "DRAFT" && (
                               <button
                                 onClick={() => handleApprove(payroll.id)}
-                                className="text-blue-600 hover:text-blue-900 mr-3"
+                                className="text-blue-400 hover:text-blue-300 mr-3"
                               >
                                 Approve
                               </button>
@@ -278,7 +289,7 @@ export default function PayrollGenerationPage() {
                             {payroll.status === "APPROVED" && (
                               <button
                                 onClick={() => handleMarkAsPaid(payroll.id)}
-                                className="text-green-600 hover:text-green-900 mr-3"
+                                className="text-emerald-400 hover:text-emerald-300 mr-3"
                               >
                                 Mark Paid
                               </button>
@@ -286,7 +297,7 @@ export default function PayrollGenerationPage() {
                             {(payroll.status === "DRAFT" || payroll.status === "REVIEWED") && (
                               <button
                                 onClick={() => handleRegenerate(payroll.id)}
-                                className="text-orange-600 hover:text-orange-900"
+                                className="text-orange-400 hover:text-orange-300"
                               >
                                 Regenerate
                               </button>
@@ -304,7 +315,7 @@ export default function PayrollGenerationPage() {
               )}
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow p-6 text-center text-gray-500">
+            <div className="bg-[#12131c] border border-white/10 rounded-xl p-6 text-center text-gray-500">
               Select a payroll period to view and generate payrolls
             </div>
           )}
@@ -313,75 +324,75 @@ export default function PayrollGenerationPage() {
 
       {/* Create Payroll Period Modal */}
       {showCreatePeriodModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Create Payroll Period</h2>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#14161f] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold text-white mb-4">Create Payroll Period</h2>
             <form onSubmit={handleCreatePeriod}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-400 mb-1">
                   Month
                 </label>
                 <select
                   value={periodFormData.month}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, month: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
                   required
                 >
                   {MONTHS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m} value={m} className="bg-[#0d0e14]">{m}</option>
                   ))}
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-400 mb-1">
                   Year
                 </label>
                 <input
                   type="number"
                   value={periodFormData.year}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, year: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
                   required
                   min={2000}
                   max={2100}
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Department <span className="text-gray-400">(optional)</span>
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Department <span className="text-gray-600">(optional)</span>
                 </label>
                 <input
                   type="text"
                   value={periodFormData.department}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, department: e.target.value })}
                   placeholder="e.g. Engineering (leave blank for all departments)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Company <span className="text-gray-400">(optional)</span>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-400 mb-1">
+                  Company <span className="text-gray-600">(optional)</span>
                 </label>
                 <input
                   type="text"
                   value={periodFormData.company}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, company: e.target.value })}
                   placeholder="e.g. JCAT Solutions"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
                 />
               </div>
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowCreatePeriodModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                  className="px-4 py-2 text-gray-400 hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingPeriod}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-pink-500 hover:opacity-90 disabled:opacity-50 transition shadow-lg shadow-pink-500/20"
                 >
                   {creatingPeriod ? "Creating..." : "Create"}
                 </button>
