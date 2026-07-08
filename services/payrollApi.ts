@@ -54,6 +54,12 @@ export interface PayrollPeriodDTO {
   updatedAt?: string;
 }
 
+/** Payload for creating a new period — server assigns id, lock fields, timestamps */
+export type CreatePayrollPeriodPayload = Omit<
+  PayrollPeriodDTO,
+  "id" | "lockedBy" | "lockedByName" | "lockedAt" | "unlockedBy" | "unlockedAt" | "createdAt" | "updatedAt"
+>;
+
 export interface PayrollPolicyDTO {
   id: number;
   lateDeductionRule?: string;
@@ -214,7 +220,7 @@ export const payrollApi = {
 
   // ─── Payroll Period Management ────────────────────────────────────────────────
 
-  createPayrollPeriod: async (payload: PayrollPeriodDTO): Promise<PayrollPeriodDTO> => {
+  createPayrollPeriod: async (payload: CreatePayrollPeriodPayload): Promise<PayrollPeriodDTO> => {
     const res = await apiClient.post<PayrollPeriodDTO>("/api/payroll/periods", payload);
     return res.data;
   },

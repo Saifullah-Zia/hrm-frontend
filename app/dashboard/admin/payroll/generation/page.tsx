@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { payrollApi, PayrollPeriodDTO, PayrollDTO } from "@/services/payrollApi";
 import { useAuth } from "@/lib/useAuth";
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 export default function PayrollGenerationPage() {
   const { user } = useAuth();
   const [periods, setPeriods] = useState<PayrollPeriodDTO[]>([]);
@@ -11,6 +16,15 @@ export default function PayrollGenerationPage() {
   const [payrolls, setPayrolls] = useState<PayrollDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+
+  const [showCreatePeriodModal, setShowCreatePeriodModal] = useState(false);
+  const [creatingPeriod, setCreatingPeriod] = useState(false);
+  const [periodFormData, setPeriodFormData] = useState({
+    month: MONTHS[new Date().getMonth()],
+    year: new Date().getFullYear(),
+    department: "",
+    company: "",
+  });
 
   useEffect(() => {
     loadPeriods();
@@ -40,6 +54,33 @@ export default function PayrollGenerationPage() {
   const handlePeriodSelect = (period: PayrollPeriodDTO) => {
     setSelectedPeriod(period);
     loadPayrolls(period.id);
+  };
+
+  const handleCreatePeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setCreatingPeriod(true);
+      await payrollApi.createPayrollPeriod({
+        month: periodFormData.month,
+        year: periodFormData.year,
+        department: periodFormData.department || undefined,
+        company: periodFormData.company || undefined,
+        locked: false,
+      });
+      setShowCreatePeriodModal(false);
+      setPeriodFormData({
+        month: MONTHS[new Date().getMonth()],
+        year: new Date().getFullYear(),
+        department: "",
+        company: "",
+      });
+      await loadPeriods();
+    } catch (error) {
+      console.error("Failed to create payroll period:", error);
+      alert("Failed to create payroll period. Please check the details and try again.");
+    } finally {
+      setCreatingPeriod(false);
+    }
   };
 
   const handleBulkGenerate = async () => {
@@ -101,7 +142,15 @@ export default function PayrollGenerationPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Payroll Generation</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Payroll Generation</h1>
+        <button
+          onClick={() => setShowCreatePeriodModal(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          + Create Payroll Period
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Period Selection */}
@@ -261,6 +310,87 @@ export default function PayrollGenerationPage() {
           )}
         </div>
       </div>
+
+      {/* Create Payroll Period Modal */}
+      {showCreatePeriodModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Create Payroll Period</h2>
+            <form onSubmit={handleCreatePeriod}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Month
+                </label>
+                <select
+                  value={periodFormData.month}
+                  onChange={(e) => setPeriodFormData({ ...periodFormData, month: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Year
+                </label>
+                <input
+                  type="number"
+                  value={periodFormData.year}
+                  onChange={(e) => setPeriodFormData({ ...periodFormData, year: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  min={2000}
+                  max={2100}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Department <span className="text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={periodFormData.department}
+                  onChange={(e) => setPeriodFormData({ ...periodFormData, department: e.target.value })}
+                  placeholder="e.g. Engineering (leave blank for all departments)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company <span className="text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={periodFormData.company}
+                  onChange={(e) => setPeriodFormData({ ...periodFormData, company: e.target.value })}
+                  placeholder="e.g. JCAT Solutions"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePeriodModal(false)}
+                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingPeriod}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {creatingPeriod ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
