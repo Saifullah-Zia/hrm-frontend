@@ -28,6 +28,7 @@ const ICONS = {
   user:       "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   clipboard:  "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
   chat:       "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
+  notice:     "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
   logout:     "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
 };
 
@@ -44,6 +45,7 @@ const NAV_ITEMS = {
     { label: "Probation",           href: "/dashboard/superadmin/probation",    icon: "calendar" },
     { label: "Payroll & Reports",   href: "/dashboard/superadmin/payroll",       icon: "currency" },
     { label: "Announcements",       href: "/dashboard/superadmin/announcements", icon: "bell" },
+    { label: "Notices",            href: "/dashboard/superadmin/notices",       icon: "notice" },
     { label: "Document Hub",        href: "/dashboard/superadmin/documents",     icon: "document" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
     { label: "Attendance Overview", href: "/dashboard/superadmin/attendance",    icon: "clock" },
@@ -62,6 +64,7 @@ const NAV_ITEMS = {
     { label: "Office hours",        href: "/dashboard/admin/office-hours",        icon: "clock" },
     { label: "Attendance Tracking", href: "/dashboard/admin/attendance",         icon: "clock" },
     { label: "Announcements",       href: "/dashboard/admin/announcements",      icon: "bell" },
+    { label: "Notices",            href: "/dashboard/admin/notices",            icon: "notice" },
     { label: "Document Hub",        href: "/dashboard/admin/documents",          icon: "document" },
     { label: "Department View",     href: "/dashboard/admin/departments",        icon: "building" },
     { label: "Audit Logs",          href: "/dashboard/admin/audit-logs",         icon: "clipboard" },
