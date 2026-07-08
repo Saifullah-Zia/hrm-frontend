@@ -78,6 +78,7 @@ const NAV_ITEMS = {
     { label: "My Payslips",         href: "/dashboard/employee/payslips",       icon: "document" },
     { label: "My Documents",        href: "/dashboard/employee/documents",      icon: "document" },
     { label: "Announcements",       href: "/dashboard/employee/announcements",  icon: "bell" },
+    { label: "My Notices",          href: "/dashboard/employee/notices",        icon: "notice" },
   ],
 };
 
