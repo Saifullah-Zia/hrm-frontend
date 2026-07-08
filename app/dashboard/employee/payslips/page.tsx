@@ -15,6 +15,8 @@ export default function EmployeePayslipsPage() {
   const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedPayroll, setSelectedPayroll] = useState<PayrollDTO | null>(null);
+  const [showPayslipModal, setShowPayslipModal] = useState(false);
 
   const payrollQuery = useQuery({
     queryKey: ["employee-payroll", userId, page, pageSize],
@@ -30,13 +32,18 @@ export default function EmployeePayslipsPage() {
   const handleDownload = async (p: PayrollDTO) => {
     setPdfLoadingId(p.id);
     try {
-      const downloaded = await payrollApi.tryDownloadPdf(p.id);
+      const downloaded = await payrollApi.downloadPayslipPdf(p.id);
       if (!downloaded) {
         openPayslipPrintView(p, user?.username ?? p.userName ?? "Employee");
       }
     } finally {
       setPdfLoadingId(null);
     }
+  };
+
+  const handleViewPayslip = (payroll: PayrollDTO) => {
+    setSelectedPayroll(payroll);
+    setShowPayslipModal(true);
   };
 
   if (typeof userId !== "number") {
@@ -71,24 +78,31 @@ export default function EmployeePayslipsPage() {
               <thead>
                 <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 font-medium">Period</th>
-                  <th className="px-4 py-3 font-medium text-right">Salary</th>
-                  <th className="px-4 py-3 font-medium text-right">Bonuses</th>
+                  <th className="px-4 py-3 font-medium text-right">Basic Salary</th>
+                  <th className="px-4 py-3 font-medium text-right">Gross</th>
                   <th className="px-4 py-3 font-medium text-right">Deductions</th>
                   <th className="px-4 py-3 font-medium text-right">Net</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Payslip</th>
+                  <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
                 {rows.map((p: PayrollDTO) => (
                   <tr key={p.id} className="hover:bg-white/[0.02]">
                     <td className="px-4 py-3 text-white/80">{p.month ?? "—"}</td>
-                    <td className="px-4 py-3 text-right text-white/70">{fmtMoney(p.salary)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400/80">{fmtMoney(p.bonuses)}</td>
-                    <td className="px-4 py-3 text-right text-rose-400/80">{fmtMoney(p.deductions)}</td>
+                    <td className="px-4 py-3 text-right text-white/70">{fmtMoney(p.basicSalary || p.salary)}</td>
+                    <td className="px-4 py-3 text-right text-emerald-400/80">{fmtMoney(p.grossSalary || p.salary)}</td>
+                    <td className="px-4 py-3 text-right text-rose-400/80">{fmtMoney(p.totalDeductions || p.deductions)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-white/90">{fmtMoney(p.netSalary)}</td>
                     <td className="px-4 py-3 text-white/50 capitalize">{p.status ?? "—"}</td>
                     <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleViewPayslip(p)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/15 text-blue-400 border border-blue-500/25 hover:bg-blue-500/25 transition-colors mr-2"
+                      >
+                        View
+                      </button>
                       <button
                         type="button"
                         disabled={pdfLoadingId === p.id}
@@ -149,6 +163,146 @@ export default function EmployeePayslipsPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Payslip Modal */}
+      {showPayslipModal && selectedPayroll && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Payslip</h2>
+              <button
+                onClick={() => setShowPayslipModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Employee Information */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3 text-gray-900">Employee Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+                  <div>
+                    <span className="text-gray-500">Name:</span>
+                    <span className="ml-2">{selectedPayroll.userName || `Employee ${selectedPayroll.userId}`}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Summary */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3 text-gray-900">Attendance Summary</h3>
+                <div className="grid grid-cols-3 gap-4 text-sm text-gray-700">
+                  <div>
+                    <span className="text-gray-500">Working Days:</span>
+                    <span className="ml-2">{selectedPayroll.workingDays || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Present Days:</span>
+                    <span className="ml-2">{selectedPayroll.presentDays || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Late Days:</span>
+                    <span className="ml-2">{selectedPayroll.lateDays || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Paid Leave:</span>
+                    <span className="ml-2">{selectedPayroll.paidLeaveDays || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Unpaid Leave:</span>
+                    <span className="ml-2">{selectedPayroll.unpaidLeaveDays || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Absent Days:</span>
+                    <span className="ml-2">{selectedPayroll.absentDays || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Salary Breakdown */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3 text-gray-900">Salary Breakdown</h3>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Basic Salary:</span>
+                    <span>PKR {fmtMoney(selectedPayroll.basicSalary || selectedPayroll.salary)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Daily Salary:</span>
+                    <span>PKR {fmtMoney(selectedPayroll.dailySalary || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Total Allowances:</span>
+                    <span>PKR {fmtMoney(selectedPayroll.totalAllowances || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Total Bonuses:</span>
+                    <span>PKR {fmtMoney(selectedPayroll.totalBonuses || selectedPayroll.bonuses)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span className="text-gray-500">Total Deductions:</span>
+                    <span>- PKR {fmtMoney(selectedPayroll.totalDeductions || selectedPayroll.deductions)}</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
+                    <span>Gross Salary:</span>
+                    <span>PKR {fmtMoney(selectedPayroll.grossSalary || selectedPayroll.salary)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-lg">
+                    <span>Net Salary:</span>
+                    <span className="text-green-600">PKR {fmtMoney(selectedPayroll.netSalary)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Status */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3 text-gray-900">Payment Status</h3>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Status:</span>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      selectedPayroll.status === "PAID" ? "bg-green-100 text-green-800" :
+                      selectedPayroll.status === "APPROVED" ? "bg-blue-100 text-blue-800" :
+                      "bg-gray-100 text-gray-800"
+                    }`}>
+                      {selectedPayroll.status}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Generated At:</span>
+                    <span>{selectedPayroll.generatedAt ? new Date(selectedPayroll.generatedAt).toLocaleString() : "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Approved At:</span>
+                    <span>{selectedPayroll.approvedAt ? new Date(selectedPayroll.approvedAt).toLocaleString() : "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Paid At:</span>
+                    <span>{selectedPayroll.paidAt ? new Date(selectedPayroll.paidAt).toLocaleString() : "N/A"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  onClick={() => void handleDownload(selectedPayroll)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => setShowPayslipModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

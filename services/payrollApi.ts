@@ -10,6 +10,23 @@ export interface PayrollDTO {
   netSalary: number;
   month?: string;
   status?: string;
+  basicSalary?: number;
+  dailySalary?: number;
+  workingDays?: number;
+  presentDays?: number;
+  lateDays?: number;
+  paidLeaveDays?: number;
+  unpaidLeaveDays?: number;
+  absentDays?: number;
+  totalAllowances?: number;
+  totalBonuses?: number;
+  totalDeductions?: number;
+  grossSalary?: number;
+  generatedBy?: number;
+  generatedAt?: string;
+  approvedBy?: number;
+  approvedAt?: string;
+  paidAt?: string;
 }
 
 export interface CreatePayrollPayload {
@@ -19,6 +36,33 @@ export interface CreatePayrollPayload {
   deductions: number;
   month?: string;
   status?: string;
+}
+
+export interface PayrollPeriodDTO {
+  id: number;
+  month: string;
+  year: number;
+  company?: string;
+  department?: string;
+  locked: boolean;
+  lockedBy?: number;
+  lockedByName?: string;
+  lockedAt?: string;
+  unlockedBy?: number;
+  unlockedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PayrollPolicyDTO {
+  id: number;
+  lateDeductionRule?: string;
+  unpaidLeaveDeductionRule?: string;
+  absentDeductionRule?: string;
+  isActive: boolean;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** Spring Data `Page<PayrollDTO>` JSON (camelCase) or a plain array from older APIs */
@@ -151,6 +195,141 @@ export const payrollApi = {
       const a = document.createElement("a");
       a.href = url;
       a.download = `payslip-${id}.pdf`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // ─── Payroll Period Management ────────────────────────────────────────────────
+
+  createPayrollPeriod: async (payload: PayrollPeriodDTO): Promise<PayrollPeriodDTO> => {
+    const res = await apiClient.post<PayrollPeriodDTO>("/api/payroll/periods", payload);
+    return res.data;
+  },
+
+  getAllPayrollPeriods: async (): Promise<PayrollPeriodDTO[]> => {
+    const res = await apiClient.get<PayrollPeriodDTO[]>("/api/payroll/periods");
+    return res.data;
+  },
+
+  getPayrollPeriodById: async (id: number): Promise<PayrollPeriodDTO> => {
+    const res = await apiClient.get<PayrollPeriodDTO>(`/api/payroll/periods/${id}`);
+    return res.data;
+  },
+
+  lockPayrollPeriod: async (id: number, userId: number): Promise<PayrollPeriodDTO> => {
+    const res = await apiClient.put<PayrollPeriodDTO>(`/api/payroll/periods/${id}/lock`, null, {
+      params: { userId },
+    });
+    return res.data;
+  },
+
+  unlockPayrollPeriod: async (id: number, userId: number): Promise<PayrollPeriodDTO> => {
+    const res = await apiClient.put<PayrollPeriodDTO>(`/api/payroll/periods/${id}/unlock`, null, {
+      params: { userId },
+    });
+    return res.data;
+  },
+
+  isPeriodLocked: async (month: string, year: number, department?: string): Promise<boolean> => {
+    const res = await apiClient.get<boolean>("/api/payroll/periods/check", {
+      params: { month, year, department },
+    });
+    return res.data;
+  },
+
+  // ─── Payroll Generation ─────────────────────────────────────────────────────
+
+  generatePayroll: async (payrollPeriodId: number, employeeId: number, generatedBy: number): Promise<PayrollDTO> => {
+    const res = await apiClient.post<PayrollDTO>("/api/payroll/generate", null, {
+      params: { payrollPeriodId, employeeId, generatedBy },
+    });
+    return res.data;
+  },
+
+  generateBulkPayroll: async (payrollPeriodId: number, generatedBy: number): Promise<string> => {
+    const res = await apiClient.post<string>("/api/payroll/generate/bulk", null, {
+      params: { payrollPeriodId, generatedBy },
+    });
+    return res.data;
+  },
+
+  approvePayroll: async (id: number, approvedBy: number): Promise<PayrollDTO> => {
+    const res = await apiClient.put<PayrollDTO>(`/api/payroll/${id}/approve`, null, {
+      params: { approvedBy },
+    });
+    return res.data;
+  },
+
+  markAsPaid: async (id: number): Promise<PayrollDTO> => {
+    const res = await apiClient.put<PayrollDTO>(`/api/payroll/${id}/pay`);
+    return res.data;
+  },
+
+  regeneratePayroll: async (id: number): Promise<PayrollDTO> => {
+    const res = await apiClient.put<PayrollDTO>(`/api/payroll/${id}/regenerate`);
+    return res.data;
+  },
+
+  getPayrollsByPeriod: async (periodId: number): Promise<PayrollDTO[]> => {
+    const res = await apiClient.get<PayrollDTO[]>(`/api/payroll/period/${periodId}`);
+    return res.data;
+  },
+
+  // ─── Payroll Policy Management ───────────────────────────────────────────────
+
+  createPayrollPolicy: async (payload: PayrollPolicyDTO): Promise<PayrollPolicyDTO> => {
+    const res = await apiClient.post<PayrollPolicyDTO>("/api/payroll/policies", payload);
+    return res.data;
+  },
+
+  getAllPayrollPolicies: async (): Promise<PayrollPolicyDTO[]> => {
+    const res = await apiClient.get<PayrollPolicyDTO[]>("/api/payroll/policies");
+    return res.data;
+  },
+
+  getActivePayrollPolicy: async (): Promise<PayrollPolicyDTO | null> => {
+    try {
+      const res = await apiClient.get<PayrollPolicyDTO>("/api/payroll/policies/active");
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  updatePayrollPolicy: async (id: number, payload: PayrollPolicyDTO): Promise<PayrollPolicyDTO> => {
+    const res = await apiClient.put<PayrollPolicyDTO>(`/api/payroll/policies/${id}`, payload);
+    return res.data;
+  },
+
+  // ─── Payslip Generation ───────────────────────────────────────────────────────
+
+  getPayslipData: async (payrollId: number): Promise<Record<string, unknown>> => {
+    const res = await apiClient.get<Record<string, unknown>>(`/api/payslip/${payrollId}/data`);
+    return res.data;
+  },
+
+  getPayslipHtml: async (payrollId: number): Promise<string> => {
+    const res = await apiClient.get<string>(`/api/payslip/${payrollId}/html`);
+    return res.data;
+  },
+
+  downloadPayslipPdf: async (payrollId: number): Promise<boolean> => {
+    try {
+      const res = await apiClient.get(`/api/payslip/${payrollId}/pdf`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `payslip-${payrollId}.pdf`;
       a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
