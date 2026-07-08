@@ -65,6 +65,12 @@ export interface PayrollPolicyDTO {
   updatedAt?: string;
 }
 
+/** Payload for creating a new policy — server assigns id/createdAt/updatedAt */
+export type CreatePayrollPolicyPayload = Omit<
+  PayrollPolicyDTO,
+  "id" | "createdAt" | "updatedAt"
+>;
+
 /** Spring Data `Page<PayrollDTO>` JSON (camelCase) or a plain array from older APIs */
 export interface PayrollPageResponse {
   content: PayrollDTO[];
@@ -284,7 +290,7 @@ export const payrollApi = {
 
   // ─── Payroll Policy Management ───────────────────────────────────────────────
 
-  createPayrollPolicy: async (payload: PayrollPolicyDTO): Promise<PayrollPolicyDTO> => {
+  createPayrollPolicy: async (payload: CreatePayrollPolicyPayload): Promise<PayrollPolicyDTO> => {
     const res = await apiClient.post<PayrollPolicyDTO>("/api/payroll/policies", payload);
     return res.data;
   },
@@ -303,7 +309,7 @@ export const payrollApi = {
     }
   },
 
-  updatePayrollPolicy: async (id: number, payload: PayrollPolicyDTO): Promise<PayrollPolicyDTO> => {
+  updatePayrollPolicy: async (id: number, payload: CreatePayrollPolicyPayload): Promise<PayrollPolicyDTO> => {
     const res = await apiClient.put<PayrollPolicyDTO>(`/api/payroll/policies/${id}`, payload);
     return res.data;
   },
@@ -341,3 +347,4 @@ export const payrollApi = {
     }
   },
 };
+

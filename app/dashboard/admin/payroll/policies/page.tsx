@@ -70,7 +70,7 @@ export default function PayrollPoliciesPage() {
     try {
       await payrollApi.updatePayrollPolicy(editingPolicy.id, {
         ...formData,
-        isActive: formData.isActive !== false,
+        isActive: editingPolicy.isActive !== false,
       });
       setShowEditModal(false);
       setEditingPolicy(null);
@@ -373,3 +373,4 @@ export default function PayrollPoliciesPage() {
     </div>
   );
 }
+
