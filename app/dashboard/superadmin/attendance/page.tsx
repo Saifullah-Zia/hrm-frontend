@@ -16,11 +16,13 @@ const STATUS_COLORS: Record<string, string> = {
   PRESENT: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   ABSENT:  "bg-rose-500/15 text-rose-400 border-rose-500/20",
   LATE:    "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  ON_LEAVE: "bg-blue-500/15 text-blue-400 border-blue-500/20",
 };
 const STATUS_DOT: Record<string, string> = {
   PRESENT: "bg-emerald-400",
   ABSENT:  "bg-rose-400",
   LATE:    "bg-amber-400",
+  ON_LEAVE: "bg-blue-400",
 };
 
 /* ─── helpers ────────────────────────────────────────────────────────────────── */
@@ -579,7 +581,7 @@ export default function AttendanceOverviewPage() {
           {/* Row 2: status pill filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-white/30 text-xs font-medium uppercase tracking-wider">Status:</span>
-            {["ALL", "PRESENT", "LATE", "ABSENT"].map(s => (
+            {["ALL", "PRESENT", "LATE", "ABSENT", "ON_LEAVE"].map(s => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
@@ -588,6 +590,7 @@ export default function AttendanceOverviewPage() {
                     ? s === "PRESENT" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                     : s === "LATE"    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
                     : s === "ABSENT"  ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                    : s === "ON_LEAVE" ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
                     : "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
                     : "bg-white/5 text-white/40 border-white/[0.08] hover:bg-white/10"
                 }`}
