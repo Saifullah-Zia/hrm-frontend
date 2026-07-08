@@ -31,6 +31,7 @@ export default function PayrollGenerationPage() {
   const [payrolls, setPayrolls] = useState<PayrollDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [togglingLock, setTogglingLock] = useState(false);
 
   const [showCreatePeriodModal, setShowCreatePeriodModal] = useState(false);
   const [creatingPeriod, setCreatingPeriod] = useState(false);
@@ -95,6 +96,27 @@ export default function PayrollGenerationPage() {
       alert("Failed to create payroll period. Please check the details and try again.");
     } finally {
       setCreatingPeriod(false);
+    }
+  };
+
+  const handleToggleLock = async () => {
+    if (!selectedPeriod || !user?.id) return;
+    try {
+      setTogglingLock(true);
+      const updated = selectedPeriod.locked
+        ? await payrollApi.unlockPayrollPeriod(selectedPeriod.id, user.id)
+        : await payrollApi.lockPayrollPeriod(selectedPeriod.id, user.id);
+      setSelectedPeriod(updated);
+      setPeriods((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } catch (error) {
+      console.error("Failed to toggle period lock:", error);
+      alert(
+        selectedPeriod.locked
+          ? "Failed to unlock period."
+          : "Failed to lock period. Make sure attendance for this month is finalized."
+      );
+    } finally {
+      setTogglingLock(false);
     }
   };
 
@@ -212,6 +234,22 @@ export default function PayrollGenerationPage() {
                   </p>
                 </div>
                 <div className="flex gap-3">
+                  <button
+                    onClick={handleToggleLock}
+                    disabled={togglingLock}
+                    className={`px-4 py-2 rounded-lg font-medium border transition disabled:opacity-50 ${
+                      selectedPeriod.locked
+                        ? "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+                        : "bg-gradient-to-r from-amber-600 to-orange-500 text-white border-transparent hover:opacity-90"
+                    }`}
+                  >
+                    {togglingLock
+                      ? "Please wait..."
+                      : selectedPeriod.locked
+                      ? "Unlock Period"
+                      : "Lock Period"}
+                  </button>
+
                   {selectedPeriod.locked ? (
                     <button
                       onClick={handleBulkGenerate}
@@ -221,7 +259,7 @@ export default function PayrollGenerationPage() {
                       {generating ? "Generating..." : "Generate Payroll"}
                     </button>
                   ) : (
-                    <span className="px-4 py-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-sm">
+                    <span className="px-4 py-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-sm flex items-center">
                       Period must be locked
                     </span>
                   )}
