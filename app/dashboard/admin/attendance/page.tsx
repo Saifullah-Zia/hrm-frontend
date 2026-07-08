@@ -164,6 +164,21 @@ export default function AttendanceOverviewPage() {
     return { total, present, absent, late, rate };
   }, [records]);
 
+  /* ── monthly records (selected month) ── */
+  const monthlyRecords = useMemo(() =>
+    records.filter(r => (r.date ?? "").startsWith(month)),
+  [records, month]);
+
+  /* ── monthly stats (selected month) ── */
+  const monthlyStats = useMemo(() => {
+    const total   = monthlyRecords.length;
+    const present = monthlyRecords.filter(r => r.status === "PRESENT").length;
+    const absent  = monthlyRecords.filter(r => r.status === "ABSENT").length;
+    const late    = monthlyRecords.filter(r => r.status === "LATE").length;
+    const rate    = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+    return { total, present, absent, late, rate };
+  }, [monthlyRecords]);
+
   /* ── this-week stats ── */
   const weekStats = useMemo(() => {
     const today = new Date();
@@ -179,11 +194,6 @@ export default function AttendanceOverviewPage() {
     const rate     = total ? Math.round((attended / total) * 100) : 0;
     return { attended, absent, total, rate };
   }, [records]);
-
-  /* ── monthly week-bucket breakdown ── */
-  const monthlyRecords = useMemo(() =>
-    records.filter(r => (r.date ?? "").startsWith(month)),
-  [records, month]);
 
   const weekBuckets = useMemo((): WeekBucket[] => {
     if (!month) return [];
@@ -449,11 +459,11 @@ export default function AttendanceOverviewPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
-            { label: "Total Records",    value: stats.total,    color: "text-white/90",   bg: "bg-white/5" },
-            { label: "Present",          value: stats.present,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
-            { label: "Late",             value: stats.late,     color: "text-amber-400",   bg: "bg-amber-500/10" },
-            { label: "Absent",           value: stats.absent,   color: "text-rose-400",    bg: "bg-rose-500/10" },
-            { label: "Attendance Rate",  value: `${stats.rate}%`, color: "text-indigo-400", bg: "bg-indigo-500/10" },
+            { label: "Total Records",    value: monthlyStats.total,    color: "text-white/90",   bg: "bg-white/5" },
+            { label: "Present",          value: monthlyStats.present,  color: "text-emerald-400", bg: "bg-emerald-500/10" },
+            { label: "Late",             value: monthlyStats.late,     color: "text-amber-400",   bg: "bg-amber-500/10" },
+            { label: "Absent",           value: monthlyStats.absent,   color: "text-rose-400",    bg: "bg-rose-500/10" },
+            { label: "Attendance Rate",  value: `${monthlyStats.rate}%`, color: "text-indigo-400", bg: "bg-indigo-500/10" },
           ].map(stat => (
             <div key={stat.label} className={`${stat.bg} border border-white/[0.06] rounded-2xl p-4`}>
               <p className="text-white/40 text-xs mb-1">{stat.label}</p>
