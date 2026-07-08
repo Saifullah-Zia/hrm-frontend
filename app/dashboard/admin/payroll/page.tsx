@@ -1,51 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   payrollApi,
   type PayrollDTO,
-  type CreatePayrollPayload,
 } from "@/services/payrollApi";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface UserDTO {
-  id: number;
-  name: string;
-  email?: string;
-}
-
-// ─── API ──────────────────────────────────────────────────────────────────────
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("token");
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-
-  if (!res.ok) throw new Error(await res.text());
-
-  // Handle both JSON and text responses
-  const contentType = res.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
-    return res.json();
-  }
-
-  // For non-JSON responses (like delete returning plain text)
-  return res.text() as Promise<T>;
-}
-
-const userApi = {
-  getAll: () => apiFetch<UserDTO[]>("/api/users"),
-};
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -58,26 +18,12 @@ const Icon = ({ d, className = "w-4 h-4" }: { d: string; className?: string }) =
 const ICONS = {
   plus: "M12 4v16m8-8H4",
   search: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
-  edit: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
   trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
-  close: "M6 18L18 6M6 6l12 12",
   wallet: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m0-4h4m0 0v4m0-4V9a2 2 0 00-2-2h-2",
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const inputClass =
-  "w-full px-3 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/40 transition-colors";
-
-const selectClass =
-  "w-full px-3 py-2.5 text-sm rounded-xl bg-[#1a1d2e] border border-white/[0.08] text-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/40 transition-colors";
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// FIX: accept null/undefined so a missing salary/bonus/deduction in the DB
-// never crashes the page. Previously this threw "Cannot read properties of
-// null (reading 'toLocaleString')" whenever any payroll record had a null
-// numeric field, which crashed the whole page render.
 const fmt = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString("en-PK", { minimumFractionDigits: 0 });
 
@@ -105,217 +51,6 @@ function Modal({
         {children}
       </div>
     </div>
-  );
-}
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-4">
-      <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-// ─── Payroll Form Modal ───────────────────────────────────────────────────────
-
-interface FormState {
-  userId: string;
-  salary: string;
-  bonuses: string;
-  deductions: string;
-  month: string;
-  status: string;
-}
-
-const EMPTY_FORM: FormState = {
-  userId: "",
-  salary: "",
-  bonuses: "",
-  deductions: "",
-  month: "",
-  status: "PAID",
-};
-
-function PayrollFormModal({
-  open,
-  onClose,
-  onSave,
-  editPayroll,
-  users,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (data: CreatePayrollPayload, id?: number) => Promise<void>;
-  editPayroll?: PayrollDTO | null;
-  users: UserDTO[];
-}) {
-  const isEdit = Boolean(editPayroll);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (editPayroll) {
-      setForm({
-        userId: String(editPayroll.userId),
-        // FIX: guard against null so the input doesn't literally show the
-        // string "null" when a field is missing in the DB.
-        salary: String(editPayroll.salary ?? 0),
-        bonuses: String(editPayroll.bonuses ?? 0),
-        deductions: String(editPayroll.deductions ?? 0),
-        month: editPayroll.month ?? "",
-        status: editPayroll.status ?? "PAID",
-      });
-    } else {
-      setForm(EMPTY_FORM);
-    }
-    setError("");
-  }, [editPayroll, open]);
-
-  const set = (key: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((prev) => ({ ...prev, [key]: e.target.value }));
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const payload: CreatePayrollPayload = {
-        userId: Number(form.userId),
-        salary: Number(form.salary) || 0,
-        bonuses: Number(form.bonuses) || 0,
-        deductions: Number(form.deductions) || 0,
-        month: form.month || undefined,
-        status: form.status || undefined,
-      };
-
-      await onSave(payload, editPayroll?.id);
-      onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose}>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-base font-semibold text-white/90">
-          {isEdit ? "Edit Payroll" : "Add Payroll"}
-        </h2>
-        <button onClick={onClose} className="text-white/30 hover:text-white/70">
-          <Icon d={ICONS.close} />
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        <FormField label="Employee">
-          <select className={selectClass} value={form.userId} onChange={set("userId")} required>
-            <option value="">Select Employee</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-        </FormField>
-
-        <FormField label="Basic Salary">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            className={inputClass}
-            placeholder="50000"
-            value={form.salary}
-            onChange={set("salary")}
-            required
-          />
-        </FormField>
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Bonus">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className={inputClass}
-              placeholder="0"
-              value={form.bonuses}
-              onChange={set("bonuses")}
-            />
-          </FormField>
-
-          <FormField label="Deduction">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className={inputClass}
-              placeholder="0"
-              value={form.deductions}
-              onChange={set("deductions")}
-            />
-          </FormField>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label="Month (YYYY-MM)">
-            <input
-              type="month"
-              className={inputClass}
-              value={form.month}
-              onChange={set("month")}
-            />
-          </FormField>
-
-          <FormField label="Status">
-            <select className={selectClass} value={form.status} onChange={set("status")}>
-              <option value="PAID">Paid</option>
-              <option value="PENDING">Pending</option>
-            </select>
-          </FormField>
-        </div>
-
-        {form.salary && (
-          <div className="mb-4 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-sm text-indigo-300">
-            Net Salary Preview: Rs.{" "}
-            {fmt(
-              (Number(form.salary) || 0) +
-              (Number(form.bonuses) || 0) -
-              (Number(form.deductions) || 0)
-            )}
-          </div>
-        )}
-
-        {error && (
-          <p className="text-xs text-rose-400 mb-4 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
-            {error}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2 mt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-white/50 border border-white/[0.08] rounded-xl hover:bg-white/[0.05]"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50 shadow-lg shadow-indigo-600/20"
-          >
-            {loading ? "Saving..." : "Save Payroll"}
-          </button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 
@@ -404,34 +139,23 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 
 export default function PayrollManagementPage() {
   const [payrolls, setPayrolls] = useState<PayrollDTO[]>([]);
-  const [users, setUsers] = useState<UserDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [editPayroll, setEditPayroll] = useState<PayrollDTO | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PayrollDTO | null>(null);
-  const [pageError, setPageError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  // ─── Notification State ─────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-
-  const showNotification = useCallback((message: string, type: "success" | "error" | "info") => {
-    setToast({ message, type });
-  }, []);
 
   // ─── Fetch payroll (paginated) ─────────────────────────────────────────────
 
   const loadPayrolls = useCallback(
     async (pageOverride?: number) => {
       setLoading(true);
-      setPageError("");
       const pageIndex = pageOverride !== undefined ? pageOverride : page;
       try {
         const pay = await payrollApi.getPage({
@@ -459,43 +183,6 @@ export default function PayrollManagementPage() {
     void loadPayrolls();
   }, [loadPayrolls]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setUsers(await userApi.getAll());
-      } catch (err) {
-        setToast({
-          message: err instanceof Error ? err.message : "Failed to load users",
-          type: "error",
-        });
-      }
-    })();
-  }, []);
-
-  // ─── Save (create or update) ─────────────────────────────────────────────────
-
-  async function handleSave(data: CreatePayrollPayload, id?: number) {
-    try {
-      if (id !== undefined) {
-        const updated = await payrollApi.update(id, data);
-        setPayrolls((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-        const employee = users.find(u => u.id === data.userId);
-        showNotification(`✅ Payroll updated for ${employee?.name || "employee"} - Email notification sent`, "success");
-      } else {
-        await payrollApi.create(data);
-        await loadPayrolls(0);
-        const employee = users.find((u) => u.id === data.userId);
-        showNotification(
-          `✅ Payroll created for ${employee?.name || "employee"} - Email sent to ${employee?.email || "their email"}`,
-          "success"
-        );
-      }
-    } catch (err) {
-      showNotification(err instanceof Error ? err.message : "Failed to save payroll", "error");
-      throw err;
-    }
-  }
-
   // ─── Delete ──────────────────────────────────────────────────────────────────
 
   async function handleDelete() {
@@ -505,9 +192,12 @@ export default function PayrollManagementPage() {
     try {
       const message = await payrollApi.delete(deleteTarget.id);
       await loadPayrolls();
-      showNotification(`🗑️ ${message || "Payroll deleted successfully"}`, "success");
+      setToast({ message: `🗑️ ${message || "Payroll deleted successfully"}`, type: "success" });
     } catch (err) {
-      showNotification(err instanceof Error ? err.message : "Failed to delete payroll", "error");
+      setToast({
+        message: err instanceof Error ? err.message : "Failed to delete payroll",
+        type: "error",
+      });
     } finally {
       setDeleteLoading(false);
       setShowDelete(false);
@@ -528,7 +218,6 @@ export default function PayrollManagementPage() {
 
   return (
     <div className="min-h-screen bg-[#0f1117] p-6">
-      {/* Toast Notification */}
       {toast && (
         <Toast
           message={toast.message}
@@ -543,30 +232,16 @@ export default function PayrollManagementPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7">
           <div>
             <h1 className="text-xl font-semibold text-white/90">Payroll Management</h1>
-            <p className="text-sm text-white/35 mt-0.5">Manage employee payroll records</p>
+            <p className="text-sm text-white/35 mt-0.5">View and manage employee payroll records</p>
           </div>
-          <button
-            onClick={() => { setEditPayroll(null); setShowForm(true); }}
+          <Link
+            href="/dashboard/admin/payroll/generation"
             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 shrink-0"
           >
             <Icon d={ICONS.plus} />
-            Add Payroll
-          </button>
+            Generate Payroll
+          </Link>
         </div>
-
-        {/* Success Message (keeping your original) */}
-        {successMessage && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400">
-            {successMessage}
-          </div>
-        )}
-
-        {/* Page-level error */}
-        {pageError && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-sm text-rose-400">
-            {pageError}
-          </div>
-        )}
 
         {/* Search */}
         <div className="relative mb-4 max-w-sm">
@@ -616,9 +291,6 @@ export default function PayrollManagementPage() {
                   </tr>
                 ) : (
                   filtered.map((p) => {
-                    // FIX: guard each operand individually so a single null
-                    // field (salary/bonuses/deductions) can't blow up the
-                    // calculation or the render.
                     const net =
                       p.netSalary ?? (p.salary ?? 0) + (p.bonuses ?? 0) - (p.deductions ?? 0);
                     return (
@@ -653,13 +325,6 @@ export default function PayrollManagementPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => { setEditPayroll(p); setShowForm(true); }}
-                              className="p-1.5 rounded-lg text-white/25 hover:text-indigo-400 hover:bg-indigo-500/10"
-                              title="Edit"
-                            >
-                              <Icon d={ICONS.edit} className="w-3.5 h-3.5" />
-                            </button>
                             <button
                               onClick={() => { setDeleteTarget(p); setShowDelete(true); }}
                               className="p-1.5 rounded-lg text-white/25 hover:text-rose-400 hover:bg-rose-500/10"
@@ -731,15 +396,6 @@ export default function PayrollManagementPage() {
         )}
 
       </div>
-
-      {/* Modals */}
-      <PayrollFormModal
-        open={showForm}
-        onClose={() => setShowForm(false)}
-        onSave={handleSave}
-        editPayroll={editPayroll}
-        users={users}
-      />
 
       <DeleteModal
         open={showDelete}
