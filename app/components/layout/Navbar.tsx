@@ -68,6 +68,13 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     return t === "PAYROLL" || t.includes("PAYROLL");
   };
 
+  // Matches the "NOTICE_RECEIVED" type created by NoticeService.java when an
+  // employee is issued a warning/termination notice.
+  const isNoticeNotification = (type: string) => {
+    const t = (type ?? "").toUpperCase();
+    return t === "NOTICE_RECEIVED" || t.includes("NOTICE");
+  };
+
   const fetchNotifications = async () => {
     setLoading(true);
     try {
@@ -158,7 +165,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     }
   };
 
-  /** Mark read when needed, then deep-link employees to payslips for payroll alerts. */
+  /** Mark read when needed, then deep-link employees to the right page for the notification type. */
   const handleNotificationRowClick = async (notif: NotificationDTO) => {
     if (notif.status === "UNREAD") {
       await handleMarkAsRead(notif.id);
@@ -166,6 +173,11 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     if (isEmployee() && isPayrollNotification(notif.type)) {
       setNotifOpen(false);
       router.push("/dashboard/employee/payslips");
+      return;
+    }
+    if (isEmployee() && isNoticeNotification(notif.type)) {
+      setNotifOpen(false);
+      router.push("/dashboard/employee/notices");
       return;
     }
     if (isEmployee() && isAnnouncementNotificationType(notif.type)) {
@@ -198,11 +210,13 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     const t = (type ?? "").toUpperCase();
     if (t.includes("PAYROLL")) return "💰";
     if (t.includes("ANNOUNCEMENT")) return "📣";
+    if (t.includes("NOTICE")) return "⚠️";
     switch (type) {
       case "LEAVE_REQUEST":  return "📋";
       case "LEAVE_APPROVED": return "✅";
       case "LEAVE_REJECTED": return "❌";
       case "PAYROLL":        return "💰";
+      case "NOTICE_RECEIVED": return "⚠️";
       default:               return "🔔";
     }
   };
@@ -322,7 +336,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
           </span>
         </button>
 
-        {/* Notifications (all roles — employees get payroll, admins get leave, etc.) */}
+        {/* Notifications (all roles — employees get payroll, notices, leave, etc.) */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={handleToggleNotif}
