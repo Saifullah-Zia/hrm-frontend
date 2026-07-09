@@ -174,6 +174,8 @@ const Field = ({
   form,
   handle,
   isReadOnly,
+  salaryRevealed,
+  onRevealSalaryClick,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -183,24 +185,43 @@ const Field = ({
   form: EmployeeProfileDto;
   handle: (field: keyof EmployeeProfileDto, val: string | number) => void;
   isReadOnly: boolean;
-}) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
-      <span className="text-[#FC0175]">{icon}</span>
-      {label}
-    </label>
-    <input
-      type={type}
-      value={(form[field] as string) ?? ""}
-      onChange={(e) => handle(field, e.target.value)}
-      disabled={isReadOnly}
-      placeholder={placeholder}
-      className="bg-[#0F1120] border border-[#2A2D45] rounded-lg px-3 py-2 text-sm text-[#E2E4F0] placeholder-[#3D4065]
-        focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all
-        disabled:opacity-60 disabled:cursor-default"
-    />
-  </div>
-);
+  salaryRevealed?: boolean;
+  onRevealSalaryClick?: () => void;
+}) => {
+  const isSalary = field === "basicSalary";
+  const displayType = isSalary && !salaryRevealed ? "password" : type;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-[#8B8FA8] flex items-center gap-1.5">
+        <span className="text-[#FC0175]">{icon}</span>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type={displayType}
+          value={(form[field] as string) ?? ""}
+          onChange={(e) => handle(field, e.target.value)}
+          disabled={isReadOnly}
+          placeholder={placeholder}
+          className="bg-[#0F1120] border border-[#2A2D45] rounded-lg pl-3 pr-10 py-2 text-sm text-[#E2E4F0] placeholder-[#3D4065]
+            w-full focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all
+            disabled:opacity-60 disabled:cursor-default"
+        />
+        {isSalary && onRevealSalaryClick && (
+          <button
+            type="button"
+            onClick={onRevealSalaryClick}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all"
+            title={salaryRevealed ? "Hide salary" : "Reveal salary"}
+          >
+            {salaryRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─── Profile Modal (Create / Edit) ────────────────────────────────────────────
 const EMPTY: EmployeeProfileDto = {
@@ -232,6 +253,8 @@ const Modal = ({
   linkedUserIds,
   onClose,
   onSave,
+  salaryRevealed,
+  onRevealSalaryClick,
 }: {
   mode: ModalMode;
   profile: EmployeeProfileDto | null;
@@ -241,6 +264,8 @@ const Modal = ({
   linkedUserIds: Set<number>;
   onClose: () => void;
   onSave: (dto: EmployeeProfileDto) => Promise<void>;
+  salaryRevealed: boolean;
+  onRevealSalaryClick: () => void;
 }) => {
   const [form, setForm] = useState<EmployeeProfileDto>(profile ?? EMPTY);
   const [saving, setSaving] = useState(false);
@@ -546,6 +571,8 @@ const Modal = ({
             form={form}
             handle={handle}
             isReadOnly={isReadOnly}
+            salaryRevealed={salaryRevealed}
+            onRevealSalaryClick={onRevealSalaryClick}
           />
 
           {/* Profile Picture */}
@@ -1447,7 +1474,6 @@ export default function EmployeeProfilesPage() {
         />
       )}
 
-      {/* ── Modals ── */}
       {modal.open && (
         <Modal
           mode={modal.mode}
@@ -1458,6 +1484,14 @@ export default function EmployeeProfilesPage() {
           linkedUserIds={linkedUserIds}
           onClose={() => setModal({ open: false, mode: "create", profile: null })}
           onSave={handleSave}
+          salaryRevealed={salaryRevealed}
+          onRevealSalaryClick={() => {
+            if (salaryRevealed) {
+              setSalaryRevealed(false);
+            } else {
+              setShowOtpModal(true);
+            }
+          }}
         />
       )}
 
