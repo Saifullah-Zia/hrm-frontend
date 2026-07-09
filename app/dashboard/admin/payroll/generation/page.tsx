@@ -32,6 +32,7 @@ export default function PayrollGenerationPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [togglingLock, setTogglingLock] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [showCreatePeriodModal, setShowCreatePeriodModal] = useState(false);
   const [creatingPeriod, setCreatingPeriod] = useState(false);
@@ -100,20 +101,26 @@ export default function PayrollGenerationPage() {
   };
 
   const handleToggleLock = async () => {
-    if (!selectedPeriod || !user?.id) return;
+    if (!selectedPeriod) return;
+    if (!user?.id) {
+      setErrorMsg("Cannot identify current user. Please log out and log in again.");
+      return;
+    }
     try {
+      setErrorMsg(null);
       setTogglingLock(true);
       const updated = selectedPeriod.locked
         ? await payrollApi.unlockPayrollPeriod(selectedPeriod.id, user.id)
         : await payrollApi.lockPayrollPeriod(selectedPeriod.id, user.id);
       setSelectedPeriod(updated);
       setPeriods((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    } catch (error) {
-      console.error("Failed to toggle period lock:", error);
-      alert(
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error("Lock toggle failed:", msg);
+      setErrorMsg(
         selectedPeriod.locked
-          ? "Failed to unlock period."
-          : "Failed to lock period. Make sure attendance for this month is finalized."
+          ? `Failed to unlock period: ${msg}`
+          : `Failed to lock period: ${msg}`
       );
     } finally {
       setTogglingLock(false);
@@ -121,14 +128,20 @@ export default function PayrollGenerationPage() {
   };
 
   const handleBulkGenerate = async () => {
-    if (!selectedPeriod || !user?.id) return;
+    if (!selectedPeriod) return;
+    if (!user?.id) {
+      setErrorMsg("Cannot identify current user. Please log out and log in again.");
+      return;
+    }
     try {
+      setErrorMsg(null);
       setGenerating(true);
       await payrollApi.generateBulkPayroll(selectedPeriod.id, user.id);
       await loadPayrolls(selectedPeriod.id);
-    } catch (error) {
-      console.error("Failed to generate bulk payroll:", error);
-      alert("Failed to generate payroll. Make sure the period is locked and attendance summaries exist.");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error("Bulk generate failed:", msg);
+      setErrorMsg(`Failed to generate payroll: ${msg}`);
     } finally {
       setGenerating(false);
     }
@@ -188,6 +201,15 @@ export default function PayrollGenerationPage() {
           + Create Payroll Period
         </button>
       </div>
+
+      {/* Inline error banner */}
+      {errorMsg && (
+        <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-sm">
+          <span className="text-rose-400 mt-0.5">⚠</span>
+          <span className="flex-1">{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-rose-200 ml-2">✕</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Period Selection */}

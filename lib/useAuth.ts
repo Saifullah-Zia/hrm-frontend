@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 
 export interface AuthUser {
   id: number;
+  userId: number;  // raw JWT claim
   email: string;
   role: string;
   exp: number;
+  sub: string;     // username / subject
   [key: string]: unknown;
 }
 
@@ -21,7 +23,14 @@ function decodeJwt(token: string): AuthUser | null {
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
         .join("")
     );
-    return JSON.parse(json) as AuthUser;
+    const payload = JSON.parse(json) as Record<string, unknown>;
+    // Backend JWT uses claim key "userId" (Long) — map it to "id" for convenience
+    const userId = Number(payload["userId"] ?? payload["id"] ?? 0);
+    return {
+      ...payload,
+      id: userId,
+      userId,
+    } as AuthUser;
   } catch {
     return null;
   }
