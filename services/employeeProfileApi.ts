@@ -430,3 +430,31 @@ export const employeeProfileApi = {
     return res.data;
   },
 };
+
+// ─── Salary OTP helpers ───────────────────────────────────────────────────────
+
+/**
+ * Sends a 6-digit OTP to the currently logged-in admin's registered email.
+ * Returns { message: string } on success.
+ */
+export async function requestSalaryOtp(): Promise<{ message: string }> {
+  const res = await apiClient.post<{ message: string }>(
+    "/api/employee-profiles/salary-otp/request"
+  );
+  return res.data;
+}
+
+/**
+ * Verifies the submitted OTP code against the server-side cache.
+ * Returns { valid: true } on success, { valid: false, error: string } on failure.
+ */
+export async function verifySalaryOtp(
+  code: string
+): Promise<{ valid: boolean; error?: string }> {
+  const res = await apiClient.post<{ valid: boolean; error?: string }>(
+    "/api/employee-profiles/salary-otp/verify",
+    { code }
+  );
+  return res.data;
+}
+

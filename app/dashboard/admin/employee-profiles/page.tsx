@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import apiClient from "@/lib/apiClient";
 import {
   employeeProfileApi,
   EmployeeProfileDto,
   mergeProfiles,
+  requestSalaryOtp,
+  verifySalaryOtp,
 } from "@/services/employeeProfileApi";
 import {
   User,
@@ -26,6 +28,11 @@ import {
   XCircle,
   Clock,
   Loader2,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Mail,
+  RefreshCw,
 } from "lucide-react";
 
 type SystemUser = {
@@ -702,6 +709,196 @@ const DeleteConfirm = ({
   </div>
 );
 
+// ─── Salary OTP Modal ──────────────────────────────────────────────────────────
+const SalaryOtpModal = ({
+  onSuccess,
+  onClose,
+}: {
+  onSuccess: () => void;
+  onClose: () => void;
+}) => {
+  const [step, setStep] = useState<"sending" | "input" | "verifying" | "done">("sending");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-send OTP when modal opens
+  useEffect(() => {
+    (async () => {
+      try {
+        await requestSalaryOtp();
+        setStep("input");
+        setTimeout(() => inputRef.current?.focus(), 100);
+      } catch {
+        setError("Failed to send OTP. Please try again.");
+        setStep("input");
+      }
+    })();
+  }, []);
+
+  const handleVerify = async () => {
+    if (code.trim().length !== 6) {
+      setError("Please enter the 6-digit code.");
+      return;
+    }
+    setStep("verifying");
+    setError(null);
+    try {
+      const res = await verifySalaryOtp(code.trim());
+      if (res.valid) {
+        setStep("done");
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 800);
+      } else {
+        setError(res.error ?? "Invalid or expired code. Please try again.");
+        setStep("input");
+        setCode("");
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
+    } catch {
+      setError("Verification failed. Please try again.");
+      setStep("input");
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    setError(null);
+    setCode("");
+    try {
+      await requestSalaryOtp();
+      setError(null);
+    } catch {
+      setError("Failed to resend. Please try again.");
+    } finally {
+      setResending(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const isLoading = step === "sending" || step === "verifying" || step === "done";
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl border border-[#2A2D45] animate-in fade-in zoom-in-95 duration-200">
+        {/* Gradient header */}
+        <div className="bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f0e17] px-6 pt-7 pb-5">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-[#8B8FA8] hover:text-white hover:bg-white/10 transition-all"
+          >
+            <X size={16} />
+          </button>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#FC0175] to-[#a8005e] flex items-center justify-center shadow-lg shadow-[#FC0175]/30">
+              {step === "done" ? (
+                <CheckCircle size={26} className="text-white" />
+              ) : (
+                <ShieldCheck size={26} className="text-white" />
+              )}
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-white">
+                {step === "done" ? "Verified!" : "Salary Verification"}
+              </h3>
+              <p className="text-xs text-[#8B8FA8] mt-1">
+                {step === "sending"
+                  ? "Sending code to your email…"
+                  : step === "done"
+                  ? "Revealing salary data…"
+                  : "Enter the 6-digit code sent to your registered email"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="bg-[#0F1120] px-6 py-5">
+          {step === "sending" ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 size={32} className="animate-spin text-[#FC0175]" />
+            </div>
+          ) : step === "done" ? (
+            <div className="flex items-center justify-center py-6">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <CheckCircle size={22} className="text-emerald-400" />
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Email sent hint */}
+              <div className="flex items-center gap-2 bg-[#FC0175]/10 border border-[#FC0175]/20 rounded-xl px-3 py-2.5 mb-4">
+                <Mail size={14} className="text-[#FC0175] shrink-0" />
+                <p className="text-xs text-[#FC0175]/90">Code sent to your admin email. Check your inbox.</p>
+              </div>
+
+              {/* 6-digit input */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-[#8B8FA8]">Verification Code</label>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => {
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                  placeholder="000000"
+                  className="w-full text-center text-2xl font-mono tracking-[0.5em] bg-[#1A1D35] border border-[#2A2D45] rounded-xl px-4 py-3 text-white placeholder-[#3D4065] focus:outline-none focus:border-[#FC0175] focus:ring-1 focus:ring-[#FC0175]/30 transition-all"
+                />
+              </div>
+
+              {/* Error */}
+              {error && (
+                <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
+                  <AlertTriangle size={12} />{error}
+                </p>
+              )}
+
+              {/* Verify button */}
+              <button
+                onClick={handleVerify}
+                disabled={step === "verifying" || code.length !== 6}
+                className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FC0175] to-[#a8005e] text-white text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#FC0175]/20"
+              >
+                {step === "verifying" ? (
+                  <><Loader2 size={15} className="animate-spin" /> Verifying…</>
+                ) : (
+                  <><EyeOff size={15} /> Reveal Salary</>
+                )}
+              </button>
+
+              {/* Resend */}
+              <div className="mt-3 text-center">
+                <button
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="text-xs text-[#8B8FA8] hover:text-[#FC0175] transition-colors flex items-center gap-1 mx-auto disabled:opacity-50"
+                >
+                  <RefreshCw size={11} className={resending ? "animate-spin" : ""} />
+                  {resending ? "Resending…" : "Resend code"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function EmployeeProfilesPage() {
   const [profiles, setProfiles] = useState<EmployeeProfileDto[]>([]);
@@ -709,6 +906,10 @@ export default function EmployeeProfilesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
+  // ── Salary reveal OTP state ──────────────────────────────────────────────────
+  const [salaryRevealed, setSalaryRevealed] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
 
   // Pagination states
   const [page, setPage] = useState(0);
@@ -1095,9 +1296,29 @@ export default function EmployeeProfilesPage() {
                     </span>
 
                     {/* Basic Salary */}
-                    <span className="text-sm text-[#C2C5DA] truncate">
-                      {p.basicSalary !== undefined && p.basicSalary !== null ? `PKR ${p.basicSalary.toLocaleString()}` : "—"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="text-sm text-[#C2C5DA] truncate transition-all duration-300 select-none"
+                        style={!salaryRevealed ? { filter: "blur(6px)", userSelect: "none" } : {}}
+                      >
+                        {p.basicSalary !== undefined && p.basicSalary !== null
+                          ? `PKR ${p.basicSalary.toLocaleString()}`
+                          : "—"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (salaryRevealed) {
+                            setSalaryRevealed(false);
+                          } else {
+                            setShowOtpModal(true);
+                          }
+                        }}
+                        className="p-1 rounded-md text-[#8B8FA8] hover:text-[#FC0175] hover:bg-[#FC0175]/10 transition-all shrink-0"
+                        title={salaryRevealed ? "Hide salary" : "Reveal salary"}
+                      >
+                        {salaryRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                    </div>
 
                     {/* Status */}
                     <div className="flex items-center gap-2">
@@ -1217,6 +1438,14 @@ export default function EmployeeProfilesPage() {
           )}
         </div>
       </div>
+
+      {/* ── Salary OTP Modal ── */}
+      {showOtpModal && (
+        <SalaryOtpModal
+          onSuccess={() => setSalaryRevealed(true)}
+          onClose={() => setShowOtpModal(false)}
+        />
+      )}
 
       {/* ── Modals ── */}
       {modal.open && (
