@@ -136,7 +136,8 @@ export default function PayrollGenerationPage() {
     try {
       setErrorMsg(null);
       setGenerating(true);
-      await payrollApi.generateBulkPayroll(selectedPeriod.id, user.id);
+      const result = await payrollApi.generateBulkPayroll(selectedPeriod.id, user.id);
+      console.log("Bulk generate result:", result);
       await loadPayrolls(selectedPeriod.id);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
