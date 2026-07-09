@@ -29,7 +29,9 @@ const STATUS_DOT: Record<string, string> = {
 
 const formatTime = (dt: string) => {
   if (!dt) return "—";
-  return new Date(dt + "+05:00").toLocaleTimeString("en-PK", {
+  // Backend sends PKT time as LocalDateTime (e.g., "2024-07-09T12:06:00")
+  // Parse it directly and format for PKT display
+  return new Date(dt).toLocaleTimeString("en-PK", {
     timeZone: "Asia/Karachi",
     hour: "2-digit",
     minute: "2-digit",
