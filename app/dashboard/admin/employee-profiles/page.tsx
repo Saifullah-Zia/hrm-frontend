@@ -741,7 +741,7 @@ const SalaryOtpModal = ({
   onSuccess,
   onClose,
 }: {
-  onSuccess: () => void;
+  onSuccess: (token: string) => void;
   onClose: () => void;
 }) => {
   const [step, setStep] = useState<"sending" | "input" | "verifying" | "done">("sending");
@@ -773,10 +773,10 @@ const SalaryOtpModal = ({
     setError(null);
     try {
       const res = await verifySalaryOtp(code.trim());
-      if (res.valid) {
+      if (res.valid && res.token) {
         setStep("done");
         setTimeout(() => {
-          onSuccess();
+          onSuccess(res.token!);
           onClose();
         }, 800);
       } else {
@@ -936,6 +936,7 @@ export default function EmployeeProfilesPage() {
 
   // ── Salary reveal OTP state ──────────────────────────────────────────────────
   const [salaryRevealed, setSalaryRevealed] = useState(false);
+  const [revealToken, setRevealToken] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
 
   // Pagination states
@@ -991,11 +992,12 @@ export default function EmployeeProfilesPage() {
   }, []);
 
   // ── Fetch (single source: GET /api/employee-profiles) ──
-  const loadData = async (): Promise<EmployeeProfileDto[]> => {
+  const loadData = async (token?: string): Promise<EmployeeProfileDto[]> => {
     setLoading(true);
     setError(null);
+    const activeToken = token !== undefined ? token : (revealToken ?? undefined);
     try {
-      const allData = await employeeProfileApi.getAll();
+      const allData = await employeeProfileApi.getAll(activeToken);
       setProfiles(allData);
       return allData;
     } catch (err: unknown) {
@@ -1336,6 +1338,8 @@ export default function EmployeeProfilesPage() {
                         onClick={() => {
                           if (salaryRevealed) {
                             setSalaryRevealed(false);
+                            setRevealToken(null);
+                            void loadData("");
                           } else {
                             setShowOtpModal(true);
                           }
@@ -1469,7 +1473,11 @@ export default function EmployeeProfilesPage() {
       {/* ── Salary OTP Modal ── */}
       {showOtpModal && (
         <SalaryOtpModal
-          onSuccess={() => setSalaryRevealed(true)}
+          onSuccess={(token) => {
+            setSalaryRevealed(true);
+            setRevealToken(token);
+            void loadData(token);
+          }}
           onClose={() => setShowOtpModal(false)}
         />
       )}

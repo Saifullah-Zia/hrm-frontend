@@ -249,9 +249,20 @@ export function mergeProfiles(
   return Array.from(merged.values());
 }
 
+const headersConfig = (revealToken?: string) => {
+  if (revealToken) {
+    return {
+      headers: {
+        "X-Salary-Reveal-Token": revealToken,
+      },
+    };
+  }
+  return undefined;
+};
+
 export const employeeProfileApi = {
-  getAll: async (): Promise<EmployeeProfileDto[]> => {
-    const res = await apiClient.get<unknown>(`/api/employee-profiles?_t=${Date.now()}`);
+  getAll: async (revealToken?: string): Promise<EmployeeProfileDto[]> => {
+    const res = await apiClient.get<unknown>(`/api/employee-profiles?_t=${Date.now()}`, headersConfig(revealToken));
     return normalizeProfilesList(res.data);
   },
 
@@ -259,10 +270,12 @@ export const employeeProfileApi = {
     page = 0,
     size = 10,
     sortBy = "firstName",
-    sortDir = "asc"
+    sortDir = "asc",
+    revealToken?: string
   ): Promise<EmployeeProfilePageResponse> => {
     const res = await apiClient.get<unknown>(
-      `/api/employee-profiles/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}&_t=${Date.now()}`
+      `/api/employee-profiles/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}&_t=${Date.now()}`,
+      headersConfig(revealToken)
     );
     const raw = res.data as Record<string, unknown>;
     const content = normalizeProfilesList(raw.content ?? raw);
@@ -308,16 +321,17 @@ export const employeeProfileApi = {
     };
   },
 
-  getById: async (id: number): Promise<EmployeeProfileDto> => {
-    const res = await apiClient.get<unknown>(`/api/employee-profiles/${id}`);
+  getById: async (id: number, revealToken?: string): Promise<EmployeeProfileDto> => {
+    const res = await apiClient.get<unknown>(`/api/employee-profiles/${id}`, headersConfig(revealToken));
     const profile = normalizeProfile(res.data);
     if (!profile) throw new Error("Invalid profile response");
     return profile;
   },
 
-  getByUserId: async (userId: number): Promise<EmployeeProfileDto> => {
+  getByUserId: async (userId: number, revealToken?: string): Promise<EmployeeProfileDto> => {
     const res = await apiClient.get<EmployeeProfileDto>(
-      `/api/employee-profiles/user/${userId}`
+      `/api/employee-profiles/user/${userId}`,
+      headersConfig(revealToken)
     );
     const profile = normalizeProfile(res.data);
     if (!profile) throw new Error("Invalid profile response");
@@ -450,8 +464,8 @@ export async function requestSalaryOtp(): Promise<{ message: string }> {
  */
 export async function verifySalaryOtp(
   code: string
-): Promise<{ valid: boolean; error?: string }> {
-  const res = await apiClient.post<{ valid: boolean; error?: string }>(
+): Promise<{ valid: boolean; token?: string; error?: string }> {
+  const res = await apiClient.post<{ valid: boolean; token?: string; error?: string }>(
     "/api/employee-profiles/salary-otp/verify",
     { code }
   );
