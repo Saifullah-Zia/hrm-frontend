@@ -6,8 +6,8 @@ import { useAuthStore } from "@/store/authStore";
 import { payrollApi, PayrollDTO } from "@/services/payrollApi";
 import { openPayslipPrintView } from "@/lib/payslipExport";
 
-const fmtMoney = (n: number) =>
-  n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const fmtMoney = (n: number | null | undefined) =>
+  (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 export default function EmployeePayslipsPage() {
   const { user } = useAuthStore();
