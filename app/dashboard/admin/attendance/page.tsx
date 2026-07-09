@@ -279,10 +279,14 @@ export default function AttendanceOverviewPage() {
     }
     setExporting(true);
     try {
+      // Exclude ADMIN/SUPERADMIN — they are not tracked for daily attendance.
+      const trackedUsers = users.filter(
+        (u) => u.role?.toUpperCase() !== "ADMIN" && u.role?.toUpperCase() !== "SUPERADMIN"
+      );
       const count = exportMonthlyAttendanceCsv({
         month,
         records: monthlyRecords,
-        users,
+        users: trackedUsers,
       });
       setToast({ message: `Exported ${count} record(s) for ${month}.`, type: "success" });
     } catch {
@@ -762,3 +766,4 @@ export default function AttendanceOverviewPage() {
     </div>
   );
 }
+
