@@ -730,8 +730,8 @@ const SalaryOtpModal = ({
         await requestSalaryOtp();
         setStep("input");
         setTimeout(() => inputRef.current?.focus(), 100);
-      } catch {
-        setError("Failed to send OTP. Please try again.");
+      } catch (err) {
+        setError(extractErrorMessage(err, "Failed to send OTP. Please try again."));
         setStep("input");
       }
     })();
@@ -758,8 +758,8 @@ const SalaryOtpModal = ({
         setCode("");
         setTimeout(() => inputRef.current?.focus(), 100);
       }
-    } catch {
-      setError("Verification failed. Please try again.");
+    } catch (err) {
+      setError(extractErrorMessage(err, "Verification failed. Please try again."));
       setStep("input");
     }
   };
@@ -771,8 +771,8 @@ const SalaryOtpModal = ({
     try {
       await requestSalaryOtp();
       setError(null);
-    } catch {
-      setError("Failed to resend. Please try again.");
+    } catch (err) {
+      setError(extractErrorMessage(err, "Failed to resend. Please try again."));
     } finally {
       setResending(false);
       setTimeout(() => inputRef.current?.focus(), 100);
