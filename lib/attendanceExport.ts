@@ -24,15 +24,26 @@ function formatPktTime(dt: string): string {
   });
 }
 
+// Distinct single/short codes per status — no two statuses share a code.
+// P  = Present
+// LT = Late
+// A  = Absent
+// O  = On Leave (paid)
+// UL = Unpaid Leave
+// H  = Holiday / weekend (assigned separately in isOffDay branch)
 function mapStatus(status: string | null | undefined): string {
   if (!status) return "A";
   switch (status.toUpperCase()) {
     case "PRESENT":
       return "P";
     case "LATE":
-      return "L";
+      return "LT";
     case "ABSENT":
       return "A";
+    case "ON_LEAVE":
+      return "O";
+    case "UNPAID_LEAVE":
+      return "UL";
     default:
       return "A";
   }
@@ -120,6 +131,14 @@ export function exportMonthlyAttendanceCsv(options: {
 
   // Generate CSV lines
   const lines: string[] = [];
+
+  // Legend row — explains the status codes used in the matrix below.
+  lines.push(
+    ["Legend:", "P=Present", "LT=Late", "A=Absent", "O=On Leave", "UL=Unpaid Leave", "H=Holiday/Weekend"]
+      .map(escapeCsvCell)
+      .join(",")
+  );
+  lines.push(""); // blank spacer row
 
   // First header row: Day names
   const dayNamesRow = ["", "", "", ...daysInMonth.map(getDayName)];
