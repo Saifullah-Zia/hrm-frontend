@@ -29,15 +29,27 @@ const STATUS_DOT: Record<string, string> = {
 
 const formatTime = (dt: string) => {
   if (!dt) return "—";
-  // Backend sends PKT time as LocalDateTime (e.g., "2024-07-09T12:06:00")
-  // Parse it directly and format for PKT display
-  return new Date(dt).toLocaleTimeString("en-PK", {
-    timeZone: "Asia/Karachi",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  // Backend sends a naive PKT wall-clock LocalDateTime string,
+  // e.g. "2026-07-09T17:03:00" — this is ALREADY Pakistan time.
+  // Do NOT use `new Date(dt)` here: without a timezone marker (no "Z", no offset),
+  // the JS Date object interprets it in the browser's local timezone, then
+  // re-applying `timeZone: "Asia/Karachi"` on top double-converts it and
+  // produces the wrong hour (this was the bug — 5:03 PM showing as 12:03 PM).
+  //
+  // Instead, extract the hour/minute directly from the string — no Date
+  // object, no timezone math, no ambiguity.
+  const match = dt.match(/T(\d{2}):(\d{2})/);
+  if (!match) return "—";
+
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const period = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+
+  return `${hours}:${minutes} ${period}`;
 };
+
 const formatDate = (d: string) => {
   if (!d) return "—";
   // Force local-time parsing to avoid UTC-offset shifting the date back by one day
