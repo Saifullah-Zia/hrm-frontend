@@ -50,6 +50,7 @@ const NAV_ITEMS = {
     { label: "Office hours",        href: "/dashboard/admin/office-hours",       icon: "clock" },
     { label: "Attendance Overview", href: "/dashboard/superadmin/attendance",    icon: "clock" },
     { label: "Corrections Review",  href: "/dashboard/admin/corrections",       icon: "clock" },
+    { label: "Holiday Management",  href: "/dashboard/admin/holidays",          icon: "calendar" },
     { label: "Audit Logs",          href: "/dashboard/admin/audit-logs",         icon: "clipboard" },
   ],
   ADMIN: [
@@ -63,6 +64,7 @@ const NAV_ITEMS = {
     { label: "Payroll Processing",  href: "/dashboard/admin/payroll",            icon: "currency" },
     { label: "Office hours",        href: "/dashboard/admin/office-hours",        icon: "clock" },
     { label: "Attendance Tracking", href: "/dashboard/admin/attendance",         icon: "clock" },
+    { label: "Holiday Management",  href: "/dashboard/admin/holidays",          icon: "calendar" },
     { label: "Announcements",       href: "/dashboard/admin/announcements",      icon: "bell" },
     { label: "Notices",            href: "/dashboard/admin/notices",            icon: "notice" },
     { label: "Document Hub",        href: "/dashboard/admin/documents",          icon: "document" },
