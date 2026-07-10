@@ -29,6 +29,16 @@ const todayPKT = (): string => {
   });
 };
 
+const isWeekend = (): boolean => {
+  // Check if today is Saturday (6) or Sunday (0) in PKT timezone
+  const today = new Date();
+  const dayOfWeek = today.toLocaleString("en-US", {
+    timeZone: "Asia/Karachi",
+  });
+  const pktDate = new Date(dayOfWeek);
+  return pktDate.getDay() === 6 || pktDate.getDay() === 0;
+};
+
 /* ─── component ──────────────────────────────────────────────────────────── */
 
 interface Props {
@@ -129,6 +139,7 @@ export default function AttendanceClockCard({ userId }: Props) {
   });
 
   const isActing = checkInMutation.isPending || checkOutMutation.isPending;
+  const weekendDisabled = isWeekend();
 
   /* ─── render ─────────────────────────────────────────────────────────────── */
   return (
@@ -189,6 +200,10 @@ export default function AttendanceClockCard({ userId }: Props) {
       {/* Status message */}
       {isLoading ? (
         <p className="text-white/30 text-xs mb-4">Loading today's record...</p>
+      ) : weekendDisabled ? (
+        <p className="text-amber-400/70 text-xs mb-4">
+          📅 Weekend — check-in/check-out disabled on Saturday & Sunday
+        </p>
       ) : hasCheckedIn && !hasCheckedOut ? (
         <p className="text-white/40 text-xs mb-4">
           Checked in — use Check out when you leave.
@@ -219,16 +234,18 @@ export default function AttendanceClockCard({ userId }: Props) {
       <div className="flex gap-3">
         <button
           onClick={() => checkInMutation.mutate()}
-          disabled={isActing || isLoading || hasCheckedIn}
+          disabled={isActing || isLoading || hasCheckedIn || weekendDisabled}
           className="px-5 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={weekendDisabled ? "Check-in disabled on weekends" : undefined}
         >
           {checkInMutation.isPending ? "Checking in..." : "Check in"}
         </button>
 
         <button
           onClick={() => checkOutMutation.mutate()}
-          disabled={isActing || !hasCheckedIn || hasCheckedOut}
+          disabled={isActing || !hasCheckedIn || hasCheckedOut || weekendDisabled}
           className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={weekendDisabled ? "Check-out disabled on weekends" : undefined}
         >
           {checkOutMutation.isPending ? "Checking out..." : "Check out"}
         </button>
