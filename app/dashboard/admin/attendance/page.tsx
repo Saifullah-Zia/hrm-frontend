@@ -114,6 +114,12 @@ export default function AttendanceOverviewPage() {
     checkOut: "",
   });
 
+  // ── Manual attendance marking (admin backup for scheduled job) ──────────────
+  const [showManualMark, setShowManualMark] = useState(false);
+  const [manualRange, setManualRange]       = useState({ startDate: "", endDate: "" });
+  const [manualUserIds, setManualUserIds]   = useState<number[]>([]); // empty = all tracked employees
+  const [manualLoading, setManualLoading]   = useState(false);
+
   const isAdminOrSuperAdmin = () => {
     const role = user?.role?.toUpperCase();
     return role === "ADMIN" || role === "SUPERADMIN";
@@ -169,6 +175,12 @@ export default function AttendanceOverviewPage() {
     users.forEach(u => m.set(u.id, u));
     return m;
   }, [users]);
+
+  /* ── tracked (non-admin) employees, used for manual-mark employee picker ── */
+  const trackedEmployees = useMemo(
+    () => users.filter(u => u.role?.toUpperCase() !== "ADMIN" && u.role?.toUpperCase() !== "SUPERADMIN"),
+    [users]
+  );
 
   /* ── overall stats (all records) ── */
   const stats = useMemo(() => {
@@ -322,6 +334,39 @@ export default function AttendanceOverviewPage() {
     } finally { setActionLoading(false); }
   };
 
+  /* ── Manual attendance marking (backup for scheduled job) ── */
+  const handleManualMark = async () => {
+    if (!manualRange.startDate || !manualRange.endDate) {
+      setToast({ message: "Start and end date are required", type: "error" });
+      return;
+    }
+    if (manualRange.endDate < manualRange.startDate) {
+      setToast({ message: "End date cannot be before start date", type: "error" });
+      return;
+    }
+    setManualLoading(true);
+    try {
+      const result = await attendanceApi.markManualAttendance(
+        manualRange.startDate,
+        manualRange.endDate,
+        manualUserIds.length ? manualUserIds : undefined
+      );
+      setToast({
+        message: `✅ Created: ${result.created} · Updated to leave: ${result.updatedToLeave} · Skipped: ${result.skippedAlreadyHandled} · Weekends skipped: ${result.skippedWeekend}`,
+        type: "success",
+      });
+      setShowManualMark(false);
+      setManualRange({ startDate: "", endDate: "" });
+      setManualUserIds([]);
+      setPage(0);
+      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+    } catch (err: any) {
+      setToast({ message: err.message || "Failed to run manual attendance marking", type: "error" });
+    } finally {
+      setManualLoading(false);
+    }
+  };
+
   /* ────────────────────────────────────────────────────────────────────────────
      RENDER
   ──────────────────────────────────────────────────────────────────────────── */
@@ -375,7 +420,16 @@ export default function AttendanceOverviewPage() {
           <div className="flex items-center gap-3">
             {isAdminOrSuperAdmin() && (
               <button
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => { setShowManualMark(!showManualMark); setShowForm(false); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors"
+              >
+                <span className="text-lg">{showManualMark ? "×" : "🕓"}</span>
+                {showManualMark ? "Cancel" : "Mark Attendance (Range)"}
+              </button>
+            )}
+            {isAdminOrSuperAdmin() && (
+              <button
+                onClick={() => { setShowForm(!showForm); setShowManualMark(false); }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
               >
                 <span className="text-lg">{showForm ? "×" : "+"}</span>
@@ -491,6 +545,81 @@ export default function AttendanceOverviewPage() {
             </div>
           ))}
         </div>
+
+        {/* ── Manual Attendance Marking Panel ── */}
+        {showManualMark && isAdminOrSuperAdmin() && (
+          <div className="bg-[#13151e] border border-amber-500/20 rounded-2xl p-6 mb-6">
+            <h2 className="text-white/90 font-semibold mb-1">Manual Attendance Marking</h2>
+            <p className="text-white/40 text-xs mb-4">
+              Backup for the nightly job. Creates missing records as ABSENT and updates stale ABSENT
+              placeholders to ON_LEAVE / UNPAID_LEAVE where approved leave exists. Real check-ins are
+              never touched, and weekends are skipped automatically.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-white/50 text-xs mb-1.5 block">Start Date *</label>
+                <input
+                  type="date" value={manualRange.startDate}
+                  onChange={e => setManualRange(p => ({ ...p, startDate: e.target.value }))}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-white/50 text-xs mb-1.5 block">End Date *</label>
+                <input
+                  type="date" value={manualRange.endDate}
+                  onChange={e => setManualRange(p => ({ ...p, endDate: e.target.value }))}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-white/50 text-xs mb-1.5 block">
+                Employees (leave empty to apply to all tracked employees)
+              </label>
+              <select
+                multiple
+                value={manualUserIds.map(String)}
+                onChange={e =>
+                  setManualUserIds(Array.from(e.target.selectedOptions, o => Number(o.value)))
+                }
+                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm h-32 focus:outline-none focus:border-amber-500/50 transition-colors"
+              >
+                {trackedEmployees.map(u => (
+                  <option key={u.id} value={u.id} className="bg-[#1a1d2e] text-white">
+                    {u.name} (#{u.id})
+                  </option>
+                ))}
+              </select>
+              {manualUserIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setManualUserIds([])}
+                  className="mt-1.5 text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
+                >
+                  Clear selection (apply to all)
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handleManualMark}
+                disabled={manualLoading}
+                className="px-6 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+              >
+                {manualLoading ? "Processing..." : "Run"}
+              </button>
+              <button
+                onClick={() => setShowManualMark(false)}
+                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Create Form */}
         {showForm && isAdminOrSuperAdmin() && (

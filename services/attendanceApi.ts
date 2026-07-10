@@ -70,6 +70,14 @@ export interface AttendancePageResponse {
   last: boolean;
 }
 
+// ── Manual attendance marking (admin backup for scheduled job) ───────────────
+export interface ManualAttendanceResult {
+  created: number;
+  updatedToLeave: number;
+  skippedAlreadyHandled: number;
+  skippedWeekend: number;
+}
+
 export const attendanceApi = {
 
   getAll: (): Promise<AttendanceDTO[]> =>
@@ -135,4 +143,23 @@ export const attendanceApi = {
     apiFetch<AttendancePageResponse>(
       `/api/attendance/user/${userId}/paged?page=${page}&size=${size}&sortBy=${sortBy}&sortDir=${sortDir}`
     ),
+
+  // ── Admin: manual attendance marking for a date range (backup for scheduled job) ──
+  // Creates missing records and updates stale ABSENT placeholders to
+  // ON_LEAVE/UNPAID_LEAVE where approved leave exists. Never touches a real check-in.
+  // Pass userIds = undefined/omitted to apply to all tracked employees.
+  markManualAttendance: (
+    startDate: string,
+    endDate: string,
+    userIds?: number[]
+  ): Promise<ManualAttendanceResult> =>
+    apiFetch<ManualAttendanceResult>("/api/attendance/mark-manual", {
+      method: "POST",
+      body: JSON.stringify({
+        startDate,
+        endDate,
+        userIds: userIds && userIds.length ? userIds : null,
+      }),
+    }),
 };
+
