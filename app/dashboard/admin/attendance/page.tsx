@@ -276,6 +276,9 @@ export default function AttendanceOverviewPage() {
   }, [pageRecords, search, idSearch, nameSearch, statusFilter, userMap]);
 
   /* ── CRUD ── */
+  // NOTE: This form doubles as the manual check-in / check-out tool for admins —
+  // setting checkIn and/or checkOut here creates a record with those exact PKT
+  // times for the given employee/date (via attendanceApi.create → POST /api/attendance).
   const handleCreate = async () => {
     if (!form.userId || !form.date) {
       setToast({ message: "User ID and date are required", type: "error" }); return;
@@ -288,13 +291,13 @@ export default function AttendanceOverviewPage() {
         checkOut: form.checkOut ? `${form.date}T${form.checkOut}:00` : undefined,
       };
       await attendanceApi.create(payload);
-      setToast({ message: "✅ Record created!", type: "success" });
+      setToast({ message: "✅ Record saved!", type: "success" });
       setShowForm(false);
       setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
       setPage(0); // Go back to first page to see the new entry
       await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
     } catch (err: any) {
-      setToast({ message: err.message || "Failed to create record", type: "error" });
+      setToast({ message: err.message || "Failed to save record", type: "error" });
     } finally { setActionLoading(false); }
   };
 
@@ -334,7 +337,7 @@ export default function AttendanceOverviewPage() {
     } finally { setActionLoading(false); }
   };
 
-  /* ── Manual attendance marking (backup for scheduled job) ── */
+  /* ── Manual attendance marking (backup for scheduled job) — admin/superadmin only ── */
   const handleManualMark = async () => {
     if (!manualRange.startDate || !manualRange.endDate) {
       setToast({ message: "Start and end date are required", type: "error" });
@@ -367,15 +370,21 @@ export default function AttendanceOverviewPage() {
     }
   };
 
+  const toggleManualUser = (id: number) => {
+    setManualUserIds(prev =>
+      prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
+    );
+  };
+
   /* ────────────────────────────────────────────────────────────────────────────
      RENDER
   ──────────────────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#0f1117] p-6">
+    <div className="min-h-screen bg-[#0f1117] p-4 sm:p-6">
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${
+        <div className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${
           toast.type === "success"
             ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
             : "bg-rose-500/20 border border-rose-500/30 text-rose-400"
@@ -411,32 +420,31 @@ export default function AttendanceOverviewPage() {
 
       <div className="max-w-6xl mx-auto">
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        {/* Header — stacks vertically on mobile, row on larger screens */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
             <h1 className="text-2xl font-semibold text-white/90">Attendance Overview</h1>
             <p className="text-white/40 text-sm mt-1">Track and manage employee attendance</p>
           </div>
-          <div className="flex items-center gap-3">
-            {isAdminOrSuperAdmin() && (
+          {isAdminOrSuperAdmin() && (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <button
                 onClick={() => { setShowManualMark(!showManualMark); setShowForm(false); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors w-full sm:w-auto"
               >
                 <span className="text-lg">{showManualMark ? "×" : "🕓"}</span>
                 {showManualMark ? "Cancel" : "Mark Attendance (Range)"}
               </button>
-            )}
-            {isAdminOrSuperAdmin() && (
               <button
                 onClick={() => { setShowForm(!showForm); setShowManualMark(false); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors w-full sm:w-auto"
+                title="Create a record or set a manual check-in/check-out time for an employee"
               >
                 <span className="text-lg">{showForm ? "×" : "+"}</span>
-                {showForm ? "Cancel" : "Add Record"}
+                {showForm ? "Cancel" : "Manual Check-In/Out"}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── Weekly Summary + Monthly picker ── */}
@@ -444,7 +452,7 @@ export default function AttendanceOverviewPage() {
           {/* This week card */}
           <div className="sm:col-span-2 bg-gradient-to-br from-indigo-600/20 to-violet-600/10 border border-indigo-500/20 rounded-2xl p-5 flex flex-col gap-3">
             <p className="text-indigo-300/70 text-xs font-semibold uppercase tracking-widest">This Week — All Employees</p>
-            <div className="flex items-end gap-6">
+            <div className="flex flex-wrap items-end gap-6">
               <div>
                 <p className="text-4xl font-bold text-white/90">{weekStats.attended}</p>
                 <p className="text-white/30 text-xs mt-0.5">attended</p>
@@ -490,8 +498,8 @@ export default function AttendanceOverviewPage() {
 
         {/* ── Monthly weekly bar chart ── */}
         {weekBuckets.length > 0 && (
-          <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 mb-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-4 sm:p-6 mb-6 overflow-x-auto">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6 min-w-[420px]">
               <div>
                 <p className="text-white/80 font-semibold text-sm">Weekly Breakdown</p>
                 <p className="text-white/30 text-xs mt-0.5">Attendance per week for the selected month</p>
@@ -501,7 +509,7 @@ export default function AttendanceOverviewPage() {
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500/40 inline-block" />Absent</span>
               </div>
             </div>
-            <div className="flex items-end gap-4 h-36">
+            <div className="flex items-end gap-4 h-36 min-w-[420px]">
               {weekBuckets.map(bucket => {
                 const barMax = Math.max(...weekBuckets.map(b => b.total), 1);
                 return (
@@ -519,7 +527,7 @@ export default function AttendanceOverviewPage() {
                 );
               })}
             </div>
-            <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${weekBuckets.length}, 1fr)` }}>
+            <div className="mt-4 grid gap-2 min-w-[420px]" style={{ gridTemplateColumns: `repeat(${weekBuckets.length}, 1fr)` }}>
               {weekBuckets.map(b => (
                 <div key={b.label} className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-2 py-2 text-center">
                   <p className="text-emerald-400/80 text-[11px] font-semibold">{b.attended} att</p>
@@ -546,9 +554,9 @@ export default function AttendanceOverviewPage() {
           ))}
         </div>
 
-        {/* ── Manual Attendance Marking Panel ── */}
+        {/* ── Manual Attendance Marking Panel (admin/superadmin) ── */}
         {showManualMark && isAdminOrSuperAdmin() && (
-          <div className="bg-[#13151e] border border-amber-500/20 rounded-2xl p-6 mb-6">
+          <div className="bg-[#13151e] border border-amber-500/20 rounded-2xl p-4 sm:p-6 mb-6">
             <h2 className="text-white/90 font-semibold mb-1">Manual Attendance Marking</h2>
             <p className="text-white/40 text-xs mb-4">
               Backup for the nightly job. Creates missing records as ABSENT and updates stale ABSENT
@@ -575,45 +583,55 @@ export default function AttendanceOverviewPage() {
             </div>
 
             <div className="mt-4">
-              <label className="text-white/50 text-xs mb-1.5 block">
-                Employees (leave empty to apply to all tracked employees)
-              </label>
-              <select
-                multiple
-                value={manualUserIds.map(String)}
-                onChange={e =>
-                  setManualUserIds(Array.from(e.target.selectedOptions, o => Number(o.value)))
-                }
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm h-32 focus:outline-none focus:border-amber-500/50 transition-colors"
-              >
-                {trackedEmployees.map(u => (
-                  <option key={u.id} value={u.id} className="bg-[#1a1d2e] text-white">
-                    {u.name} (#{u.id})
-                  </option>
-                ))}
-              </select>
-              {manualUserIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setManualUserIds([])}
-                  className="mt-1.5 text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
-                >
-                  Clear selection (apply to all)
-                </button>
-              )}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-white/50 text-xs block">
+                  Employees ({manualUserIds.length === 0 ? "all tracked employees" : `${manualUserIds.length} selected`})
+                </label>
+                {manualUserIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManualUserIds([])}
+                    className="text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
+                  >
+                    Clear (apply to all)
+                  </button>
+                )}
+              </div>
+              {/* Checkbox list instead of native <select multiple> — much easier to use on mobile/touch */}
+              <div className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-2 py-2 max-h-48 overflow-y-auto">
+                {trackedEmployees.length === 0 ? (
+                  <p className="text-white/30 text-xs px-2 py-1.5">No employees found</p>
+                ) : (
+                  trackedEmployees.map(u => (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={manualUserIds.includes(u.id)}
+                        onChange={() => toggleManualUser(u.id)}
+                        className="w-4 h-4 rounded border-white/20 bg-white/5 accent-amber-500 shrink-0"
+                      />
+                      <span className="text-white/80 text-sm truncate">{u.name}</span>
+                      <span className="text-white/30 text-xs shrink-0">#{u.id}</span>
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
 
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <button
                 onClick={handleManualMark}
                 disabled={manualLoading}
-                className="px-6 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+                className="px-6 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50 w-full sm:w-auto"
               >
                 {manualLoading ? "Processing..." : "Run"}
               </button>
               <button
                 onClick={() => setShowManualMark(false)}
-                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors"
+                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors w-full sm:w-auto"
               >
                 Cancel
               </button>
@@ -621,10 +639,14 @@ export default function AttendanceOverviewPage() {
           </div>
         )}
 
-        {/* Create Form */}
+        {/* Manual Check-In / Check-Out + Create Form (admin/superadmin) */}
         {showForm && isAdminOrSuperAdmin() && (
-          <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl p-6 mb-6">
-            <h2 className="text-white/90 font-semibold mb-4">Add Attendance Record</h2>
+          <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl p-4 sm:p-6 mb-6">
+            <h2 className="text-white/90 font-semibold mb-1">Manual Check-In / Check-Out</h2>
+            <p className="text-white/40 text-xs mb-4">
+              Create an attendance record for an employee and optionally set exact check-in / check-out
+              times — useful when an employee forgot to clock in/out or for backfilling a record.
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">User ID *</label>
@@ -656,7 +678,7 @@ export default function AttendanceOverviewPage() {
                 </select>
               </div>
               <div>
-                <label className="text-white/50 text-xs mb-1.5 block">Check In Time</label>
+                <label className="text-white/50 text-xs mb-1.5 block">Check In Time (manual check-in)</label>
                 <input
                   type="time" value={form.checkIn}
                   onChange={e => setForm(p => ({ ...p, checkIn: e.target.value }))}
@@ -664,7 +686,7 @@ export default function AttendanceOverviewPage() {
                 />
               </div>
               <div>
-                <label className="text-white/50 text-xs mb-1.5 block">Check Out Time</label>
+                <label className="text-white/50 text-xs mb-1.5 block">Check Out Time (manual check-out)</label>
                 <input
                   type="time" value={form.checkOut}
                   onChange={e => setForm(p => ({ ...p, checkOut: e.target.value }))}
@@ -672,13 +694,13 @@ export default function AttendanceOverviewPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <button onClick={handleCreate} disabled={actionLoading}
-                className="px-6 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50">
+                className="px-6 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 w-full sm:w-auto">
                 {actionLoading ? "Saving..." : "Save Record"}
               </button>
               <button onClick={() => setShowForm(false)}
-                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors">
+                className="px-6 py-2 rounded-xl bg-white/5 text-white/40 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors w-full sm:w-auto">
                 Cancel
               </button>
             </div>
@@ -757,7 +779,7 @@ export default function AttendanceOverviewPage() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table — horizontally scrollable on mobile */}
         {loading || tableLoading ? (
           <div className="text-center py-16 text-white/40">Loading...</div>
         ) : filtered.length === 0 ? (
@@ -768,11 +790,11 @@ export default function AttendanceOverviewPage() {
         ) : (
           <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[720px]">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
                     {["Employee", "User ID", "Date", "Status", "Check In", "Check Out", isAdminOrSuperAdmin() ? "Actions" : ""].map(h => (
-                      <th key={h} className="px-5 py-3.5 text-left text-xs font-medium text-white/30 uppercase tracking-wider">
+                      <th key={h} className="px-5 py-3.5 text-left text-xs font-medium text-white/30 uppercase tracking-wider whitespace-nowrap">
                         {h}
                       </th>
                     ))}
@@ -805,7 +827,7 @@ export default function AttendanceOverviewPage() {
                           <span className="text-white/50 text-sm font-mono">#{record.userId}</span>
                         </td>
                         {/* Date */}
-                        <td className="px-5 py-4 text-white/70 text-sm">
+                        <td className="px-5 py-4 text-white/70 text-sm whitespace-nowrap">
                           {formatDate(record.date)}
                         </td>
                         {/* Status */}
@@ -818,11 +840,11 @@ export default function AttendanceOverviewPage() {
                           </div>
                         </td>
                         {/* Check in */}
-                        <td className="px-5 py-4 text-white/60 text-sm font-mono">
+                        <td className="px-5 py-4 text-white/60 text-sm font-mono whitespace-nowrap">
                           {formatTime(record.checkIn)}
                         </td>
                         {/* Check out */}
-                        <td className="px-5 py-4 text-white/60 text-sm font-mono">
+                        <td className="px-5 py-4 text-white/60 text-sm font-mono whitespace-nowrap">
                           {formatTime(record.checkOut)}
                         </td>
                         {/* Actions */}
@@ -852,7 +874,7 @@ export default function AttendanceOverviewPage() {
                 <span>
                   Showing <span className="text-white/60">{filtered.length}</span> of <span className="text-white/60">{pageRecords.length}</span> page rows · <span className="text-white/60">{totalElements}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
                 </span>
-                <div className="flex items-center gap-3 border-t border-white/[0.04] sm:border-t-0 pt-2 sm:pt-0">
+                <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.04] sm:border-t-0 pt-2 sm:pt-0">
                   <span className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Present: {stats.present}
                   </span>
@@ -865,7 +887,7 @@ export default function AttendanceOverviewPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 self-end sm:self-auto">
+              <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
                 <label className="flex items-center gap-1.5">
                   <span>Rows</span>
                   <select
