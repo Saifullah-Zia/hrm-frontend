@@ -281,7 +281,7 @@ export default function AttendanceOverviewPage() {
   // times for the given employee/date (via attendanceApi.create → POST /api/attendance).
   const handleCreate = async () => {
     if (!form.userId || !form.date) {
-      setToast({ message: "User ID and date are required", type: "error" }); return;
+      setToast({ message: "Employee and date are required", type: "error" }); return;
     }
     setActionLoading(true);
     try {
@@ -649,13 +649,19 @@ export default function AttendanceOverviewPage() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-white/50 text-xs mb-1.5 block">User ID *</label>
-                <input
-                  type="number" value={form.userId}
+                <label className="text-white/50 text-xs mb-1.5 block">Employee *</label>
+                <select
+                  value={form.userId}
                   onChange={e => setForm(p => ({ ...p, userId: e.target.value }))}
-                  placeholder="Enter user ID..."
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                />
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
+                >
+                  <option value="" className="bg-[#1a1d2e] text-white/40">Select an employee...</option>
+                  {trackedEmployees.map(u => (
+                    <option key={u.id} value={u.id} className="bg-[#1a1d2e] text-white">
+                      {u.name} ({u.email})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Date *</label>
