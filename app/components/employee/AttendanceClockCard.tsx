@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
+import { getUsersWithPermissions } from "@/services/userPermissionsApi";
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
@@ -56,6 +57,15 @@ export default function AttendanceClockCard({ userId }: Props) {
     queryFn: () => attendanceApi.getByUserId(userId),
     enabled: typeof userId === "number",
   });
+
+  /* ── fetch web check-in permission for this user ── */
+  const { data: usersPermissions, isLoading: permLoading } = useQuery({
+    queryKey: ["user-permissions"],
+    queryFn: () => getUsersWithPermissions(),
+    enabled: typeof userId === "number",
+    staleTime: 30_000, // cache for 30s
+  });
+  const webCheckInAllowed = usersPermissions?.find((u) => u.id === userId)?.webCheckInAllowed ?? null;
 
   // Find today's record in PKT (used for status badge)
   const todayRecord: AttendanceDTO | undefined = allRecords?.find(
@@ -249,26 +259,41 @@ export default function AttendanceClockCard({ userId }: Props) {
         </div>
       )}
 
-      {/* Buttons */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => checkInMutation.mutate()}
-          disabled={isActing || isLoading || hasCheckedIn || weekendDisabled}
-          className="px-5 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={weekendDisabled ? "Check-in disabled on weekends" : undefined}
-        >
-          {checkInMutation.isPending ? "Checking in..." : "Check in"}
-        </button>
+      {/* Buttons — or biometric lock message */}
+      {permLoading ? (
+        <div className="h-10 rounded-xl bg-white/[0.04] animate-pulse" />
+      ) : webCheckInAllowed === false ? (
+        /* ── Biometric-only lock message ── */
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3">
+          <span className="text-xl leading-none mt-0.5">🔒</span>
+          <div>
+            <p className="text-amber-300/90 text-sm font-medium">Web check-in disabled</p>
+            <p className="text-amber-300/50 text-xs mt-0.5">
+              Please use the biometric device to check in and out.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          <button
+            onClick={() => checkInMutation.mutate()}
+            disabled={isActing || isLoading || hasCheckedIn || weekendDisabled}
+            className="px-5 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={weekendDisabled ? "Check-in disabled on weekends" : undefined}
+          >
+            {checkInMutation.isPending ? "Checking in..." : "Check in"}
+          </button>
 
-        <button
-          onClick={() => checkOutMutation.mutate()}
-          disabled={isActing || !hasCheckedIn || hasCheckedOut || weekendDisabled}
-          className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={weekendDisabled ? "Check-out disabled on weekends" : undefined}
-        >
-          {checkOutMutation.isPending ? "Checking out..." : "Check out"}
-        </button>
-      </div>
+          <button
+            onClick={() => checkOutMutation.mutate()}
+            disabled={isActing || !hasCheckedIn || hasCheckedOut || weekendDisabled}
+            className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={weekendDisabled ? "Check-out disabled on weekends" : undefined}
+          >
+            {checkOutMutation.isPending ? "Checking out..." : "Check out"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

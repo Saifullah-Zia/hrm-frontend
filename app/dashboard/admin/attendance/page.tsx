@@ -5,6 +5,11 @@ import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import apiClient from "@/lib/apiClient";
 import { exportMonthlyAttendanceCsv } from "@/lib/attendanceExport";
+import {
+  getUsersWithPermissions,
+  setWebCheckInAccess,
+  UserWithPermission,
+} from "@/services/userPermissionsApi";
 
 /* ─── types ─────────────────────────────────────────────────────────────────── */
 
@@ -120,9 +125,48 @@ export default function AttendanceOverviewPage() {
   const [manualUserIds, setManualUserIds]   = useState<number[]>([]); // empty = all tracked employees
   const [manualLoading, setManualLoading]   = useState(false);
 
+  // ── Web Check-In Access management ──────────────────────────────────────────
+  const [showAccessPanel, setShowAccessPanel]       = useState(false);
+  const [permissions, setPermissions]               = useState<UserWithPermission[]>([]);
+  const [permLoading, setPermLoading]               = useState(false);
+  const [permTogglingId, setPermTogglingId]         = useState<number | null>(null);
+
   const isAdminOrSuperAdmin = () => {
     const role = user?.role?.toUpperCase();
     return role === "ADMIN" || role === "SUPERADMIN";
+  };
+
+  // ── Load web check-in permissions when panel opens ──────────────────────────
+  const loadPermissions = useCallback(async () => {
+    setPermLoading(true);
+    try {
+      const all = await getUsersWithPermissions();
+      // Keep only non-admin employees
+      setPermissions(all.filter(u => u.role?.toUpperCase() !== "ADMIN" && u.role?.toUpperCase() !== "SUPERADMIN"));
+    } catch {
+      setToast({ message: "Failed to load access permissions", type: "error" });
+    } finally {
+      setPermLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showAccessPanel) loadPermissions();
+  }, [showAccessPanel, loadPermissions]);
+
+  const handleToggleAccess = async (userId: number, currentValue: boolean) => {
+    setPermTogglingId(userId);
+    try {
+      await setWebCheckInAccess(userId, !currentValue);
+      setPermissions(prev =>
+        prev.map(u => u.id === userId ? { ...u, webCheckInAllowed: !currentValue } : u)
+      );
+      setToast({ message: `Web check-in ${!currentValue ? "enabled" : "disabled"} successfully.`, type: "success" });
+    } catch {
+      setToast({ message: "Failed to update access", type: "error" });
+    } finally {
+      setPermTogglingId(null);
+    }
   };
 
   /* ── auto-hide toast ── */
@@ -429,19 +473,26 @@ export default function AttendanceOverviewPage() {
           {isAdminOrSuperAdmin() && (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <button
-                onClick={() => { setShowManualMark(!showManualMark); setShowForm(false); }}
+                onClick={() => { setShowManualMark(!showManualMark); setShowForm(false); setShowAccessPanel(false); }}
                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors w-full sm:w-auto"
               >
                 <span className="text-lg">{showManualMark ? "×" : "🕓"}</span>
                 {showManualMark ? "Cancel" : "Mark Attendance (Range)"}
               </button>
               <button
-                onClick={() => { setShowForm(!showForm); setShowManualMark(false); }}
+                onClick={() => { setShowForm(!showForm); setShowManualMark(false); setShowAccessPanel(false); }}
                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors w-full sm:w-auto"
                 title="Create a record or set a manual check-in/check-out time for an employee"
               >
                 <span className="text-lg">{showForm ? "×" : "+"}</span>
                 {showForm ? "Cancel" : "Manual Check-In/Out"}
+              </button>
+              <button
+                onClick={() => { setShowAccessPanel(!showAccessPanel); setShowForm(false); setShowManualMark(false); }}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/25 text-sm font-medium hover:bg-violet-500/30 transition-colors w-full sm:w-auto"
+              >
+                <span className="text-lg">{showAccessPanel ? "×" : "🔒"}</span>
+                {showAccessPanel ? "Cancel" : "Web Check-In Access"}
               </button>
             </div>
           )}
@@ -933,6 +984,80 @@ export default function AttendanceOverviewPage() {
             </div>
           </div>
         )}
+
+        {/* ── Web Check-In Access Panel ── */}
+        {showAccessPanel && isAdminOrSuperAdmin() && (
+          <div className="bg-[#13151e] border border-violet-500/20 rounded-2xl p-4 sm:p-6 mb-6">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-white/90 font-semibold">Web Check-In Access</h2>
+              <span className="text-xs text-white/30">{permissions.filter(u => u.webCheckInAllowed).length} of {permissions.length} enabled</span>
+            </div>
+            <p className="text-white/40 text-xs mb-4">
+              Employees with access <span className="text-emerald-400/80">enabled</span> can use the HRM web app to check in/out.
+              All others must use the <span className="text-amber-400/80">biometric device</span>.
+            </p>
+
+            {permLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-12 rounded-xl bg-white/[0.04] animate-pulse" />)}
+              </div>
+            ) : permissions.length === 0 ? (
+              <p className="text-white/30 text-sm">No employees found.</p>
+            ) : (
+              <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                {permissions.map(u => (
+                  <div
+                    key={u.id}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/[0.03] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Avatar */}
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/30 to-indigo-500/20 text-violet-300 flex items-center justify-center text-xs font-bold shrink-0">
+                        {u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white/80 text-sm font-medium truncate">{u.name}</p>
+                        <p className="text-white/30 text-xs truncate">{u.email}</p>
+                      </div>
+                    </div>
+
+                    {/* Toggle switch */}
+                    <button
+                      onClick={() => handleToggleAccess(u.id, u.webCheckInAllowed)}
+                      disabled={permTogglingId === u.id}
+                      className="relative shrink-0 ml-3 disabled:opacity-60 disabled:cursor-wait"
+                      title={u.webCheckInAllowed ? "Click to disable web check-in" : "Click to enable web check-in"}
+                    >
+                      <span
+                        className={`flex items-center w-11 h-6 rounded-full border transition-all duration-200 ${
+                          u.webCheckInAllowed
+                            ? "bg-emerald-500/25 border-emerald-500/40"
+                            : "bg-white/[0.05] border-white/[0.12]"
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full shadow transition-all duration-200 mx-1 ${
+                            u.webCheckInAllowed
+                              ? "translate-x-5 bg-emerald-400"
+                              : "translate-x-0 bg-white/30"
+                          }`}
+                        />
+                      </span>
+                    </button>
+
+                    {/* Status label */}
+                    <span className={`ml-3 text-xs font-medium w-16 text-right shrink-0 ${
+                      u.webCheckInAllowed ? "text-emerald-400" : "text-white/25"
+                    }`}>
+                      {u.webCheckInAllowed ? "Web ✓" : "Device only"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
