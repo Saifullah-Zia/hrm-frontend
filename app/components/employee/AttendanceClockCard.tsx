@@ -57,13 +57,25 @@ export default function AttendanceClockCard({ userId }: Props) {
     enabled: typeof userId === "number",
   });
 
-  // Find today's record in PKT
+  // Find today's record in PKT (used for status badge)
   const todayRecord: AttendanceDTO | undefined = allRecords?.find(
     (r) => r.date === todayPKT()
   );
 
-  const hasCheckedIn = !!todayRecord?.checkIn;
-  const hasCheckedOut = !!todayRecord?.checkOut;
+  // Find any open shift (checked-in but not yet checked-out).
+  // This handles overnight shifts: e.g. check-in at 5 PM (date = July 14)
+  // and checkout at 2 AM next day (todayPKT = July 15 → todayRecord = undefined).
+  // The open record is picked up regardless of date so the checkout button
+  // stays enabled and the check-in time remains visible.
+  const openRecord: AttendanceDTO | undefined = allRecords?.find(
+    (r) => !!r.checkIn && !r.checkOut
+  );
+
+  // Active record: prefer the open overnight shift; otherwise use today's record.
+  const activeRecord = openRecord ?? todayRecord;
+
+  const hasCheckedIn  = !!activeRecord?.checkIn;
+  const hasCheckedOut = !!activeRecord?.checkOut;
 
   /* ── office hours (for display only) ── */
   const { data: officeHours } = useQuery({
@@ -164,33 +176,40 @@ export default function AttendanceClockCard({ userId }: Props) {
           )}
         </div>
 
-        {/* Status badge */}
-        {todayRecord?.status && (
-          <span className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${todayRecord.status === "PRESENT"
-            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
-            : todayRecord.status === "LATE"
-              ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
-              : "bg-rose-500/15 text-rose-400 border-rose-500/20"
+        {/* Status badge — always use today's date-matched record for status */}
+        {(todayRecord?.status ?? (openRecord && !todayRecord ? "IN SHIFT" : undefined)) && (
+          <span className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${
+            (todayRecord?.status ?? "IN SHIFT") === "PRESENT"
+              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
+              : (todayRecord?.status ?? "IN SHIFT") === "LATE"
+                ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
+                : (todayRecord?.status ?? "IN SHIFT") === "IN SHIFT"
+                  ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20"
+                  : "bg-rose-500/15 text-rose-400 border-rose-500/20"
             }`}>
-            {todayRecord.status}
+            {todayRecord?.status ?? "IN SHIFT"}
           </span>
         )}
       </div>
 
-      {/* Check-in / Check-out times */}
+      {/* Check-in / Check-out times — use activeRecord so overnight shifts show correctly */}
       {hasCheckedIn && (
         <div className="flex gap-6 mb-4 text-sm">
           <div>
             <p className="text-white/30 text-xs mb-0.5">Checked in</p>
             <p className="text-white/80 font-mono font-medium">
-              {formatTimePKT(todayRecord?.checkIn)}
+              {formatTimePKT(activeRecord?.checkIn)}
             </p>
+            {/* Show the shift date if it's different from today (overnight) */}
+            {activeRecord?.date && activeRecord.date !== todayPKT() && (
+              <p className="text-indigo-400/70 text-[10px] mt-0.5">Shift started {activeRecord.date}</p>
+            )}
           </div>
           {hasCheckedOut && (
             <div>
               <p className="text-white/30 text-xs mb-0.5">Checked out</p>
               <p className="text-white/80 font-mono font-medium">
-                {formatTimePKT(todayRecord?.checkOut)}
+                {formatTimePKT(activeRecord?.checkOut)}
               </p>
             </div>
           )}
