@@ -1,4 +1,5 @@
 "use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState, useMemo } from "react";
 import { useAuthStore } from "@/store/authStore";
@@ -63,34 +64,6 @@ function durationForLeave(leave: LeaveDto): number {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  if (!toast) return null;
-
-  const colors = {
-    success: "bg-emerald-500/20 border-emerald-500/30 text-emerald-300",
-    error:   "bg-rose-500/20    border-rose-500/30    text-rose-300",
-    info:    "bg-indigo-500/20  border-indigo-500/30  text-indigo-300",
-  };
-
-  const icons = { success: "✅", error: "❌", info: "ℹ️" };
-
-  return (
-    <div
-      className={`fixed top-5 right-5 z-[100] flex items-center gap-3 px-5 py-3.5 rounded-2xl border shadow-2xl backdrop-blur-md text-sm font-medium transition-all ${colors[toast.type]}`}
-      style={{ animation: "slideInRight 0.3s ease" }}
-    >
-      <span>{icons[toast.type]}</span>
-      <span>{toast.message}</span>
-      <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100 transition-opacity text-lg leading-none">×</button>
-    </div>
-  );
-}
 
 function ViewDetailsModal({
   leave,
@@ -405,7 +378,13 @@ export default function AdminLeavePage() {
       `}</style>
 
       {/* Toast */}
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* View Details Modal */}
       {viewDetails && (

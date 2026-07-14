@@ -1,4 +1,5 @@
 "use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -55,11 +56,6 @@ export default function AdminProbationPage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const confirm = async (row: UserWithProbationDto) => {
     setActionId(row.id);
@@ -91,15 +87,11 @@ export default function AdminProbationPage() {
         </div>
 
         {toast && (
-          <p
-            className={`text-sm px-4 py-2 rounded-xl border ${
-              toast.type === "success"
-                ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/25"
-                : "bg-rose-500/10 text-rose-300 border-rose-500/25"
-            }`}
-          >
-            {toast.message}
-          </p>
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
         )}
 
         {loading ? (

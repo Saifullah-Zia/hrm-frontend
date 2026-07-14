@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState } from "react";
 import { leavePolicyApi, LeavePolicyDto } from "@/services/leaveApi";
@@ -59,15 +60,11 @@ export default function SuperadminLeavePolicyPage() {
   return (
     <div className="min-h-screen bg-[#0f1117] p-6">
       {toast && (
-        <div
-          className={`fixed top-5 right-5 z-50 rounded-xl border px-4 py-3 text-sm shadow-lg ${
-            toast.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
-              : "border-rose-500/30 bg-rose-500/15 text-rose-200"
-          }`}
-        >
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div className="max-w-5xl mx-auto px-0 sm:px-4">

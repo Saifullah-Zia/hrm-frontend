@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
@@ -145,7 +145,6 @@ export default function AttendanceOverviewPage() {
 
   /* ── auto-hide toast ── */
   useEffect(() => {
-    if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); }
   }, [toast]);
 
   const fetchAllAndUsers = useCallback(async () => {

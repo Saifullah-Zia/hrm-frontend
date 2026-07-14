@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState } from "react";
 import { noticeApi, NoticeDto } from "@/services/noticeApi";
@@ -143,12 +144,6 @@ export default function NoticesPage() {
   };
 
   // Auto hide toast
-  useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [toast]);
 
   return (
     <div className="min-h-screen bg-[#070918] text-[#E2E4F0]">
@@ -171,16 +166,12 @@ export default function NoticesPage() {
         </div>
 
         {toast && (
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-              toast.type === "success"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-red-500/30 bg-red-500/10 text-red-400"
-            }`}
-          >
-            {toast.message}
-          </div>
-        )}
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
         {/* Send Notice Form */}
         {showForm && (

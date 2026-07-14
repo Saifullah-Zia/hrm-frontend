@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import apiClient from "@/lib/apiClient";
@@ -1145,16 +1146,12 @@ export default function EmployeeProfilesPage() {
         </div>
 
         {toast && (
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-              toast.type === "success"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-red-500/30 bg-red-500/10 text-red-400"
-            }`}
-          >
-            {toast.message}
-          </div>
-        )}
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
 
         {/* ── Stats Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -163,15 +164,11 @@ export default function EmployeeProfilePage() {
   return (
     <div className="space-y-6 max-w-3xl">
       {toast && (
-        <div
-          className={`fixed top-5 right-5 z-50 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
-            toast.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
-              : "border-rose-500/30 bg-rose-500/15 text-rose-200"
-          }`}
-        >
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

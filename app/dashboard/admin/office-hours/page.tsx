@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,15 +73,11 @@ export default function AdminOfficeHoursPage() {
   return (
     <div className="max-w-xl space-y-6">
       {toast && (
-        <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            toast.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-              : "border-amber-500/30 bg-amber-500/10 text-amber-200"
-          }`}
-        >
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div>

@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
@@ -27,12 +28,6 @@ export default function AnnouncementsPage() {
   };
 
   // Auto hide toast
-  useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(null), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [toast]);
 
   const fetchAnnouncements = async (pageIndex = page) => {
     setLoading(true);
@@ -133,13 +128,11 @@ export default function AnnouncementsPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${
-          toast.type === "success"
-            ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
-            : "bg-rose-500/20 border border-rose-500/30 text-rose-400"
-        }`}>
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       {/* Delete Confirm Modal */}

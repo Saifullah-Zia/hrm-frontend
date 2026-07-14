@@ -24,6 +24,9 @@ import {
   Bell,
   ArrowLeft,
   CheckCheck,
+  Check,
+  X,
+  EyeOff,
 } from "lucide-react";
 import { Toast } from "@/app/components/Toast";
 
@@ -284,7 +287,20 @@ export default function NotificationsPage() {
           </button>
         </div>
 
-        <h1 className="text-xl font-semibold text-white/90 mb-6">All Notifications</h1>
+        {/* Title with glowing unread badge */}
+        {(() => {
+          const unreadCount = notifications.filter(n => n.status === "UNREAD").length;
+          return (
+            <div className="flex items-baseline gap-3 mb-6">
+              <h1 className="text-xl font-semibold text-white/90">All Notifications</h1>
+              {unreadCount > 0 && (
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-xs font-bold shadow-[0_0_12px_rgba(99,102,241,0.15)] animate-pulse">
+                  {unreadCount} new
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Content */}
         {loading ? (
@@ -299,13 +315,16 @@ export default function NotificationsPage() {
             {notifications.slice(0, visibleCount).map((notif) => (
               <div
                 key={notif.id}
-                className={`group/card relative overflow-hidden backdrop-blur-md border rounded-2xl p-5 transition-all duration-300 ${
+                className={`group/card relative overflow-hidden backdrop-blur-md border rounded-2xl p-5 pl-6 transition-all duration-300 ${
                   notif.status === "UNREAD"
                     ? "border-indigo-500/20 bg-indigo-500/5 shadow-lg shadow-indigo-500/5 hover:border-indigo-500/35"
                     : "border-white/[0.05] bg-[#13151e]/40 hover:bg-[#13151e]/65 opacity-80"
                 }`}
-                // ✅ No onClick on parent div anymore
               >
+                {/* Indigo left border highlight for unread */}
+                {notif.status === "UNREAD" && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                )}
                 <div className="flex items-start gap-4">
 
                   {/* Icon */}
@@ -328,26 +347,29 @@ export default function NotificationsPage() {
 
                     {/* Approve / Reject buttons - only for LEAVE_REQUEST + UNREAD */}
                     {notif.type === "LEAVE_REQUEST" && notif.status === "UNREAD" && (
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex flex-wrap gap-2 mt-3.5">
                         <button
                           onClick={(e) => handleApprove(e, notif)}
                           disabled={actionLoading === notif.id}
-                          className="px-4 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-medium hover:bg-emerald-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {actionLoading === notif.id ? "Processing..." : "✅ Approve"}
+                          <Check className="w-3.5 h-3.5" />
+                          {actionLoading === notif.id ? "Processing..." : "Approve"}
                         </button>
                         <button
                           onClick={(e) => handleReject(e, notif)}
                           disabled={actionLoading === notif.id}
-                          className="px-4 py-1.5 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/25 text-xs font-medium hover:bg-rose-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {actionLoading === notif.id ? "Processing..." : "❌ Reject"}
+                          <X className="w-3.5 h-3.5" />
+                          {actionLoading === notif.id ? "Processing..." : "Reject"}
                         </button>
                         <button
                           onClick={(e) => handleDismiss(e, notif.id)}
                           disabled={actionLoading === notif.id}
-                          className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 border border-white/10 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                         >
+                          <EyeOff className="w-3.5 h-3.5" />
                           Dismiss
                         </button>
                       </div>
@@ -355,24 +377,27 @@ export default function NotificationsPage() {
 
                     {/* Show status badge for already actioned notifications */}
                     {notif.type === "LEAVE_APPROVED" && (
-                      <span className="inline-block mt-2 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-xs">
+                      <span className="inline-flex items-center gap-1 mt-2.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 text-xs font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         Approved
                       </span>
                     )}
                     {notif.type === "LEAVE_REJECTED" && (
-                      <span className="inline-block mt-2 px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-400 text-xs">
+                      <span className="inline-flex items-center gap-1 mt-2.5 px-2.5 py-0.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/15 text-xs font-medium">
+                        <XCircle className="w-3.5 h-3.5" />
                         Rejected
                       </span>
                     )}
 
                     {/* Payroll — matches PayRollService notifications (type PAYROLL, referenceId = payroll id) */}
                     {isEmployee && isPayrollNotification(notif.type) && (
-                      <div className="flex flex-wrap gap-2 mt-3">
+                      <div className="flex flex-wrap gap-2 mt-3.5">
                         <button
                           type="button"
                           onClick={(e) => handleViewPayslips(e, notif)}
-                          className="px-4 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/25 text-xs font-medium hover:bg-indigo-500/25 transition-colors"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                         >
+                          <DollarSign className="w-3.5 h-3.5" />
                           View payslips
                         </button>
                         {notif.status === "UNREAD" && (
@@ -380,8 +405,9 @@ export default function NotificationsPage() {
                             type="button"
                             onClick={(e) => handleDismiss(e, notif.id)}
                             disabled={actionLoading === notif.id}
-                            className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 border border-white/10 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                           >
+                            <EyeOff className="w-3.5 h-3.5" />
                             Dismiss
                           </button>
                         )}
@@ -390,21 +416,23 @@ export default function NotificationsPage() {
 
                     {/* Probation — HR review (referenceId = employee user id) */}
                     {isHr && isProbationHrReviewNotification(notif) && notif.status === "UNREAD" && (
-                      <div className="flex flex-wrap gap-2 mt-3">
+                      <div className="flex flex-wrap gap-2 mt-3.5">
                         <button
                           type="button"
                           onClick={(e) => handleConfirmProbation(e, notif)}
                           disabled={actionLoading === notif.id}
-                          className="px-4 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-medium hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                         >
+                          <Check className="w-3.5 h-3.5" />
                           {actionLoading === notif.id ? "Processing…" : "Confirm permanent"}
                         </button>
                         <button
                           type="button"
                           onClick={(e) => handleDismiss(e, notif.id)}
                           disabled={actionLoading === notif.id}
-                          className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 border border-white/10 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                         >
+                          <EyeOff className="w-3.5 h-3.5" />
                           Dismiss
                         </button>
                       </div>
@@ -412,14 +440,15 @@ export default function NotificationsPage() {
 
                     {/* Probation — employee congratulations (read-only + dismiss) */}
                     {isEmployee && isProbationType(notif.type) && notif.message?.toLowerCase().includes("congratulations") && (
-                      <div className="flex flex-wrap gap-2 mt-3">
+                      <div className="flex flex-wrap gap-2 mt-3.5">
                         {notif.status === "UNREAD" && (
                           <button
                             type="button"
                             onClick={(e) => handleDismiss(e, notif.id)}
                             disabled={actionLoading === notif.id}
-                            className="px-4 py-1.5 rounded-lg bg-white/5 text-white/40 border border-white/10 text-xs font-medium hover:bg-white/10 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/80 border border-white/10 text-xs font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
                           >
+                            <EyeOff className="w-3.5 h-3.5" />
                             Dismiss
                           </button>
                         )}

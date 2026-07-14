@@ -1,4 +1,5 @@
-"use client";
+﻿"use client";
+import { Toast } from "@/app/components/Toast";
 
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -128,15 +129,11 @@ export default function HolidaysPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       {toast && (
-        <div
-          className={`fixed top-5 right-5 z-50 max-w-md rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
-            toast.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
-              : "border-rose-500/30 bg-rose-500/15 text-rose-200"
-          }`}
-        >
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div className="flex items-center justify-between">
