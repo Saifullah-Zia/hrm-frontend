@@ -10,6 +10,7 @@ import {
   LeaveBalanceDto,
   LeavePolicyDto,
 } from "@/services/leaveApi";
+import { Toast } from "@/app/components/Toast";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -287,15 +288,11 @@ export default function EmployeeLeavePage() {
   return (
     <div className="space-y-8 max-w-4xl">
       {toast && (
-        <div
-          className={`fixed top-5 right-5 z-50 max-w-md rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
-            toast.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-200"
-              : "border-rose-500/30 bg-rose-500/15 text-rose-200"
-          }`}
-        >
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div>

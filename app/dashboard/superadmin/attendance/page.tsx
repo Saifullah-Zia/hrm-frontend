@@ -10,6 +10,7 @@ import {
   setWebCheckInAccess,
   UserWithPermission,
 } from "@/services/userPermissionsApi";
+import { Toast } from "@/app/components/Toast";
 
 /* ─── types ─────────────────────────────────────────────────────────────────── */
 
@@ -390,13 +391,11 @@ export default function AttendanceOverviewPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${
-          toast.type === "success"
-            ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
-            : "bg-rose-500/20 border border-rose-500/30 text-rose-400"
-        }`}>
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       {/* Delete Confirm Modal */}

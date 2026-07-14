@@ -14,6 +14,18 @@ import {
   markAnnouncementsSeen,
   mergeWithAnnouncementAlerts,
 } from "@/lib/announcementAlerts";
+import {
+  FileText,
+  CheckCircle2,
+  XCircle,
+  DollarSign,
+  Megaphone,
+  Award,
+  Bell,
+  ArrowLeft,
+  CheckCheck,
+} from "lucide-react";
+import { Toast } from "@/app/components/Toast";
 
 const PAYSLIPS_HREF = "/dashboard/employee/payslips";
 
@@ -40,7 +52,8 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
     fetchNotifications();
@@ -200,14 +213,14 @@ export default function NotificationsPage() {
   };
 
   const getTypeIcon = (type: string) => {
-    if (isPayrollNotification(type)) return "💰";
-    if (isAnnouncementNotificationType(type)) return "📣";
-    if (isProbationType(type)) return "🎓";
+    if (isPayrollNotification(type)) return <DollarSign className="w-5 h-5" />;
+    if (isAnnouncementNotificationType(type)) return <Megaphone className="w-5 h-5" />;
+    if (isProbationType(type)) return <Award className="w-5 h-5" />;
     switch (type) {
-      case "LEAVE_REQUEST":  return "📋";
-      case "LEAVE_APPROVED": return "✅";
-      case "LEAVE_REJECTED": return "❌";
-      default:               return "🔔";
+      case "LEAVE_REQUEST":  return <FileText className="w-5 h-5" />;
+      case "LEAVE_APPROVED": return <CheckCircle2 className="w-5 h-5" />;
+      case "LEAVE_REJECTED": return <XCircle className="w-5 h-5" />;
+      default:               return <Bell className="w-5 h-5" />;
     }
   };
 
@@ -244,32 +257,29 @@ export default function NotificationsPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium transition-all ${
-          toast.type === "success"
-            ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
-            : "bg-rose-500/20 border border-rose-500/30 text-rose-400"
-        }`}>
-          {toast.message}
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-white/40 hover:text-white/60 transition-colors"
+            className="flex items-center gap-2 text-white/50 hover:text-white transition-colors group"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            <span className="text-sm font-medium">Back</span>
           </button>
           <button
             onClick={handleMarkAllAsRead}
-            className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
           >
+            <CheckCheck className="w-4 h-4" />
             Mark all as read
           </button>
         </div>
@@ -278,21 +288,21 @@ export default function NotificationsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="text-center py-12 text-white/40">Loading...</div>
+          <div className="text-center py-16 text-white/40 font-medium">Loading...</div>
         ) : notifications.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4">🔔</div>
-            <p className="text-white/40">No notifications yet</p>
+          <div className="text-center py-20 border border-white/[0.04] bg-[#13151e]/30 rounded-2xl">
+            <Bell className="w-12 h-12 text-white/20 mx-auto mb-4" />
+            <p className="text-white/40 text-sm font-medium">No notifications yet</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {notifications.map((notif) => (
+          <div className="space-y-4">
+            {notifications.slice(0, visibleCount).map((notif) => (
               <div
                 key={notif.id}
-                className={`bg-[#13151e] border rounded-xl p-4 transition-all ${
+                className={`group/card relative overflow-hidden backdrop-blur-md border rounded-2xl p-5 transition-all duration-300 ${
                   notif.status === "UNREAD"
-                    ? "border-indigo-500/30 bg-indigo-500/5"
-                    : "border-white/[0.08] opacity-70"
+                    ? "border-indigo-500/20 bg-indigo-500/5 shadow-lg shadow-indigo-500/5 hover:border-indigo-500/35"
+                    : "border-white/[0.05] bg-[#13151e]/40 hover:bg-[#13151e]/65 opacity-80"
                 }`}
                 // ✅ No onClick on parent div anymore
               >
@@ -424,6 +434,18 @@ export default function NotificationsPage() {
                 </div>
               </div>
             ))}
+
+            {/* Read More button */}
+            {notifications.length > visibleCount && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => setVisibleCount(prev => prev + 10)}
+                  className="px-6 py-2.5 rounded-xl bg-[#13151e] hover:bg-white/[0.04] text-white/80 hover:text-white text-xs font-semibold border border-white/[0.08] transition-all duration-200 cursor-pointer shadow-md"
+                >
+                  Read More
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
