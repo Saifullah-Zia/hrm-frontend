@@ -5,6 +5,11 @@ import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import apiClient from "@/lib/apiClient";
 import { exportMonthlyAttendanceCsv } from "@/lib/attendanceExport";
+import {
+  getUsersWithPermissions,
+  setWebCheckInAccess,
+  UserWithPermission,
+} from "@/services/userPermissionsApi";
 
 /* ─── types ─────────────────────────────────────────────────────────────────── */
 
@@ -29,15 +34,6 @@ const STATUS_DOT: Record<string, string> = {
 
 const formatTime = (dt: string) => {
   if (!dt) return "—";
-  // Backend sends a naive PKT wall-clock LocalDateTime string,
-  // e.g. "2026-07-09T17:03:00" — this is ALREADY Pakistan time.
-  // Do NOT use `new Date(dt)` here: without a timezone marker (no "Z", no offset),
-  // the JS Date object interprets it in the browser's local timezone, then
-  // re-applying `timeZone: "Asia/Karachi"` on top double-converts it and
-  // produces the wrong hour (this was the bug — 5:03 PM showing as 12:03 PM).
-  //
-  // Instead, extract the hour/minute directly from the string — no Date
-  // object, no timezone math, no ambiguity.
   const match = dt.match(/T(\d{2}):(\d{2})/);
   if (!match) return "—";
 
@@ -52,7 +48,6 @@ const formatTime = (dt: string) => {
 
 const formatDate = (d: string) => {
   if (!d) return "—";
-  // Force local-time parsing to avoid UTC-offset shifting the date back by one day
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 };
 
@@ -63,18 +58,6 @@ const weekStart = (date: Date): Date => {
   d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
   d.setHours(0, 0, 0, 0);
   return d;
-};
-
-/** Count Mon–Fri days between start and end (inclusive) */
-const workdaysBetween = (start: Date, end: Date): number => {
-  let count = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return count;
 };
 
 interface WeekBucket { label: string; dateRange: string; attended: number; absent: number; total: number; pct: number; }
@@ -89,12 +72,8 @@ export default function AttendanceOverviewPage() {
   const [loading, setLoading]           = useState(true);
 
   // Pagination State
-  const [pageRecords, setPageRecords]   = useState<AttendanceDTO[]>([]);
-  const [tableLoading, setTableLoading] = useState(true);
   const [page, setPage]                 = useState(0);
   const [pageSize, setPageSize]         = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages]     = useState(1);
 
   const [month, setMonth]               = useState(() => new Date().toISOString().slice(0, 7));
   const [search, setSearch]             = useState("");
@@ -120,9 +99,47 @@ export default function AttendanceOverviewPage() {
   const [manualUserIds, setManualUserIds]   = useState<number[]>([]); // empty = all tracked employees
   const [manualLoading, setManualLoading]   = useState(false);
 
+  // ── Web Check-In Access management ──────────────────────────────────────────
+  const [showAccessPanel, setShowAccessPanel]       = useState(false);
+  const [permissions, setPermissions]               = useState<UserWithPermission[]>([]);
+  const [permLoading, setPermLoading]               = useState(false);
+  const [permTogglingId, setPermTogglingId]         = useState<number | null>(null);
+
   const isAdminOrSuperAdmin = () => {
     const role = user?.role?.toUpperCase();
     return role === "ADMIN" || role === "SUPERADMIN";
+  };
+
+  // ── Load web check-in permissions when panel opens ──────────────────────────
+  const loadPermissions = useCallback(async () => {
+    setPermLoading(true);
+    try {
+      const all = await getUsersWithPermissions();
+      setPermissions(all.filter(u => u.role?.toUpperCase() !== "ADMIN" && u.role?.toUpperCase() !== "SUPERADMIN"));
+    } catch {
+      setToast({ message: "Failed to load access permissions", type: "error" });
+    } finally {
+      setPermLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showAccessPanel) loadPermissions();
+  }, [showAccessPanel, loadPermissions]);
+
+  const handleToggleAccess = async (userId: number, currentValue: boolean) => {
+    setPermTogglingId(userId);
+    try {
+      await setWebCheckInAccess(userId, !currentValue);
+      setPermissions(prev =>
+        prev.map(u => u.id === userId ? { ...u, webCheckInAllowed: !currentValue } : u)
+      );
+      setToast({ message: `Web check-in ${!currentValue ? "enabled" : "disabled"} successfully.`, type: "success" });
+    } catch {
+      setToast({ message: "Failed to update access", type: "error" });
+    } finally {
+      setPermTogglingId(null);
+    }
   };
 
   /* ── auto-hide toast ── */
@@ -143,31 +160,16 @@ export default function AttendanceOverviewPage() {
     }
   }, []);
 
-  const loadPageRecords = useCallback(async () => {
-    setTableLoading(true);
-    try {
-      const res = await attendanceApi.getPaginated(page, pageSize, "date", "desc");
-      setPageRecords(res.content);
-      setTotalElements(res.totalElements);
-      setTotalPages(Math.max(1, res.totalPages));
-    } catch {
-      setToast({ message: "Failed to load page records", type: "error" });
-    } finally {
-      setTableLoading(false);
-    }
-  }, [page, pageSize]);
-
   /* ── fetch attendance + users in parallel ── */
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchAllAndUsers(), loadPageRecords()])
-      .finally(() => setLoading(false));
-  }, [fetchAllAndUsers, loadPageRecords]);
+    fetchAllAndUsers().finally(() => setLoading(false));
+  }, [fetchAllAndUsers]);
 
-  // Handle page or size changes
+  // Reset page to 0 when filters change to avoid empty pages
   useEffect(() => {
-    loadPageRecords();
-  }, [page, pageSize, loadPageRecords]);
+    setPage(0);
+  }, [search, idSearch, nameSearch, statusFilter]);
 
   /* ── userId → name map ── */
   const userMap = useMemo(() => {
@@ -253,7 +255,7 @@ export default function AttendanceOverviewPage() {
 
   /* ── filtered records ── */
   const filtered = useMemo(() => {
-    return pageRecords.filter(r => {
+    return records.filter(r => {
       const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
 
       // ID filter
@@ -273,12 +275,17 @@ export default function AttendanceOverviewPage() {
 
       return matchStatus && matchId && matchName && matchSearch;
     });
-  }, [pageRecords, search, idSearch, nameSearch, statusFilter, userMap]);
+  }, [records, search, idSearch, nameSearch, statusFilter, userMap]);
+
+  const totalElements = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+
+  // visible records for the current page
+  const visibleRecords = useMemo(() => {
+    return filtered.slice(page * pageSize, (page + 1) * pageSize);
+  }, [filtered, page, pageSize]);
 
   /* ── CRUD ── */
-  // NOTE: This form doubles as the manual check-in / check-out tool for admins —
-  // setting checkIn and/or checkOut here creates a record with those exact PKT
-  // times for the given employee/date (via attendanceApi.create → POST /api/attendance).
   const handleCreate = async () => {
     if (!form.userId || !form.date) {
       setToast({ message: "Employee and date are required", type: "error" }); return;
@@ -294,8 +301,8 @@ export default function AttendanceOverviewPage() {
       setToast({ message: "✅ Record saved!", type: "success" });
       setShowForm(false);
       setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
-      setPage(0); // Go back to first page to see the new entry
-      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+      setPage(0);
+      await fetchAllAndUsers();
     } catch (err: any) {
       setToast({ message: err.message || "Failed to save record", type: "error" });
     } finally { setActionLoading(false); }
@@ -308,7 +315,6 @@ export default function AttendanceOverviewPage() {
     }
     setExporting(true);
     try {
-      // Exclude ADMIN/SUPERADMIN — they are not tracked for daily attendance.
       const trackedUsers = users.filter(
         (u) => u.role?.toUpperCase() !== "ADMIN" && u.role?.toUpperCase() !== "SUPERADMIN"
       );
@@ -331,13 +337,13 @@ export default function AttendanceOverviewPage() {
       await attendanceApi.delete(id);
       setToast({ message: "🗑️ Record deleted!", type: "success" });
       setDeleteConfirmId(null);
-      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+      await fetchAllAndUsers();
     } catch (err: any) {
       setToast({ message: err.message || "Failed to delete", type: "error" });
     } finally { setActionLoading(false); }
   };
 
-  /* ── Manual attendance marking (backup for scheduled job) — admin/superadmin only ── */
+  /* ── Manual attendance marking ── */
   const handleManualMark = async () => {
     if (!manualRange.startDate || !manualRange.endDate) {
       setToast({ message: "Start and end date are required", type: "error" });
@@ -362,7 +368,7 @@ export default function AttendanceOverviewPage() {
       setManualRange({ startDate: "", endDate: "" });
       setManualUserIds([]);
       setPage(0);
-      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+      await fetchAllAndUsers();
     } catch (err: any) {
       setToast({ message: err.message || "Failed to run manual attendance marking", type: "error" });
     } finally {
@@ -420,7 +426,7 @@ export default function AttendanceOverviewPage() {
 
       <div className="max-w-6xl mx-auto">
 
-        {/* Header — stacks vertically on mobile, row on larger screens */}
+        {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
             <h1 className="text-2xl font-semibold text-white/90">Attendance Overview</h1>
@@ -429,27 +435,33 @@ export default function AttendanceOverviewPage() {
           {isAdminOrSuperAdmin() && (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <button
-                onClick={() => { setShowManualMark(!showManualMark); setShowForm(false); }}
+                onClick={() => { setShowManualMark(!showManualMark); setShowForm(false); setShowAccessPanel(false); }}
                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/25 text-sm font-medium hover:bg-amber-500/30 transition-colors w-full sm:w-auto"
               >
                 <span className="text-lg">{showManualMark ? "×" : "🕓"}</span>
                 {showManualMark ? "Cancel" : "Mark Attendance (Range)"}
               </button>
               <button
-                onClick={() => { setShowForm(!showForm); setShowManualMark(false); }}
+                onClick={() => { setShowForm(!showForm); setShowManualMark(false); setShowAccessPanel(false); }}
                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors w-full sm:w-auto"
                 title="Create a record or set a manual check-in/check-out time for an employee"
               >
                 <span className="text-lg">{showForm ? "×" : "+"}</span>
                 {showForm ? "Cancel" : "Manual Check-In/Out"}
               </button>
+              <button
+                onClick={() => { setShowAccessPanel(!showAccessPanel); setShowForm(false); setShowManualMark(false); }}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/25 text-sm font-medium hover:bg-violet-500/30 transition-colors w-full sm:w-auto"
+              >
+                <span className="text-lg">{showAccessPanel ? "×" : "🔒"}</span>
+                {showAccessPanel ? "Cancel" : "Web Check-In Access"}
+              </button>
             </div>
           )}
         </div>
 
-        {/* ── Weekly Summary + Monthly picker ── */}
+        {/* Weekly Summary + Monthly picker */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          {/* This week card */}
           <div className="sm:col-span-2 bg-gradient-to-br from-indigo-600/20 to-violet-600/10 border border-indigo-500/20 rounded-2xl p-5 flex flex-col gap-3">
             <p className="text-indigo-300/70 text-xs font-semibold uppercase tracking-widest">This Week — All Employees</p>
             <div className="flex flex-wrap items-end gap-6">
@@ -471,7 +483,6 @@ export default function AttendanceOverviewPage() {
             </div>
             <p className="text-indigo-300/60 text-xs">{weekStats.rate}% attendance rate this week</p>
           </div>
-          {/* Month picker */}
           <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5 flex flex-col justify-between">
             <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-2">Monthly View</p>
             <input
@@ -496,7 +507,7 @@ export default function AttendanceOverviewPage() {
           </div>
         </div>
 
-        {/* ── Monthly weekly bar chart ── */}
+        {/* Weekly bar chart */}
         {weekBuckets.length > 0 && (
           <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-4 sm:p-6 mb-6 overflow-x-auto">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6 min-w-[420px]">
@@ -597,7 +608,6 @@ export default function AttendanceOverviewPage() {
                   </button>
                 )}
               </div>
-              {/* Checkbox list instead of native <select multiple> — much easier to use on mobile/touch */}
               <div className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-2 py-2 max-h-48 overflow-y-auto">
                 {trackedEmployees.length === 0 ? (
                   <p className="text-white/30 text-xs px-2 py-1.5">No employees found</p>
@@ -639,7 +649,7 @@ export default function AttendanceOverviewPage() {
           </div>
         )}
 
-        {/* Manual Check-In / Check-Out + Create Form (admin/superadmin) */}
+        {/* Manual Check-In / Check-Out */}
         {showForm && isAdminOrSuperAdmin() && (
           <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl p-4 sm:p-6 mb-6">
             <h2 className="text-white/90 font-semibold mb-1">Manual Check-In / Check-Out</h2>
@@ -713,11 +723,9 @@ export default function AttendanceOverviewPage() {
           </div>
         )}
 
-        {/* ── Filters ── */}
+        {/* Filters */}
         <div className="space-y-3 mb-6">
-          {/* Row 1: specific filters */}
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Filter by ID */}
             <div className="relative sm:w-48">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs font-semibold pointer-events-none">ID</span>
               <input
@@ -727,7 +735,6 @@ export default function AttendanceOverviewPage() {
                 className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
               />
             </div>
-            {/* Filter by Name */}
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zm-4 7a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -739,7 +746,6 @@ export default function AttendanceOverviewPage() {
                 className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
               />
             </div>
-            {/* General search */}
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -753,7 +759,6 @@ export default function AttendanceOverviewPage() {
             </div>
           </div>
 
-          {/* Row 2: status pill filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-white/30 text-xs font-medium uppercase tracking-wider">Status:</span>
             {["ALL", "PRESENT", "LATE", "ABSENT", "ON_LEAVE"].map(s => (
@@ -773,7 +778,6 @@ export default function AttendanceOverviewPage() {
                 {s}
               </button>
             ))}
-            {/* clear filters */}
             {(idSearch || nameSearch || search || statusFilter !== "ALL") && (
               <button
                 onClick={() => { setIdSearch(""); setNameSearch(""); setSearch(""); setStatusFilter("ALL"); }}
@@ -785,8 +789,8 @@ export default function AttendanceOverviewPage() {
           </div>
         </div>
 
-        {/* Table — horizontally scrollable on mobile */}
-        {loading || tableLoading ? (
+        {/* Table */}
+        {loading ? (
           <div className="text-center py-16 text-white/40">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -807,14 +811,13 @@ export default function AttendanceOverviewPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
-                  {filtered.map(record => {
+                  {visibleRecords.map(record => {
                     const emp = userMap.get(Number(record.userId));
                     const initials = emp?.name
                       ? emp.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
                       : String(record.userId).slice(0, 2);
                     return (
                       <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
-                        {/* Employee name + avatar */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500/30 to-violet-500/20 text-indigo-300 flex items-center justify-center text-xs font-bold shrink-0">
@@ -828,15 +831,12 @@ export default function AttendanceOverviewPage() {
                             </div>
                           </div>
                         </td>
-                        {/* User ID */}
                         <td className="px-5 py-4">
                           <span className="text-white/50 text-sm font-mono">#{record.userId}</span>
                         </td>
-                        {/* Date */}
                         <td className="px-5 py-4 text-white/70 text-sm whitespace-nowrap">
                           {formatDate(record.date)}
                         </td>
-                        {/* Status */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-2">
                             <div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[record.status] ?? "bg-gray-400"}`} />
@@ -845,15 +845,12 @@ export default function AttendanceOverviewPage() {
                             </span>
                           </div>
                         </td>
-                        {/* Check in */}
                         <td className="px-5 py-4 text-white/60 text-sm font-mono whitespace-nowrap">
                           {formatTime(record.checkIn)}
                         </td>
-                        {/* Check out */}
                         <td className="px-5 py-4 text-white/60 text-sm font-mono whitespace-nowrap">
                           {formatTime(record.checkOut)}
                         </td>
-                        {/* Actions */}
                         {isAdminOrSuperAdmin() && (
                           <td className="px-5 py-4">
                             <button
@@ -878,7 +875,7 @@ export default function AttendanceOverviewPage() {
             <div className="px-5 py-3 border-t border-white/[0.06] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-white/35">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <span>
-                  Showing <span className="text-white/60">{filtered.length}</span> of <span className="text-white/60">{pageRecords.length}</span> page rows · <span className="text-white/60">{totalElements}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
+                  Showing <span className="text-white/60">{visibleRecords.length}</span> of <span className="text-white/60">{filtered.length}</span> page rows · <span className="text-white/60">{records.length}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
                 </span>
                 <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.04] sm:border-t-0 pt-2 sm:pt-0">
                   <span className="flex items-center gap-1.5">
@@ -933,8 +930,80 @@ export default function AttendanceOverviewPage() {
             </div>
           </div>
         )}
+
+        {/* ── Web Check-In Access Panel ── */}
+        {showAccessPanel && isAdminOrSuperAdmin() && (
+          <div className="bg-[#13151e] border border-violet-500/20 rounded-2xl p-4 sm:p-6 mb-6">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-white/90 font-semibold">Web Check-In Access</h2>
+              <span className="text-xs text-white/30">{permissions.filter(u => u.webCheckInAllowed).length} of {permissions.length} enabled</span>
+            </div>
+            <p className="text-white/40 text-xs mb-4">
+              Employees with access <span className="text-emerald-400/80">enabled</span> can use the HRM web app to check in/out.
+              All others must use the <span className="text-amber-400/80">biometric device</span>.
+            </p>
+
+            {permLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-12 rounded-xl bg-white/[0.04] animate-pulse" />)}
+              </div>
+            ) : permissions.length === 0 ? (
+              <p className="text-white/30 text-sm">No employees found.</p>
+            ) : (
+              <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+                {permissions.map(u => (
+                  <div
+                    key={u.id}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/[0.03] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/30 to-indigo-500/20 text-violet-300 flex items-center justify-center text-xs font-bold shrink-0">
+                        {u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white/80 text-sm font-medium truncate">{u.name}</p>
+                        <p className="text-white/30 text-xs truncate">{u.email}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggleAccess(u.id, u.webCheckInAllowed)}
+                      disabled={permTogglingId === u.id}
+                      className="relative shrink-0 ml-3 disabled:opacity-60 disabled:cursor-wait"
+                      title={u.webCheckInAllowed ? "Click to disable web check-in" : "Click to enable web check-in"}
+                    >
+                      <span
+                        className={`flex items-center w-11 h-6 rounded-full border transition-all duration-200 ${
+                          u.webCheckInAllowed
+                            ? "bg-emerald-500/25 border-emerald-500/40"
+                            : "bg-white/[0.05] border-white/[0.12]"
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full shadow transition-all duration-200 mx-1 ${
+                            u.webCheckInAllowed
+                              ? "translate-x-5 bg-emerald-400"
+                              : "translate-x-0 bg-white/30"
+                          }`}
+                        />
+                      </span>
+                    </button>
+
+                    <span className={`ml-3 text-xs font-medium w-16 text-right shrink-0 ${
+                      u.webCheckInAllowed ? "text-emerald-400" : "text-white/25"
+                    }`}>
+                      {u.webCheckInAllowed ? "Web ✓" : "Device only"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
 }
+
 
