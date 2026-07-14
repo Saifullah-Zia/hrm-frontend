@@ -103,6 +103,8 @@ export default function AttendanceOverviewPage() {
   const [idSearch, setIdSearch]         = useState("");
   const [nameSearch, setNameSearch]     = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [startDate, setStartDate]       = useState("");
+  const [endDate, setEndDate]           = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [actionLoading, setActionLoading]     = useState(false);
   const [showForm, setShowForm]         = useState(false);
@@ -192,7 +194,7 @@ export default function AttendanceOverviewPage() {
   // Reset page to 0 when filters change to avoid empty pages
   useEffect(() => {
     setPage(0);
-  }, [search, idSearch, nameSearch, statusFilter]);
+  }, [search, idSearch, nameSearch, statusFilter, startDate, endDate]);
 
   /* ── userId → name map ── */
   const userMap = useMemo(() => {
@@ -297,7 +299,11 @@ export default function AttendanceOverviewPage() {
           String(r.userId).includes(search) ||
           userName.toLowerCase().includes(search.toLowerCase());
 
-        return matchStatus && matchId && matchName && matchSearch;
+        // Date range filter
+        const matchStartDate = startDate === "" || (r.date ?? "") >= startDate;
+        const matchEndDate = endDate === "" || (r.date ?? "") <= endDate;
+
+        return matchStatus && matchId && matchName && matchSearch && matchStartDate && matchEndDate;
       })
       // Sort newest date first; within same date, keep consistent order by userId
       .sort((a, b) => {
@@ -305,7 +311,7 @@ export default function AttendanceOverviewPage() {
         if (dateDiff !== 0) return dateDiff;
         return (a.userId ?? 0) - (b.userId ?? 0);
       });
-  }, [records, search, idSearch, nameSearch, statusFilter, userMap]);
+  }, [records, search, idSearch, nameSearch, statusFilter, startDate, endDate, userMap]);
 
   const totalElements = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
@@ -763,12 +769,12 @@ export default function AttendanceOverviewPage() {
           {/* Row 1: specific filters */}
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Filter by ID */}
-            <div className="relative sm:w-48">
+            <div className="relative sm:w-36">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs font-semibold pointer-events-none">ID</span>
               <input
                 type="text" value={idSearch}
                 onChange={e => setIdSearch(e.target.value)}
-                placeholder="Filter by user ID..."
+                placeholder="User ID..."
                 className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
               />
             </div>
@@ -782,6 +788,24 @@ export default function AttendanceOverviewPage() {
                 onChange={e => setNameSearch(e.target.value)}
                 placeholder="Filter by employee name..."
                 className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-white/90 text-sm placeholder:text-white/25 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
+            {/* Start Date */}
+            <div className="relative sm:w-44">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[10px] font-bold uppercase tracking-wider pointer-events-none">Start</span>
+              <input
+                type="date" value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-14 pr-3 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
+              />
+            </div>
+            {/* End Date */}
+            <div className="relative sm:w-44">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[10px] font-bold uppercase tracking-wider pointer-events-none">End</span>
+              <input
+                type="date" value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="w-full bg-[#13151e] border border-white/[0.08] rounded-xl pl-12 pr-3 py-2.5 text-white/90 text-sm focus:outline-none focus:border-indigo-500/50 transition-colors"
               />
             </div>
             {/* General search */}
@@ -819,9 +843,9 @@ export default function AttendanceOverviewPage() {
               </button>
             ))}
             {/* clear filters */}
-            {(idSearch || nameSearch || search || statusFilter !== "ALL") && (
+            {(idSearch || nameSearch || search || statusFilter !== "ALL" || startDate || endDate) && (
               <button
-                onClick={() => { setIdSearch(""); setNameSearch(""); setSearch(""); setStatusFilter("ALL"); }}
+                onClick={() => { setIdSearch(""); setNameSearch(""); setSearch(""); setStatusFilter("ALL"); setStartDate(""); setEndDate(""); }}
                 className="ml-auto text-xs text-white/30 hover:text-white/60 transition-colors underline underline-offset-2"
               >
                 Clear all filters
