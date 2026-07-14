@@ -94,12 +94,8 @@ export default function AttendanceOverviewPage() {
   const [loading, setLoading]           = useState(true);
 
   // Pagination State
-  const [pageRecords, setPageRecords]   = useState<AttendanceDTO[]>([]);
-  const [tableLoading, setTableLoading] = useState(true);
   const [page, setPage]                 = useState(0);
   const [pageSize, setPageSize]         = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages]     = useState(1);
 
   const [month, setMonth]               = useState(() => new Date().toISOString().slice(0, 7));
   const [search, setSearch]             = useState("");
@@ -187,31 +183,16 @@ export default function AttendanceOverviewPage() {
     }
   }, []);
 
-  const loadPageRecords = useCallback(async () => {
-    setTableLoading(true);
-    try {
-      const res = await attendanceApi.getPaginated(page, pageSize, "date", "desc");
-      setPageRecords(res.content);
-      setTotalElements(res.totalElements);
-      setTotalPages(Math.max(1, res.totalPages));
-    } catch {
-      setToast({ message: "Failed to load page records", type: "error" });
-    } finally {
-      setTableLoading(false);
-    }
-  }, [page, pageSize]);
-
   /* ── fetch attendance + users in parallel ── */
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchAllAndUsers(), loadPageRecords()])
-      .finally(() => setLoading(false));
-  }, [fetchAllAndUsers, loadPageRecords]);
+    fetchAllAndUsers().finally(() => setLoading(false));
+  }, [fetchAllAndUsers]);
 
-  // Handle page or size changes
+  // Reset page to 0 when filters change to avoid empty pages
   useEffect(() => {
-    loadPageRecords();
-  }, [page, pageSize, loadPageRecords]);
+    setPage(0);
+  }, [search, idSearch, nameSearch, statusFilter]);
 
   /* ── userId → name map ── */
   const userMap = useMemo(() => {
@@ -297,7 +278,7 @@ export default function AttendanceOverviewPage() {
 
   /* ── filtered records ── */
   const filtered = useMemo(() => {
-    return pageRecords.filter(r => {
+    return records.filter(r => {
       const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
 
       // ID filter
@@ -317,7 +298,15 @@ export default function AttendanceOverviewPage() {
 
       return matchStatus && matchId && matchName && matchSearch;
     });
-  }, [pageRecords, search, idSearch, nameSearch, statusFilter, userMap]);
+  }, [records, search, idSearch, nameSearch, statusFilter, userMap]);
+
+  const totalElements = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+
+  // visible records for the current page
+  const visibleRecords = useMemo(() => {
+    return filtered.slice(page * pageSize, (page + 1) * pageSize);
+  }, [filtered, page, pageSize]);
 
   /* ── CRUD ── */
   // NOTE: This form doubles as the manual check-in / check-out tool for admins —
@@ -339,7 +328,7 @@ export default function AttendanceOverviewPage() {
       setShowForm(false);
       setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
       setPage(0); // Go back to first page to see the new entry
-      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+      await fetchAllAndUsers();
     } catch (err: any) {
       setToast({ message: err.message || "Failed to save record", type: "error" });
     } finally { setActionLoading(false); }
@@ -375,7 +364,7 @@ export default function AttendanceOverviewPage() {
       await attendanceApi.delete(id);
       setToast({ message: "🗑️ Record deleted!", type: "success" });
       setDeleteConfirmId(null);
-      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+      await fetchAllAndUsers();
     } catch (err: any) {
       setToast({ message: err.message || "Failed to delete", type: "error" });
     } finally { setActionLoading(false); }
@@ -406,7 +395,7 @@ export default function AttendanceOverviewPage() {
       setManualRange({ startDate: "", endDate: "" });
       setManualUserIds([]);
       setPage(0);
-      await Promise.all([fetchAllAndUsers(), loadPageRecords()]);
+      await fetchAllAndUsers();
     } catch (err: any) {
       setToast({ message: err.message || "Failed to run manual attendance marking", type: "error" });
     } finally {
@@ -837,7 +826,7 @@ export default function AttendanceOverviewPage() {
         </div>
 
         {/* Table — horizontally scrollable on mobile */}
-        {loading || tableLoading ? (
+        {loading ? (
           <div className="text-center py-16 text-white/40">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -858,7 +847,7 @@ export default function AttendanceOverviewPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
-                  {filtered.map(record => {
+                  {visibleRecords.map(record => {
                     const emp = userMap.get(Number(record.userId));
                     const initials = emp?.name
                       ? emp.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
@@ -929,7 +918,7 @@ export default function AttendanceOverviewPage() {
             <div className="px-5 py-3 border-t border-white/[0.06] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-white/35">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <span>
-                  Showing <span className="text-white/60">{filtered.length}</span> of <span className="text-white/60">{pageRecords.length}</span> page rows · <span className="text-white/60">{totalElements}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
+                  Showing <span className="text-white/60">{visibleRecords.length}</span> of <span className="text-white/60">{filtered.length}</span> page rows · <span className="text-white/60">{records.length}</span> total · Page <span className="text-white/60">{page + 1}</span> of <span className="text-white/60">{totalPages}</span>
                 </span>
                 <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.04] sm:border-t-0 pt-2 sm:pt-0">
                   <span className="flex items-center gap-1.5">
