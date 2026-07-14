@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { Toast } from "@/app/components/Toast";
 
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ import {
   EmployeeProfileDto,
   EmployeeProfileLoadError,
 } from "@/services/employeeProfileApi";
+import apiClient from "@/lib/apiClient";
 import {
   formatProbationRange,
   probationApi,
@@ -39,6 +40,18 @@ export default function EmployeeProfilePage() {
     queryFn: () => probationApi.getByUserId(userId!),
     enabled: typeof userId === "number",
     staleTime: 60_000,
+  });
+
+  const departmentsQuery = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => apiClient.get<{ id: number; name: string }[]>("/api/departments").then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
+
+  const positionsQuery = useQuery({
+    queryKey: ["positions"],
+    queryFn: () => apiClient.get<{ id: number; title: string }[]>("/api/positions").then(r => r.data),
+    staleTime: 5 * 60_000,
   });
 
   const [draft, setDraft] = useState<EmployeeProfileDto | null>(null);
@@ -290,12 +303,20 @@ export default function EmployeeProfilePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Department ID</label>
-            <p className="mt-1.5 text-white/50 text-sm py-2.5">{draft.departmentId ?? "—"}</p>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Department</label>
+            <p className="mt-1.5 text-white/70 text-sm py-2.5">
+              {draft.departmentId
+                ? departmentsQuery.data?.find((d) => d.id === draft.departmentId)?.name ?? `Department #${draft.departmentId}`
+                : "—"}
+            </p>
           </div>
           <div>
-            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Position ID</label>
-            <p className="mt-1.5 text-white/50 text-sm py-2.5">{draft.positionId ?? "—"}</p>
+            <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Position</label>
+            <p className="mt-1.5 text-white/70 text-sm py-2.5">
+              {draft.positionId
+                ? positionsQuery.data?.find((p) => p.id === draft.positionId)?.title ?? `Position #${draft.positionId}`
+                : "—"}
+            </p>
           </div>
           <div>
             <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Status</label>
