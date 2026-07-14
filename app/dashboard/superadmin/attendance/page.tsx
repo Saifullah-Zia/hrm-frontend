@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
@@ -255,26 +255,32 @@ export default function AttendanceOverviewPage() {
 
   /* ── filtered records ── */
   const filtered = useMemo(() => {
-    return records.filter(r => {
-      const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
+    return records
+      .filter(r => {
+        const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
 
-      // ID filter
-      const matchId = idSearch === "" || String(r.userId).includes(idSearch.trim());
+        // ID filter
+        const matchId = idSearch === "" || String(r.userId).includes(idSearch.trim());
 
-      // Name filter — look up the user name from the map
-      const userName = userMap.get(Number(r.userId))?.name ?? "";
-      const matchName = nameSearch === "" ||
-        userName.toLowerCase().includes(nameSearch.trim().toLowerCase());
+        // Name filter — look up the user name from the map
+        const userName = userMap.get(Number(r.userId))?.name ?? "";
+        const matchName = nameSearch === "" ||
+          userName.toLowerCase().includes(nameSearch.trim().toLowerCase());
 
-      // General search (date / status)
-      const matchSearch = search === "" ||
-        r.date?.includes(search) ||
-        r.status?.toLowerCase().includes(search.toLowerCase()) ||
-        String(r.userId).includes(search) ||
-        userName.toLowerCase().includes(search.toLowerCase());
+        // General search (date / status)
+        const matchSearch = search === "" ||
+          r.date?.includes(search) ||
+          r.status?.toLowerCase().includes(search.toLowerCase()) ||
+          String(r.userId).includes(search) ||
+          userName.toLowerCase().includes(search.toLowerCase());
 
-      return matchStatus && matchId && matchName && matchSearch;
-    });
+        return matchStatus && matchId && matchName && matchSearch;
+      })
+      .sort((a, b) => {
+        const dateDiff = (b.date ?? "").localeCompare(a.date ?? "");
+        if (dateDiff !== 0) return dateDiff;
+        return (a.userId ?? 0) - (b.userId ?? 0);
+      });
   }, [records, search, idSearch, nameSearch, statusFilter, userMap]);
 
   const totalElements = filtered.length;
