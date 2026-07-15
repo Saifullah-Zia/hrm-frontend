@@ -8,19 +8,23 @@ import { getUsersWithPermissions } from "@/services/userPermissionsApi";
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
 /**
- * Backend stores PKT as LocalDateTime (no timezone suffix).
- * Appending "+05:00" tells the browser to treat it as PKT (UTC+5)
- * so it displays correctly regardless of where the employee is.
- * e.g. "2024-01-15T18:00:00" → "06:00 PM" (PKT)
+ * Backend stores and returns PKT timestamps as bare LocalDateTime strings
+ * with no timezone suffix (e.g. "2026-07-15T17:03:00" — already PKT).
+ * We extract the hour/minute directly with a regex instead of constructing
+ * a JS Date object, so the display is correct regardless of the browser's
+ * / device's local timezone. This matches the approach already used on the
+ * admin attendance page.
+ * e.g. "2026-01-15T18:00:00" → "6:00 PM"
  */
-const formatTimePKT = (dt: string | null | undefined): string => {
+const formatTime = (dt: string | null | undefined): string => {
   if (!dt) return "—";
-  return new Date(dt + "+05:00").toLocaleTimeString("en-PK", {
-    timeZone: "Asia/Karachi",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const match = dt.match(/T(\d{2}):(\d{2})/);
+  if (!match) return "—";
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const period = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${period}`;
 };
 
 const todayPKT = (): string => {
@@ -56,6 +60,10 @@ export default function AttendanceClockCard({ userId }: Props) {
     queryKey: ["employee-attendance", userId],
     queryFn: () => attendanceApi.getByUserId(userId),
     enabled: typeof userId === "number",
+    // Biometric-device checkouts happen outside the browser (no mutation to
+    // invalidate the cache), so poll in the background to pick up checkouts
+    // recorded by the Hikvision webhook without requiring a manual refresh.
+    refetchInterval: 60_000,
   });
 
   /* ── fetch web check-in permission for this user ── */
@@ -84,7 +92,7 @@ export default function AttendanceClockCard({ userId }: Props) {
   // Active record: prefer the open overnight shift; otherwise use today's record.
   const activeRecord = openRecord ?? todayRecord;
 
-  const hasCheckedIn  = !!activeRecord?.checkIn;
+  const hasCheckedIn = !!activeRecord?.checkIn;
   const hasCheckedOut = !!activeRecord?.checkOut;
 
   /* ── office hours (for display only) ── */
@@ -188,14 +196,13 @@ export default function AttendanceClockCard({ userId }: Props) {
 
         {/* Status badge — always use today's date-matched record for status */}
         {(todayRecord?.status ?? (openRecord && !todayRecord ? "IN SHIFT" : undefined)) && (
-          <span className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${
-            (todayRecord?.status ?? "IN SHIFT") === "PRESENT"
-              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
-              : (todayRecord?.status ?? "IN SHIFT") === "LATE"
-                ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
-                : (todayRecord?.status ?? "IN SHIFT") === "IN SHIFT"
-                  ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20"
-                  : "bg-rose-500/15 text-rose-400 border-rose-500/20"
+          <span className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${(todayRecord?.status ?? "IN SHIFT") === "PRESENT"
+            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20"
+            : (todayRecord?.status ?? "IN SHIFT") === "LATE"
+              ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
+              : (todayRecord?.status ?? "IN SHIFT") === "IN SHIFT"
+                ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20"
+                : "bg-rose-500/15 text-rose-400 border-rose-500/20"
             }`}>
             {todayRecord?.status ?? "IN SHIFT"}
           </span>
@@ -208,7 +215,7 @@ export default function AttendanceClockCard({ userId }: Props) {
           <div>
             <p className="text-white/30 text-xs mb-0.5">Checked in</p>
             <p className="text-white/80 font-mono font-medium">
-              {formatTimePKT(activeRecord?.checkIn)}
+              {formatTime(activeRecord?.checkIn)}
             </p>
             {/* Show the shift date if it's different from today (overnight) */}
             {activeRecord?.date && activeRecord.date !== todayPKT() && (
@@ -219,7 +226,7 @@ export default function AttendanceClockCard({ userId }: Props) {
             <div>
               <p className="text-white/30 text-xs mb-0.5">Checked out</p>
               <p className="text-white/80 font-mono font-medium">
-                {formatTimePKT(activeRecord?.checkOut)}
+                {formatTime(activeRecord?.checkOut)}
               </p>
             </div>
           )}
@@ -297,3 +304,4 @@ export default function AttendanceClockCard({ userId }: Props) {
     </div>
   );
 }
+
