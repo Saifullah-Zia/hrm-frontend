@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { BRAND_FULL_NAME, BRAND_LOGO_PATH } from "@/lib/branding";
 import { chatApi } from "@/services/chatApi";
+import { leaveApi } from "@/services/leaveApi";
+import { attendanceCorrectionApi } from "@/services/attendanceCorrectionApi";
 
 // ── Icons (inline SVG to avoid extra dependencies) ──────────
 const Icon = ({ d }: { d: string }) => (
@@ -42,6 +44,7 @@ const NAV_ITEMS = {
     { label: "Position Management", href: "/dashboard/superadmin/positions",     icon: "briefcase" },
     { label: "Leave policies",      href: "/dashboard/superadmin/leave-policy", icon: "calendar" },
     { label: "Leave balances",      href: "/dashboard/superadmin/leave-balances", icon: "chart" },
+    { label: "Leave Approvals",     href: "/dashboard/superadmin/leaves",        icon: "calendar" },
     { label: "Probation",           href: "/dashboard/superadmin/probation",    icon: "calendar" },
     { label: "Payroll & Reports",   href: "/dashboard/superadmin/payroll",       icon: "currency" },
     { label: "Announcements",       href: "/dashboard/superadmin/announcements", icon: "bell" },
@@ -107,7 +110,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuthStore();
 
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
 
+  // ── Chat unread count ────────────────────────────────────────
   useEffect(() => {
     if (!user) {
       setUnreadChatCount(0);
@@ -145,6 +151,34 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       clearInterval(interval);
     };
   }, [user, pathname]);
+
+  // ── Pending leave & correction counts (ADMIN / SUPERADMIN only) ──
+  useEffect(() => {
+    if (!user) {
+      setPendingLeaveCount(0);
+      setPendingCorrectionCount(0);
+      return;
+    }
+    const r = user.role;
+    if (r !== "SUPERADMIN" && r !== "ADMIN") return;
+
+    const fetchPendingCounts = async () => {
+      try {
+        const [leaves, corrections] = await Promise.all([
+          leaveApi.getByStatus("PENDING"),
+          attendanceCorrectionApi.getPending(),
+        ]);
+        setPendingLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
+        setPendingCorrectionCount(Array.isArray(corrections) ? corrections.length : 0);
+      } catch {
+        // Silently ignore — badge simply won't show on error
+      }
+    };
+
+    fetchPendingCounts();
+    const interval = setInterval(fetchPendingCounts, 60_000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const role = user?.role ?? "EMPLOYEE";
   const navItems = NAV_ITEMS[role] ?? NAV_ITEMS.EMPLOYEE;
@@ -226,6 +260,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               {item.label === "Team Chat" && unreadChatCount > 0 ? (
                 <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-500/20 transition-all duration-300">
                   {unreadChatCount}
+                </span>
+              ) : item.label === "Leave Approvals" && pendingLeaveCount > 0 ? (
+                <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-amber-500/20 ring-2 ring-amber-500/20 transition-all duration-300">
+                  {pendingLeaveCount}
+                </span>
+              ) : item.label === "Corrections Review" && pendingCorrectionCount > 0 ? (
+                <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-amber-500/20 ring-2 ring-amber-500/20 transition-all duration-300">
+                  {pendingCorrectionCount}
                 </span>
               ) : (
                 isActive && (
