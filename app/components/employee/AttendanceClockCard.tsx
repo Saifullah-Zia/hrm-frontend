@@ -236,13 +236,13 @@ export default function AttendanceClockCard({ userId }: Props) {
       {/* Status message */}
       {isLoading ? (
         <p className="text-white/30 text-xs mb-4">Loading today's record...</p>
-      ) : weekendDisabled ? (
-        <p className="text-amber-400/70 text-xs mb-4">
-          📅 Weekend — check-in/check-out disabled on Saturday & Sunday
-        </p>
       ) : hasCheckedIn && !hasCheckedOut ? (
         <p className="text-white/40 text-xs mb-4">
           Checked in — use Check out when you leave.
+        </p>
+      ) : weekendDisabled ? (
+        <p className="text-amber-400/70 text-xs mb-4">
+          📅 Weekend — check-in disabled on Saturday & Sunday
         </p>
       ) : hasCheckedOut ? (
         <p className="text-emerald-400/70 text-xs mb-4">
@@ -293,9 +293,8 @@ export default function AttendanceClockCard({ userId }: Props) {
 
           <button
             onClick={() => checkOutMutation.mutate()}
-            disabled={isActing || !hasCheckedIn || hasCheckedOut || weekendDisabled}
+            disabled={isActing || !hasCheckedIn || hasCheckedOut}
             className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title={weekendDisabled ? "Check-out disabled on weekends" : undefined}
           >
             {checkOutMutation.isPending ? "Checking out..." : "Check out"}
           </button>
