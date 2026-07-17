@@ -28,6 +28,7 @@ interface AuthState {
   ) => void;
   logout: () => void;
   getRedirectPath: () => string;
+  updateProfileState: (name: string, email?: string) => void;
 }
 
 function decodeJwt(token: string) {
@@ -123,6 +124,17 @@ export const useAuthStore = create<AuthState>()(
         const { user } = get();
         if (!user) return "/auth/login";
         return getDashboardRoute(user.role);
+      },
+
+      updateProfileState: (name: string, email?: string) => {
+        const current = get().user;
+        if (!current) return;
+        const updated = {
+          ...current,
+          username: name,
+          ...(email ? { email } : {}),
+        };
+        set({ user: updated });
       },
     }),
     {
