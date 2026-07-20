@@ -9,6 +9,8 @@ import { BRAND_FULL_NAME, BRAND_LOGO_PATH } from "@/lib/branding";
 import { chatApi } from "@/services/chatApi";
 import { leaveApi } from "@/services/leaveApi";
 import { attendanceCorrectionApi } from "@/services/attendanceCorrectionApi";
+import { probationApi } from "@/services/probationApi";
+import { noticeApi } from "@/services/noticeApi";
 
 // ── Icons (inline SVG to avoid extra dependencies) ──────────
 const Icon = ({ d }: { d: string }) => (
@@ -120,6 +122,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
   const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
+  const [probationPendingCount, setProbationPendingCount] = useState(0);
+  const [employeeNoticeCount, setEmployeeNoticeCount] = useState(0);
 
   // ── Chat unread count ────────────────────────────────────────
   useEffect(() => {
@@ -160,11 +164,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     };
   }, [user, pathname]);
 
-  // ── Pending leave & correction counts (ADMIN / SUPERADMIN only) ──
+  // ── Pending leave, correction & probation counts (ADMIN / SUPERADMIN only) ──
   useEffect(() => {
     if (!user) {
       setPendingLeaveCount(0);
       setPendingCorrectionCount(0);
+      setProbationPendingCount(0);
       return;
     }
     const r = user.role;
@@ -172,12 +177,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     const fetchPendingCounts = async () => {
       try {
-        const [leaves, corrections] = await Promise.all([
+        const [leaves, corrections, probation] = await Promise.all([
           leaveApi.getByStatus("PENDING"),
           attendanceCorrectionApi.getPending(),
+          probationApi.getPendingConfirmation(),
         ]);
         setPendingLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
         setPendingCorrectionCount(Array.isArray(corrections) ? corrections.length : 0);
+        setProbationPendingCount(Array.isArray(probation) ? probation.length : 0);
       } catch {
         // Silently ignore — badge simply won't show on error
       }
@@ -185,6 +192,29 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     fetchPendingCounts();
     const interval = setInterval(fetchPendingCounts, 60_000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // ── Notice count (EMPLOYEE only) ──────────────────────────────
+  useEffect(() => {
+    if (!user || user.role !== "EMPLOYEE") {
+      setEmployeeNoticeCount(0);
+      return;
+    }
+    const userId = user.userId;
+    if (typeof userId !== "number") return;
+
+    const fetchNoticeCount = async () => {
+      try {
+        const notices = await noticeApi.getNoticesByUserId(userId);
+        setEmployeeNoticeCount(Array.isArray(notices) ? notices.length : 0);
+      } catch {
+        // Silently ignore
+      }
+    };
+
+    fetchNoticeCount();
+    const interval = setInterval(fetchNoticeCount, 60_000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -278,6 +308,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               ) : item.label === "Corrections Review" && pendingCorrectionCount > 0 ? (
                 <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-amber-500/20 ring-2 ring-amber-500/20 transition-all duration-300">
                   {pendingCorrectionCount}
+                </span>
+              ) : item.label === "Probation" && probationPendingCount > 0 ? (
+                <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-amber-500/20 ring-2 ring-amber-500/20 transition-all duration-300">
+                  {probationPendingCount}
+                </span>
+              ) : item.label === "My Notices" && employeeNoticeCount > 0 ? (
+                <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-500/20 transition-all duration-300">
+                  {employeeNoticeCount}
                 </span>
               ) : (
                 isActive && (
