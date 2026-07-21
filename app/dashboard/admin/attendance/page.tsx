@@ -117,6 +117,7 @@ export default function AttendanceOverviewPage() {
     userId: "",
     date: new Date().toISOString().split("T")[0],
     status: "PRESENT",
+    leaveType: "CASUAL",
     checkIn: "",
     checkOut: "",
   });
@@ -349,13 +350,14 @@ export default function AttendanceOverviewPage() {
     try {
       const payload: Partial<AttendanceDTO> = {
         userId: Number(form.userId), date: form.date, status: form.status,
+        leaveType: form.status === "ON_LEAVE" ? form.leaveType : undefined,
         checkIn:  form.checkIn  ? `${form.date}T${form.checkIn}:00`  : undefined,
         checkOut: form.checkOut ? `${form.date}T${form.checkOut}:00` : undefined,
       };
       await attendanceApi.create(payload);
       setToast({ message: "✅ Record saved!", type: "success" });
       setShowForm(false);
-      setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", checkIn: "", checkOut: "" });
+      setForm({ userId: "", date: new Date().toISOString().split("T")[0], status: "PRESENT", leaveType: "CASUAL", checkIn: "", checkOut: "" });
       setPage(0); // Go back to first page to see the new entry
       await fetchAllAndUsers();
     } catch (err: any) {
@@ -767,6 +769,23 @@ export default function AttendanceOverviewPage() {
                   <option value="UNPAID_LEAVE" className="bg-[#1a1d2e] text-white">Unpaid Leave</option>
                 </select>
               </div>
+              {form.status === "ON_LEAVE" && (
+                <div>
+                  <label className="text-white/50 text-xs mb-1.5 block">Leave Category (Deduct Balance) *</label>
+                  <select
+                    value={form.leaveType}
+                    onChange={e => setForm(p => ({ ...p, leaveType: e.target.value }))}
+                    className="w-full bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-amber-300 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                  >
+                    <option value="CASUAL" className="bg-[#1a1d2e] text-white">CASUAL (Deduct 1 day from Casual balance)</option>
+                    <option value="ANNUAL" className="bg-[#1a1d2e] text-white">ANNUAL (Deduct 1 day from Annual balance)</option>
+                    <option value="SICK" className="bg-[#1a1d2e] text-white">SICK (Deduct 1 day from Sick balance)</option>
+                    <option value="EIDULFITAR" className="bg-[#1a1d2e] text-white">EIDULFITAR (Deduct 1 day from Eidulfitar balance)</option>
+                    <option value="EIDULAZHA" className="bg-[#1a1d2e] text-white">EIDULAZHA (Deduct 1 day from Eidulazha balance)</option>
+                    <option value="UNPAID" className="bg-[#1a1d2e] text-white">UNPAID (No quota deduction)</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Check In Time (manual check-in)</label>
                 <input

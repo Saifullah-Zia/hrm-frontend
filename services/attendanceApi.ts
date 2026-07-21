@@ -55,7 +55,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 export interface AttendanceDTO {
   id: number;
   date: string;
-  status: string;     // PRESENT, ABSENT, LATE
+  status: string;     // PRESENT, ABSENT, LATE, ON_LEAVE, UNPAID_LEAVE
+  leaveType?: string; // CASUAL, ANNUAL, SICK, etc.
   checkIn: string;    // stored as PKT, no timezone suffix
   checkOut: string;   // stored as PKT, no timezone suffix
   userId: number;
