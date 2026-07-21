@@ -23,12 +23,14 @@ const STATUS_COLORS: Record<string, string> = {
   ABSENT:  "bg-rose-500/15 text-rose-400 border-rose-500/20",
   LATE:    "bg-amber-500/15 text-amber-400 border-amber-500/20",
   ON_LEAVE: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  UNPAID_LEAVE: "bg-purple-500/15 text-purple-400 border-purple-500/20",
 };
 const STATUS_DOT: Record<string, string> = {
   PRESENT: "bg-emerald-400",
   ABSENT:  "bg-rose-400",
   LATE:    "bg-amber-400",
   ON_LEAVE: "bg-blue-400",
+  UNPAID_LEAVE: "bg-purple-400",
 };
 
 /* ─── helpers ────────────────────────────────────────────────────────────────── */
@@ -730,6 +732,8 @@ export default function AttendanceOverviewPage() {
                   <option value="PRESENT" className="bg-[#1a1d2e] text-white">Present</option>
                   <option value="ABSENT" className="bg-[#1a1d2e] text-white">Absent</option>
                   <option value="LATE" className="bg-[#1a1d2e] text-white">Late</option>
+                  <option value="ON_LEAVE" className="bg-[#1a1d2e] text-white">On Leave</option>
+                  <option value="UNPAID_LEAVE" className="bg-[#1a1d2e] text-white">Unpaid Leave</option>
                 </select>
               </div>
               <div>
