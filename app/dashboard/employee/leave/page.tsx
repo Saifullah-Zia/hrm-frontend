@@ -85,10 +85,8 @@ function policySummary(p: LeavePolicyDto): string[] {
   const lines: string[] = [`${p.totalDaysPerYear} day(s) per year.`];
   if (p.requiresOneYear) lines.push("Requires 1 year of service (annual eligibility).");
   if (p.carryForward) lines.push(`Carry forward up to ${p.maxCarryForwardDays} unused day(s).`);
-  if (p.isPublicHoliday && p.applyBeforeDays != null) {
-    lines.push(
-      `Public holiday leave: you may apply at most ${p.applyBeforeDays} day(s) before your chosen leave start date (see server validation).`
-    );
+  if (p.applyBeforeDays != null && p.applyBeforeDays > 0) {
+    lines.push(`⏰ Advance notice: Must apply at least ${p.applyBeforeDays} day(s) in advance of start date.`);
   }
   return lines;
 }
@@ -275,6 +273,19 @@ export default function EmployeeLeavePage() {
 
   const requestedDays = inclusiveDays(form.startDate, form.endDate);
 
+  const advanceNoticeDiff = useMemo(() => {
+    if (!form.startDate || !selectedPolicy || selectedPolicy.applyBeforeDays == null || selectedPolicy.applyBeforeDays <= 0) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(`${form.startDate}T00:00:00`);
+    const diffDays = Math.ceil((start.getTime() - today.getTime()) / 86_400_000);
+    return {
+      diffDays,
+      requiredDays: selectedPolicy.applyBeforeDays,
+      isShortNotice: diffDays < selectedPolicy.applyBeforeDays,
+    };
+  }, [form.startDate, selectedPolicy]);
+
   if (typeof userId !== "number") {
     return (
       <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-200">
@@ -345,6 +356,64 @@ export default function EmployeeLeavePage() {
         )}
       </div>
 
+      {/* Company Leave Policies & Advance Notice Guide */}
+      {policiesQuery.data && policiesQuery.data.length > 0 && (
+        <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-white/80 flex items-center gap-2">
+              <span>📜</span> Company Leave Policies &amp; Advance Notice Rules
+            </h2>
+            <span className="text-[11px] text-white/35">Set by HR policy</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left text-white/70">
+              <thead>
+                <tr className="border-b border-white/[0.06] text-white/40 uppercase text-[10px] tracking-wider">
+                  <th className="pb-2 font-medium">Leave Type</th>
+                  <th className="pb-2 font-medium">Quota / Year</th>
+                  <th className="pb-2 font-medium">Advance Notice Required</th>
+                  <th className="pb-2 font-medium">1-Year Service Rule</th>
+                  <th className="pb-2 font-medium">Carry Forward</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {policiesQuery.data.map((p) => (
+                  <tr key={p.id ?? p.leaveType} className="hover:bg-white/[0.02]">
+                    <td className="py-2.5 font-semibold text-white/90">{p.leaveType}</td>
+                    <td className="py-2.5 text-white/70">{p.totalDaysPerYear} day(s)</td>
+                    <td className="py-2.5">
+                      {p.applyBeforeDays != null && p.applyBeforeDays > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-amber-300 font-semibold bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/25">
+                          <span>⏰</span> Apply at least {p.applyBeforeDays} day(s) before
+                        </span>
+                      ) : (
+                        <span className="text-white/30">No advance notice limit</span>
+                      )}
+                    </td>
+                    <td className="py-2.5">
+                      {p.requiresOneYear ? (
+                        <span className="inline-flex items-center text-sky-300 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                          1 year required
+                        </span>
+                      ) : (
+                        <span className="text-white/30">Immediate</span>
+                      )}
+                    </td>
+                    <td className="py-2.5">
+                      {p.carryForward ? (
+                        <span className="text-emerald-300">Up to {p.maxCarryForwardDays} day(s)</span>
+                      ) : (
+                        <span className="text-white/30">No</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 space-y-4"
@@ -405,6 +474,20 @@ export default function EmployeeLeavePage() {
               />
             </div>
           </div>
+          {advanceNoticeDiff && advanceNoticeDiff.isShortNotice && (
+            <div className="sm:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300 flex items-start gap-3">
+              <span className="text-lg leading-none mt-0.5">⚠️</span>
+              <div>
+                <p className="font-semibold text-amber-200">Advance Notice Requirement</p>
+                <p className="text-amber-300/80 text-xs mt-0.5">
+                  {selectedPolicy?.leaveType} leave requires at least <span className="font-bold underline">{advanceNoticeDiff.requiredDays} day(s)</span> advance notice.
+                  {advanceNoticeDiff.diffDays <= 0
+                    ? " Your chosen start date is today or in the past."
+                    : ` Your chosen start date is only ${advanceNoticeDiff.diffDays} day(s) away.`}
+                </p>
+              </div>
+            </div>
+          )}
           {requestedDays > 0 && (
             <p className="sm:col-span-2 text-xs text-white/40">
               Request spans <span className="text-white/70 font-medium">{requestedDays}</span> calendar day(s)
