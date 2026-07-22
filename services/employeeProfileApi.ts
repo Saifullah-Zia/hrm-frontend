@@ -358,17 +358,12 @@ export const employeeProfileApi = {
   ): Promise<EmployeeProfileDto> => {
     let forbidden = false;
 
-    // Try /me FIRST — backend always includes salary for the logged-in employee
-    const me = await employeeProfileApi.getMe();
-    if (me && Number(me.userId) === Number(userId)) return me;
-
-    // Fall back to user-id route (e.g., admin previewing their own profile)
     try {
       return await employeeProfileApi.getByUserId(userId);
     } catch (err: unknown) {
       const status = axiosStatus(err);
       if (status === 403) forbidden = true;
-      // 400 and 404 both mean "no profile for this user" — fall through to full list
+      // 400 and 404 both mean "no profile for this user" — fall through to try /me and full list
       else if (status && status !== 404 && status !== 400) {
         throw new EmployeeProfileLoadError(
           "NETWORK",
@@ -377,6 +372,10 @@ export const employeeProfileApi = {
         );
       }
     }
+
+    // getMe() is a safe fallback — it suppresses all errors internally
+    const me = await employeeProfileApi.getMe();
+    if (me && Number(me.userId) === Number(userId)) return me;
 
     try {
       const all = await employeeProfileApi.getAll();
