@@ -219,16 +219,14 @@ export default function AnnouncementsPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setForm(prev => ({ ...prev, active: !prev.active }))}
-                  className={`relative w-11 h-6 rounded-full transition-colors ${
-                    form.active ? "bg-indigo-500" : "bg-white/10"
-                  }`}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${form.active ? "bg-indigo-500" : "bg-white/10"
+                    }`}
                 >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
-                    form.active ? "translate-x-5" : "translate-x-0"
-                  }`} />
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${form.active ? "translate-x-5" : "translate-x-0"
+                    }`} />
                 </button>
                 <span className="text-white/50 text-sm">
-                  {form.active ? "Active — visible to all users" : "Inactive — hidden from users"}
+                  {form.active ? "Active - visible to all users" : "Inactive - hidden from users"}
                 </span>
               </div>
 
@@ -273,11 +271,10 @@ export default function AnnouncementsPage() {
             {announcements.map(announcement => (
               <div
                 key={announcement.id}
-                className={`bg-[#13151e] border rounded-2xl p-5 transition-all ${
-                  announcement.active
+                className={`bg-[#13151e] border rounded-2xl p-5 transition-all ${announcement.active
                     ? "border-white/[0.08]"
                     : "border-white/[0.04] opacity-50"
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -285,11 +282,10 @@ export default function AnnouncementsPage() {
                     {/* Title + Badge */}
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <h3 className="text-white/90 font-semibold">{announcement.title}</h3>
-                      <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                        announcement.active
+                      <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${announcement.active
                           ? "bg-emerald-500/15 text-emerald-400"
                           : "bg-gray-500/15 text-gray-400"
-                      }`}>
+                        }`}>
                         {announcement.active ? "Active" : "Inactive"}
                       </span>
                     </div>

@@ -408,8 +408,8 @@ export default function EmployeeAttendancePage() {
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e]">
+              <table className="w-full text-sm min-w-[420px]">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                     <th className="px-4 py-3 font-medium">Date</th>
@@ -475,8 +475,8 @@ export default function EmployeeAttendancePage() {
             Could not load correction requests.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e]">
+            <table className="w-full text-sm min-w-[580px]">
               <thead>
                 <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 font-medium">Date</th>

@@ -155,10 +155,11 @@ export default function EmployeeDocumentsPage() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="bg-[#0D0F1E] border border-[#2A2D45] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+          <div className="min-w-[600px]">
           <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#2A2D45] text-xs font-semibold text-[#8B8FA8] uppercase tracking-wider">
-            <span>Title & File</span>
+            <span>Title &amp; File</span>
             <span>Type</span>
             <span>Size</span>
             <span>Status</span>
@@ -215,6 +216,8 @@ export default function EmployeeDocumentsPage() {
               </div>
             ))
           )}
+          </div>
+          </div>
         </div>
       </div>
     </div>

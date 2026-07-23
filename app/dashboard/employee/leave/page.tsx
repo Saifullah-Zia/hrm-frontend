@@ -366,7 +366,7 @@ export default function EmployeeLeavePage() {
             <span className="text-[11px] text-white/35">Set by HR policy</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left text-white/70">
+            <table className="w-full text-xs text-left text-white/70 min-w-[600px]">
               <thead>
                 <tr className="border-b border-white/[0.06] text-white/40 uppercase text-[10px] tracking-wider">
                   <th className="pb-2 font-medium">Leave Type</th>
@@ -562,8 +562,8 @@ export default function EmployeeLeavePage() {
         ) : leaves.length === 0 ? (
           <p className="text-white/40 text-sm">No leave requests yet.</p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e]">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 font-medium">Type</th>

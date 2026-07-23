@@ -180,15 +180,14 @@ export default function AttendanceClockCard({ userId }: Props) {
         <div>
           <p className="text-white/80 font-semibold text-sm">Today ({todayPKT()})</p>
           {officeHours && (
-            <p className="text-white/35 text-xs mt-0.5">
-              Office {formatOfficeTime(officeHours.workdayStart)}–
-              {formatOfficeTime(officeHours.workdayEnd)}
+            <p className="text-white/35 text-xs mt-0.5 flex flex-wrap gap-x-1">
+              <span>Office {formatOfficeTime(officeHours.workdayStart)}–{formatOfficeTime(officeHours.workdayEnd)}</span>
               {graceDeadline && (
-                <> · {officeHours.graceMinutes} min grace{" "}
+                <span>· {officeHours.graceMinutes} min grace{" "}
                   <span className="text-emerald-400/70">
                     (PRESENT until {graceDeadline})
                   </span>
-                </>
+                </span>
               )}
             </p>
           )}
@@ -281,11 +280,11 @@ export default function AttendanceClockCard({ userId }: Props) {
           </div>
         </div>
       ) : (
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => checkInMutation.mutate()}
             disabled={isActing || isLoading || hasCheckedIn || weekendDisabled}
-            className="px-5 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={weekendDisabled ? "Check-in disabled on weekends" : undefined}
           >
             {checkInMutation.isPending ? "Checking in..." : "Check in"}
@@ -294,7 +293,7 @@ export default function AttendanceClockCard({ userId }: Props) {
           <button
             onClick={() => checkOutMutation.mutate()}
             disabled={isActing || !hasCheckedIn || hasCheckedOut}
-            className="px-5 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/25 text-sm font-medium hover:bg-rose-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {checkOutMutation.isPending ? "Checking out..." : "Check out"}
           </button>

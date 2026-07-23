@@ -73,8 +73,8 @@ export default function EmployeePayslipsPage() {
         <p className="text-white/40 text-sm">No payroll records found for your account.</p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e]">
-            <table className="w-full text-sm min-w-[640px]">
+          <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e] -mx-0">
+            <table className="w-full text-sm min-w-[580px]">
               <thead>
                 <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
                   <th className="px-4 py-3 font-medium">Period</th>
@@ -167,8 +167,8 @@ export default function EmployeePayslipsPage() {
 
       {/* Payslip Modal */}
       {showPayslipModal && selectedPayroll && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-2xl max-h-[92vh] overflow-y-auto my-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-900">Payslip</h2>
               <button
@@ -183,7 +183,7 @@ export default function EmployeePayslipsPage() {
               {/* Employee Information */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="font-semibold mb-3 text-gray-900">Employee Information</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
                   <div>
                     <span className="text-gray-500">Name:</span>
                     <span className="ml-2">{selectedPayroll.userName || `Employee ${selectedPayroll.userId}`}</span>
@@ -194,7 +194,7 @@ export default function EmployeePayslipsPage() {
               {/* Attendance Summary */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="font-semibold mb-3 text-gray-900">Attendance Summary</h3>
-                <div className="grid grid-cols-3 gap-4 text-sm text-gray-700">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-gray-700">
                   <div>
                     <span className="text-gray-500">Working Days:</span>
                     <span className="ml-2">{selectedPayroll.workingDays || 0}</span>

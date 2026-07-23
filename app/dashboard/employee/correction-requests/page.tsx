@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { Toast } from "@/app/components/Toast";
 
 import { useState, useEffect } from "react";
@@ -103,14 +103,15 @@ export default function EmployeeCorrectionRequestsPage() {
         />
       )}
 
-      <div className="flex items-center justify-between">
+      {/* Header — stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white/90 tracking-tight">Attendance Correction Requests</h1>
           <p className="text-white/40 text-sm mt-1">Submit requests to correct your attendance records.</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors self-start sm:self-auto"
         >
           <span className="text-lg">{showForm ? "×" : "+"}</span>
           {showForm ? "Cancel" : "New Request"}
@@ -121,7 +122,7 @@ export default function EmployeeCorrectionRequestsPage() {
         <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl p-6">
           <h2 className="text-white/90 font-semibold mb-4">Submit Correction Request</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-white/50 text-xs mb-1.5 block">Date *</label>
                 <input
@@ -162,7 +163,7 @@ export default function EmployeeCorrectionRequestsPage() {
                 required
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="submit"
                 disabled={submitMutation.isPending}
@@ -194,35 +195,33 @@ export default function EmployeeCorrectionRequestsPage() {
           <p className="text-white/40 text-sm">No correction requests found</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#13151e]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
-                  <th className="px-5 py-3.5 font-medium">Date</th>
-                  <th className="px-5 py-3.5 font-medium">Req. Check In</th>
-                  <th className="px-5 py-3.5 font-medium">Req. Check Out</th>
-                  <th className="px-5 py-3.5 font-medium">Reason</th>
-                  <th className="px-5 py-3.5 font-medium">Status</th>
+        <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e]">
+          <table className="w-full text-sm min-w-[540px]">
+            <thead>
+              <tr className="border-b border-white/[0.06] text-left text-white/40 text-xs uppercase tracking-wider">
+                <th className="px-5 py-3.5 font-medium">Date</th>
+                <th className="px-5 py-3.5 font-medium">Req. Check In</th>
+                <th className="px-5 py-3.5 font-medium">Req. Check Out</th>
+                <th className="px-5 py-3.5 font-medium">Reason</th>
+                <th className="px-5 py-3.5 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {myRequests.map((row: AttendanceCorrectionRequestDTO) => (
+                <tr key={row.id} className="hover:bg-white/[0.02]">
+                  <td className="px-5 py-4 text-white/80 font-medium">{fmtDate(row.date)}</td>
+                  <td className="px-5 py-4 text-white/60">{row.requestedCheckIn ? formatTime(row.requestedCheckIn) : "—"}</td>
+                  <td className="px-5 py-4 text-white/60">{row.requestedCheckOut ? formatTime(row.requestedCheckOut) : "—"}</td>
+                  <td className="px-5 py-4 text-white/50 max-w-[200px] truncate" title={row.reason}>{row.reason}</td>
+                  <td className="px-5 py-4">
+                    <span className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${STATUS_STYLES[row.status || ""] || "bg-gray-500/15 text-gray-400"}`}>
+                      {row.status}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.04]">
-                {myRequests.map((row: AttendanceCorrectionRequestDTO) => (
-                  <tr key={row.id} className="hover:bg-white/[0.02]">
-                    <td className="px-5 py-4 text-white/80 font-medium">{fmtDate(row.date)}</td>
-                    <td className="px-5 py-4 text-white/60">{row.requestedCheckIn ? formatTime(row.requestedCheckIn) : "—"}</td>
-                    <td className="px-5 py-4 text-white/60">{row.requestedCheckOut ? formatTime(row.requestedCheckOut) : "—"}</td>
-                    <td className="px-5 py-4 text-white/50 max-w-[200px] truncate" title={row.reason}>{row.reason}</td>
-                    <td className="px-5 py-4">
-                      <span className={`px-2.5 py-1 rounded-lg border text-xs font-medium ${STATUS_STYLES[row.status || ""] || "bg-gray-500/15 text-gray-400"}`}>
-                        {row.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { Toast } from "@/app/components/Toast";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -550,8 +550,8 @@ export default function EmployeeResignationPage() {
             <h2 className="text-sm font-semibold text-white/70 mb-3">
               Resignation History
             </h2>
-            <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-[#13151e]">
+              <table className="w-full text-sm min-w-[480px]">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-left text-[11px] uppercase tracking-wider text-white/30">
                     <th className="px-5 py-3 font-medium">Submitted</th>
