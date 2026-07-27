@@ -149,11 +149,24 @@ export const payrollApi = {
 
     // Plain array → apply client-side pagination
     if (Array.isArray(res.data)) {
-      const all = res.data as PayrollDTO[];
+      let all = res.data as PayrollDTO[];
+      
+      // If array length equals requested size, check if fetching full endpoint returns more records
+      if (all.length >= params.size) {
+        try {
+          const fullRes = await apiClient.get<unknown>("/api/payroll");
+          if (Array.isArray(fullRes.data) && fullRes.data.length >= all.length) {
+            all = fullRes.data as PayrollDTO[];
+          }
+        } catch {
+          // fallback to initial `all`
+        }
+      }
+
       const totalElements = all.length;
       const { page, size } = params;
       const totalPages = Math.max(1, Math.ceil(totalElements / size));
-      const safePage = Math.min(page, totalPages - 1);
+      const safePage = Math.min(page, Math.max(0, totalPages - 1));
       const content = all.slice(safePage * size, (safePage + 1) * size);
       return {
         content,
