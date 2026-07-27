@@ -290,11 +290,14 @@ export default function SuperAdminPayrollPoliciesPage() {
                   <div>
                     <label className="block text-xs text-white/50 mb-1">Unpaid Leave Rate (%)</label>
                     <input type="number" min="0" max="100" value={unpaidLeavePct} onChange={(e) => setUnpaidLeavePct(Number(e.target.value))} className={inputClass} required />
+                    <p className="text-[10px] text-white/30 mt-1">Set to 0% for no extra policy penalty</p>
                   </div>
                   <div>
                     <label className="block text-xs text-white/50 mb-1">Absent Rate (%)</label>
                     <input type="number" min="0" max="100" value={absentPct} onChange={(e) => setAbsentPct(Number(e.target.value))} className={inputClass} required />
+                    <p className="text-[10px] text-white/30 mt-1">Set to 0% for no extra policy penalty</p>
                   </div>
+
                 </div>
               </div>
 
