@@ -38,6 +38,13 @@ export interface CreatePayrollPayload {
   status?: string;
 }
 
+export interface UpdatePayrollPayload {
+  totalBonuses?: number;
+  totalAllowances?: number;
+  deductions?: number;
+  status?: string;
+}
+
 export interface PayrollPeriodDTO {
   id: number;
   month: string;
@@ -187,8 +194,19 @@ export const payrollApi = {
     return res.data;
   },
 
-  update: async (id: number, payload: CreatePayrollPayload): Promise<PayrollDTO> => {
+  update: async (id: number, payload: UpdatePayrollPayload): Promise<PayrollDTO> => {
     const res = await apiClient.put<PayrollDTO>(`/api/payroll/${id}`, payload);
+    return res.data;
+  },
+
+  deleteBulk: async (ids: number[]): Promise<void> => {
+    await apiClient.delete("/api/payroll/bulk", { data: ids });
+  },
+
+  approveBulk: async (ids: number[], approvedBy: number): Promise<PayrollDTO[]> => {
+    const res = await apiClient.put<PayrollDTO[]>("/api/payroll/bulk-approve", ids, {
+      params: { approvedBy },
+    });
     return res.data;
   },
 

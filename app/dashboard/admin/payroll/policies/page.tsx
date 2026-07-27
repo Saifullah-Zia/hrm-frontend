@@ -10,12 +10,13 @@ export default function PayrollPoliciesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<PayrollPolicyDTO | null>(null);
-  const [formData, setFormData] = useState({
-    lateDeductionRule: '{"freeLates": 3, "deductionPerLate": 100}',
-    unpaidLeaveDeductionRule: '{"deductionPercentage": 100}',
-    absentDeductionRule: '{"deductionPercentage": 100}',
-    description: "",
-  });
+
+  // Form Fields (User Friendly)
+  const [freeLates, setFreeLates] = useState<number>(3);
+  const [deductionPerLate, setDeductionPerLate] = useState<number>(100);
+  const [unpaidLeavePct, setUnpaidLeavePct] = useState<number>(100);
+  const [absentPct, setAbsentPct] = useState<number>(100);
+  const [description, setDescription] = useState<string>("");
 
   useEffect(() => {
     loadPolicies();
@@ -43,20 +44,66 @@ export default function PayrollPoliciesPage() {
     }
   };
 
+  const parsePolicyJson = (policy: PayrollPolicyDTO) => {
+    let lates = { freeLates: 3, deductionPerLate: 100 };
+    let unpaid = { deductionPercentage: 100 };
+    let absent = { deductionPercentage: 100 };
+
+    try {
+      if (policy.lateDeductionRule) lates = JSON.parse(policy.lateDeductionRule);
+    } catch {}
+    try {
+      if (policy.unpaidLeaveDeductionRule) unpaid = JSON.parse(policy.unpaidLeaveDeductionRule);
+    } catch {}
+    try {
+      if (policy.absentDeductionRule) absent = JSON.parse(policy.absentDeductionRule);
+    } catch {}
+
+    return { lates, unpaid, absent };
+  };
+
+  const resetForm = () => {
+    setFreeLates(3);
+    setDeductionPerLate(100);
+    setUnpaidLeavePct(100);
+    setAbsentPct(100);
+    setDescription("");
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setShowCreateModal(true);
+  };
+
+  const openEditModal = (policy: PayrollPolicyDTO) => {
+    setEditingPolicy(policy);
+    const { lates, unpaid, absent } = parsePolicyJson(policy);
+    setFreeLates(lates.freeLates ?? 3);
+    setDeductionPerLate(lates.deductionPerLate ?? 100);
+    setUnpaidLeavePct(unpaid.deductionPercentage ?? 100);
+    setAbsentPct(absent.deductionPercentage ?? 100);
+    setDescription(policy.description || "");
+    setShowEditModal(true);
+  };
+
+  const buildPayload = () => {
+    return {
+      lateDeductionRule: JSON.stringify({ freeLates: Number(freeLates), deductionPerLate: Number(deductionPerLate) }),
+      unpaidLeaveDeductionRule: JSON.stringify({ deductionPercentage: Number(unpaidLeavePct) }),
+      absentDeductionRule: JSON.stringify({ deductionPercentage: Number(absentPct) }),
+      description,
+    };
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await payrollApi.createPayrollPolicy({
-        ...formData,
+        ...buildPayload(),
         isActive: true,
       });
       setShowCreateModal(false);
-      setFormData({
-        lateDeductionRule: '{"freeLates": 3, "deductionPerLate": 100}',
-        unpaidLeaveDeductionRule: '{"deductionPercentage": 100}',
-        absentDeductionRule: '{"deductionPercentage": 100}',
-        description: "",
-      });
+      resetForm();
       loadPolicies();
       loadActivePolicy();
     } catch (error) {
@@ -69,7 +116,7 @@ export default function PayrollPoliciesPage() {
     if (!editingPolicy) return;
     try {
       await payrollApi.updatePayrollPolicy(editingPolicy.id, {
-        ...formData,
+        ...buildPayload(),
         isActive: editingPolicy.isActive !== false,
       });
       setShowEditModal(false);
@@ -97,17 +144,6 @@ export default function PayrollPoliciesPage() {
     }
   };
 
-  const openEditModal = (policy: PayrollPolicyDTO) => {
-    setEditingPolicy(policy);
-    setFormData({
-      lateDeductionRule: policy.lateDeductionRule || '{"freeLates": 3, "deductionPerLate": 100}',
-      unpaidLeaveDeductionRule: policy.unpaidLeaveDeductionRule || '{"deductionPercentage": 100}',
-      absentDeductionRule: policy.absentDeductionRule || '{"deductionPercentage": 100}',
-      description: policy.description || "",
-    });
-    setShowEditModal(true);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -116,254 +152,233 @@ export default function PayrollPoliciesPage() {
     );
   }
 
+  const activeRules = activePolicy ? parsePolicyJson(activePolicy) : null;
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Payroll Policies</h1>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Payroll Policies</h1>
+          <p className="text-sm text-gray-500">Configure late arrival penalties, unpaid leave rates, and absence deductions.</p>
+        </div>
         <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          onClick={openCreateModal}
+          className="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition"
         >
-          Create Policy
+          + Create New Policy
         </button>
       </div>
 
-      {/* Active Policy Display */}
-      {activePolicy && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-semibold text-blue-900 mb-4">Active Policy</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Active Policy Summary Card */}
+      {activePolicy && activeRules && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+          <div className="flex justify-between items-start mb-4">
             <div>
-              <span className="text-sm text-gray-600">Late Deduction Rule:</span>
-              <pre className="mt-1 text-xs bg-white p-2 rounded border">{activePolicy.lateDeductionRule}</pre>
+              <span className="px-2.5 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                ACTIVE POLICY
+              </span>
+              <h2 className="text-lg font-bold text-blue-950 mt-1">
+                {activePolicy.description || "Default Company Policy"}
+              </h2>
             </div>
-            <div>
-              <span className="text-sm text-gray-600">Unpaid Leave Deduction Rule:</span>
-              <pre className="mt-1 text-xs bg-white p-2 rounded border">{activePolicy.unpaidLeaveDeductionRule}</pre>
+            <button
+              onClick={() => openEditModal(activePolicy)}
+              className="text-xs bg-white text-blue-600 font-semibold px-3 py-1.5 rounded-md border border-blue-200 hover:bg-blue-50"
+            >
+              Edit Active Policy
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="bg-white p-4 rounded-lg border border-blue-100 shadow-2xs">
+              <span className="text-xs font-semibold text-gray-400 block mb-1">LATE DEDUCTION RULE</span>
+              <p className="text-base font-bold text-gray-800">
+                {activeRules.lates.freeLates} Free Lates Allowed
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                Deduction: <span className="font-semibold text-red-600">PKR {activeRules.lates.deductionPerLate}</span> per late after free lates
+              </p>
             </div>
-            <div>
-              <span className="text-sm text-gray-600">Absent Deduction Rule:</span>
-              <pre className="mt-1 text-xs bg-white p-2 rounded border">{activePolicy.absentDeductionRule}</pre>
+
+            <div className="bg-white p-4 rounded-lg border border-blue-100 shadow-2xs">
+              <span className="text-xs font-semibold text-gray-400 block mb-1">UNPAID LEAVE RULE</span>
+              <p className="text-base font-bold text-gray-800">
+                {activeRules.unpaid.deductionPercentage}% Deduction
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                Deducts 1 full daily salary per unpaid leave day
+              </p>
             </div>
-            <div>
-              <span className="text-sm text-gray-600">Description:</span>
-              <p className="mt-1 text-sm">{activePolicy.description || "No description"}</p>
+
+            <div className="bg-white p-4 rounded-lg border border-blue-100 shadow-2xs">
+              <span className="text-xs font-semibold text-gray-400 block mb-1">ABSENT DEDUCTION RULE</span>
+              <p className="text-base font-bold text-gray-800">
+                {activeRules.absent.deductionPercentage}% Deduction
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                Deducts 1 full daily salary per unexcused absent day
+              </p>
             </div>
           </div>
         </div>
       )}
 
       {/* All Policies Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-semibold">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created At
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th className="px-6 py-3 text-left">Description</th>
+              <th className="px-6 py-3 text-left">Late Penalty</th>
+              <th className="px-6 py-3 text-left">Unpaid / Absent Rate</th>
+              <th className="px-6 py-3 text-left">Status</th>
+              <th className="px-6 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {policies.map((policy) => (
-              <tr key={policy.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {policy.description || "No description"}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    policy.isActive
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}>
-                    {policy.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {policy.createdAt ? new Date(policy.createdAt).toLocaleDateString() : "-"}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {!policy.isActive && (
+          <tbody className="bg-white divide-y divide-gray-100 text-gray-700">
+            {policies.map((policy) => {
+              const rules = parsePolicyJson(policy);
+              return (
+                <tr key={policy.id} className="hover:bg-gray-50 transition">
+                  <td className="px-6 py-4 font-medium text-gray-900">
+                    {policy.description || `Policy #${policy.id}`}
+                  </td>
+                  <td className="px-6 py-4 text-xs">
+                    <div>{rules.lates.freeLates} Free Lates</div>
+                    <div className="text-gray-500">PKR {rules.lates.deductionPerLate} / late after</div>
+                  </td>
+                  <td className="px-6 py-4 text-xs">
+                    <div>Unpaid: {rules.unpaid.deductionPercentage}%</div>
+                    <div>Absent: {rules.absent.deductionPercentage}%</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                      policy.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"
+                    }`}>
+                      {policy.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right text-xs font-semibold space-x-2">
+                    {!policy.isActive && (
+                      <button
+                        onClick={() => handleActivate(policy.id)}
+                        className="text-green-600 hover:text-green-800 underline"
+                      >
+                        Activate
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleActivate(policy.id)}
-                      className="text-green-600 hover:text-green-900 mr-3"
+                      onClick={() => openEditModal(policy)}
+                      className="text-blue-600 hover:text-blue-800 underline"
                     >
-                      Activate
+                      Edit
                     </button>
-                  )}
-                  <button
-                    onClick={() => openEditModal(policy)}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {policies.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                  No payroll policies found
-                </td>
-              </tr>
-            )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-bold mb-4">Create Payroll Policy</h2>
-            <form onSubmit={handleCreate}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Late Deduction Rule (JSON)
+      {/* Policy Modal (Create / Edit) */}
+      {(showCreateModal || showEditModal) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              {showEditModal ? "Edit Payroll Policy" : "Create New Payroll Policy"}
+            </h2>
+            <form onSubmit={showEditModal ? handleEdit : handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Policy Description / Title
                 </label>
-                <textarea
-                  value={formData.lateDeductionRule}
-                  onChange={(e) => setFormData({ ...formData, lateDeductionRule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Standard Company Policy 2026"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Example: {"{\"freeLates\": 3, \"deductionPerLate\": 100}"}</p>
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unpaid Leave Deduction Rule (JSON)
-                </label>
-                <textarea
-                  value={formData.unpaidLeaveDeductionRule}
-                  onChange={(e) => setFormData({ ...formData, unpaidLeaveDeductionRule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Example: {"{\"deductionPercentage\": 100}"}</p>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Absent Deduction Rule (JSON)
-                </label>
-                <textarea
-                  value={formData.absentDeductionRule}
-                  onChange={(e) => setFormData({ ...formData, absentDeductionRule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">Example: {"{\"deductionPercentage\": 100}"}</p>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Create
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Edit Modal */}
-      {showEditModal && editingPolicy && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-bold mb-4">Edit Payroll Policy</h2>
-            <form onSubmit={handleEdit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Late Deduction Rule (JSON)
-                </label>
-                <textarea
-                  value={formData.lateDeductionRule}
-                  onChange={(e) => setFormData({ ...formData, lateDeductionRule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
-                  required
-                />
+              {/* Late Penalty Rule */}
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                <span className="block text-xs font-bold text-gray-600 uppercase">⏰ Late Arrival Settings</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Allowed Free Lates</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={freeLates}
+                      onChange={(e) => setFreeLates(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Deduction per Late (PKR)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={deductionPerLate}
+                      onChange={(e) => setDeductionPerLate(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unpaid Leave Deduction Rule (JSON)
-                </label>
-                <textarea
-                  value={formData.unpaidLeaveDeductionRule}
-                  onChange={(e) => setFormData({ ...formData, unpaidLeaveDeductionRule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
-                  required
-                />
+
+              {/* Unpaid Leave & Absent Rule */}
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
+                <span className="block text-xs font-bold text-gray-600 uppercase">📅 Absence & Leave Deductions</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Unpaid Leave Deduction %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={unpaidLeavePct}
+                      onChange={(e) => setUnpaidLeavePct(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Absent Deduction %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={absentPct}
+                      onChange={(e) => setAbsentPct(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Absent Deduction Rule (JSON)
-                </label>
-                <textarea
-                  value={formData.absentDeductionRule}
-                  onChange={(e) => setFormData({ ...formData, absentDeductionRule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows={3}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                />
-              </div>
-              <div className="flex justify-end gap-3">
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
+                    setShowCreateModal(false);
                     setShowEditModal(false);
-                    setEditingPolicy(null);
                   }}
-                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  Update
+                  {showEditModal ? "Update Policy" : "Create & Activate"}
                 </button>
               </div>
             </form>
@@ -373,4 +388,3 @@ export default function PayrollPoliciesPage() {
     </div>
   );
 }
-
