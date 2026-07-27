@@ -415,9 +415,10 @@ export default function PayrollManagementPage() {
                     onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
                     className="rounded-lg border border-white/[0.1] bg-[#1a1d2e] px-2 py-1.5 text-sm text-white/90 focus:outline-none cursor-pointer"
                   >
-                    {[10, 20, 50].map((n) => (
+                    {[5, 10, 20, 50].map((n) => (
                       <option key={n} value={n} className="bg-[#1a1d2e] text-white">{n}</option>
                     ))}
+
                   </select>
                 </label>
                 <button
