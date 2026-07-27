@@ -131,9 +131,8 @@ export function parsePayrollPageResponse(data: unknown): PayrollPageResponse {
 export const payrollApi = {
   /**
    * Paginated list.
-   * If the backend returns a Spring Page object, use it directly.
-   * If the backend returns a plain array (no server-side pagination), apply
-   * client-side slicing so Next / Previous buttons work correctly.
+   * - Plain array response → client-side slice (pagination in frontend)
+   * - Spring Page / any object response → use existing parsePayrollPageResponse
    */
   getPage: async (params: {
     page: number;
@@ -148,33 +147,27 @@ export const payrollApi = {
       },
     });
 
-    // If the server returned a proper Page object, use it as-is
-    if (!Array.isArray(res.data) && typeof res.data === "object" && res.data !== null) {
-      const o = res.data as Record<string, unknown>;
-      if (typeof o.totalPages === "number" || typeof o.totalElements === "number") {
-        return parsePayrollPageResponse(res.data);
-      }
+    // Plain array → apply client-side pagination
+    if (Array.isArray(res.data)) {
+      const all = res.data as PayrollDTO[];
+      const totalElements = all.length;
+      const { page, size } = params;
+      const totalPages = Math.max(1, Math.ceil(totalElements / size));
+      const safePage = Math.min(page, totalPages - 1);
+      const content = all.slice(safePage * size, (safePage + 1) * size);
+      return {
+        content,
+        totalElements,
+        totalPages,
+        number: safePage,
+        size,
+        first: safePage === 0,
+        last: safePage >= totalPages - 1,
+      };
     }
 
-    // Backend returned a plain array — apply client-side pagination
-    const all = (Array.isArray(res.data) ? res.data : []) as PayrollDTO[];
-    const totalElements = all.length;
-    const size = params.size;
-    const page = params.page;
-    const totalPages = Math.max(1, Math.ceil(totalElements / size));
-    const safePage = Math.min(page, totalPages - 1);
-    const start = safePage * size;
-    const content = all.slice(start, start + size);
-
-    return {
-      content,
-      totalElements,
-      totalPages,
-      number: safePage,
-      size,
-      first: safePage === 0,
-      last: safePage >= totalPages - 1,
-    };
+    // Any object (Spring Page, custom wrapper, etc.) → existing parser handles it
+    return parsePayrollPageResponse(res.data);
   },
 
   /** Total payroll rows (uses page size 1 to read `totalElements` when backend is paginated). */
