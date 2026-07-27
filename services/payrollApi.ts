@@ -138,14 +138,17 @@ export const payrollApi = {
     page: number;
     size: number;
     sort?: string;
+    search?: string;
   }): Promise<PayrollPageResponse> => {
     const res = await apiClient.get<unknown>("/api/payroll", {
       params: {
         page: params.page,
         size: params.size,
+        ...(params.search ? { search: params.search } : {}),
         ...(params.sort ? { sort: params.sort } : { sort: "id,desc" }),
       },
     });
+
 
     // Plain array → apply client-side pagination
     if (Array.isArray(res.data)) {
