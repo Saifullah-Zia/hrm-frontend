@@ -1,6 +1,6 @@
 "use client";
 import { Toast } from "@/app/components/Toast";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { payrollApi, type PayrollDTO } from "@/services/payrollApi";
 
@@ -76,48 +76,32 @@ export default function SuperAdminPayrollHubPage() {
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
-  const loadPayrolls = useCallback(
-    async (pageOverride?: number) => {
-      setLoading(true);
-      const pageIndex = pageOverride !== undefined ? pageOverride : page;
-      try {
-        const pay = await payrollApi.getPage({
-          page: pageIndex,
-          size: pageSize,
-          sort: "id,desc",
-        });
-        setPayrolls(pay.content);
-        setTotalElements(pay.totalElements);
-        setTotalPages(Math.max(1, pay.totalPages));
-        if (pageOverride !== undefined) setPage(pageOverride);
-      } catch (err) {
-        setToast({
-          message: err instanceof Error ? err.message : "Failed to load payroll",
-          type: "error",
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [page, pageSize]
-  );
+  async function loadPayrolls(pageNum = page, pageSz = pageSize) {
+    setLoading(true);
+    try {
+      const pay = await payrollApi.getPage({ page: pageNum, size: pageSz, sort: "id,desc" });
+      setPayrolls(pay.content);
+      setTotalElements(pay.totalElements);
+      setTotalPages(Math.max(1, pay.totalPages));
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to load payroll", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  useEffect(() => {
-    void loadPayrolls();
-  }, [loadPayrolls]);
+  // Re-fetch whenever page or pageSize changes
+  useEffect(() => { void loadPayrolls(page, pageSize); }, [page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     try {
       const message = await payrollApi.delete(deleteTarget.id);
-      await loadPayrolls();
+      await loadPayrolls(page, pageSize);
       setToast({ message: `🗑️ ${message || "Payroll deleted successfully"}`, type: "success" });
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : "Failed to delete payroll",
-        type: "error",
-      });
+      setToast({ message: err instanceof Error ? err.message : "Failed to delete payroll", type: "error" });
     } finally {
       setDeleteLoading(false);
       setShowDelete(false);
@@ -310,7 +294,7 @@ export default function SuperAdminPayrollHubPage() {
                   type="button"
                   disabled={page <= 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-30"
+                  className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:pointer-events-none"
                 >
                   Previous
                 </button>
@@ -321,7 +305,7 @@ export default function SuperAdminPayrollHubPage() {
                   type="button"
                   disabled={page >= totalPages - 1}
                   onClick={() => setPage((p) => p + 1)}
-                  className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-30"
+                  className="rounded-lg border border-white/[0.1] px-3 py-1.5 text-xs text-white/70 hover:bg-white/[0.06] disabled:opacity-30 disabled:pointer-events-none"
                 >
                   Next
                 </button>

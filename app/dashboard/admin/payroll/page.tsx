@@ -1,6 +1,6 @@
 "use client";
 import { Toast } from "@/app/components/Toast";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { payrollApi, type PayrollDTO } from "@/services/payrollApi";
@@ -86,27 +86,24 @@ export default function PayrollManagementPage() {
 
   // ─── Fetch ────────────────────────────────────────────────────────────────
 
-  const loadPayrolls = useCallback(
-    async (pageOverride?: number) => {
-      setLoading(true);
-      const pageIndex = pageOverride !== undefined ? pageOverride : page;
-      try {
-        const pay = await payrollApi.getPage({ page: pageIndex, size: pageSize, sort: "id,desc" });
-        setPayrolls(pay.content);
-        setTotalElements(pay.totalElements);
-        setTotalPages(Math.max(1, pay.totalPages));
-        if (pageOverride !== undefined) setPage(pageOverride);
-        setSelectedIds([]);
-      } catch (err) {
-        setToast({ message: err instanceof Error ? err.message : "Failed to load payroll", type: "error" });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [page, pageSize]
-  );
+  // Accepts explicit page/size so it always uses the latest values
+  async function loadPayrolls(pageNum = page, pageSz = pageSize) {
+    setLoading(true);
+    try {
+      const pay = await payrollApi.getPage({ page: pageNum, size: pageSz, sort: "id,desc" });
+      setPayrolls(pay.content);
+      setTotalElements(pay.totalElements);
+      setTotalPages(Math.max(1, pay.totalPages));
+      setSelectedIds([]);
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to load payroll", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  useEffect(() => { void loadPayrolls(); }, [loadPayrolls]);
+  // Re-fetch whenever page or pageSize changes
+  useEffect(() => { void loadPayrolls(page, pageSize); }, [page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Single Delete ────────────────────────────────────────────────────────
 
@@ -115,7 +112,7 @@ export default function PayrollManagementPage() {
     setDeleteLoading(true);
     try {
       const message = await payrollApi.delete(deleteTarget.id);
-      await loadPayrolls();
+      await loadPayrolls(page, pageSize);
       setToast({ message: `🗑️ ${message || "Payroll deleted successfully"}`, type: "success" });
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : "Failed to delete payroll", type: "error" });
@@ -134,7 +131,7 @@ export default function PayrollManagementPage() {
     setBulkLoading(true);
     try {
       await payrollApi.deleteBulk(selectedIds);
-      await loadPayrolls();
+      await loadPayrolls(page, pageSize);
       setToast({ message: `🗑️ Deleted ${selectedIds.length} payroll record(s)`, type: "success" });
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : "Bulk delete failed", type: "error" });
@@ -149,7 +146,7 @@ export default function PayrollManagementPage() {
     setBulkLoading(true);
     try {
       await payrollApi.approveBulk(selectedIds, user.id);
-      await loadPayrolls();
+      await loadPayrolls(page, pageSize);
       setToast({ message: `✅ Approved ${selectedIds.length} payroll record(s)`, type: "success" });
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : "Bulk approve failed", type: "error" });
