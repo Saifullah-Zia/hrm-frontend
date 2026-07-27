@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { payrollApi, PayrollPeriodDTO } from "@/services/payrollApi";
 import { useAuth } from "@/lib/useAuth";
 
@@ -10,6 +11,12 @@ interface CreatePeriodFormData {
   company: string;
   department: string;
 }
+
+const inputClass =
+  "w-full px-3.5 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
+
+const selectClass =
+  "w-full px-3.5 py-2.5 text-sm rounded-xl bg-[#1a1d2e] border border-white/[0.08] text-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
 
 export default function SuperAdminPayrollPeriodsPage() {
   const { user } = useAuth();
@@ -76,147 +83,185 @@ export default function SuperAdminPayrollPeriodsPage() {
     "July", "August", "September", "October", "November", "December"
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Payroll Periods</h1>
-          <p className="text-sm text-gray-500">Create, lock, and manage active payroll periods</p>
+    <div className="min-h-screen bg-[#0f1117] p-6 text-white/90">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header & Back Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/superadmin/payroll"
+              className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
+              title="Back to Payroll Dashboard"
+            >
+              ← Back
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold text-white/90">Payroll Periods</h1>
+              <p className="text-sm text-white/35 mt-0.5">Create, lock, and manage active payroll periods</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2.5 bg-indigo-600 text-white font-medium text-sm rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 transition"
+          >
+            + Create Period
+          </button>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
-        >
-          + Create Period
-        </button>
+
+        {/* Table Container */}
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  {["Month", "Year", "Company", "Department", "Status", "Locked By", ""].map((h) => (
+                    <th key={h} className={`px-5 py-3.5 text-white/30 uppercase text-[11px] font-medium ${h === "" ? "text-right" : "text-left"}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-14 text-white/25">
+                      Loading periods...
+                    </td>
+                  </tr>
+                ) : periods.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-14 text-white/25">
+                      No payroll periods found. Create one to begin.
+                    </td>
+                  </tr>
+                ) : (
+                  periods.map((period) => (
+                    <tr key={period.id} className="hover:bg-white/[0.02] transition">
+                      <td className="px-5 py-4 font-medium text-white/90">{period.month}</td>
+                      <td className="px-5 py-4 text-white/60">{period.year}</td>
+                      <td className="px-5 py-4 text-white/40">{period.company || "—"}</td>
+                      <td className="px-5 py-4 text-white/40">{period.department || "—"}</td>
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                          period.locked
+                            ? "bg-rose-500/15 text-rose-400 border border-rose-500/20"
+                            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                        }`}>
+                          {period.locked ? "🔒 Locked" : "🔓 Open"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-white/40">{period.lockedByName || "—"}</td>
+                      <td className="px-5 py-4 text-right">
+                        {period.locked ? (
+                          <button
+                            onClick={() => handleUnlock(period.id)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition"
+                          >
+                            Unlock Period
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleLock(period.id)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition"
+                          >
+                            Lock Period
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-xs uppercase text-gray-500 font-semibold">
-            <tr>
-              <th className="px-6 py-3 text-left">Month</th>
-              <th className="px-6 py-3 text-left">Year</th>
-              <th className="px-6 py-3 text-left">Company</th>
-              <th className="px-6 py-3 text-left">Department</th>
-              <th className="px-6 py-3 text-left">Status</th>
-              <th className="px-6 py-3 text-left">Locked By</th>
-              <th className="px-6 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-100 text-gray-700">
-            {periods.map((period) => (
-              <tr key={period.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4 font-medium text-gray-900">{period.month}</td>
-                <td className="px-6 py-4">{period.year}</td>
-                <td className="px-6 py-4 text-gray-500">{period.company || "-"}</td>
-                <td className="px-6 py-4 text-gray-500">{period.department || "-"}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                    period.locked ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
-                  }`}>
-                    {period.locked ? "🔒 Locked" : "🔓 Open"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-500">{period.lockedByName || "-"}</td>
-                <td className="px-6 py-4 text-right font-semibold text-xs">
-                  {period.locked ? (
-                    <button
-                      onClick={() => handleUnlock(period.id)}
-                      className="text-blue-600 hover:text-blue-900 underline"
-                    >
-                      Unlock
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleLock(period.id)}
-                      className="text-orange-600 hover:text-orange-900 underline"
-                    >
-                      Lock Period
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {periods.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No payroll periods found. Create one to begin.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
+      {/* Modal Shell */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4 text-gray-800">Create Payroll Period</h2>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-[#13151e] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-white/90 mb-4">Create Payroll Period</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Month</label>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
+                  Month
+                </label>
                 <select
                   value={formData.month}
                   onChange={(e) => setFormData({ ...formData, month: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className={selectClass}
                   required
                 >
-                  <option value="">Select Month</option>
+                  <option value="" className="bg-[#1a1d2e] text-white">Select Month</option>
                   {months.map((month) => (
-                    <option key={month} value={month}>{month}</option>
+                    <option key={month} value={month} className="bg-[#1a1d2e] text-white">
+                      {month}
+                    </option>
                   ))}
                 </select>
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Year</label>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
+                  Year
+                </label>
                 <input
                   type="number"
                   value={formData.year}
                   onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className={inputClass}
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Company (Optional)</label>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
+                  Company <span className="text-white/20">(Optional)</span>
+                </label>
                 <input
                   type="text"
+                  placeholder="e.g. JCAT Solutions"
                   value={formData.company}
                   onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className={inputClass}
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase">Department (Optional)</label>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
+                  Department <span className="text-white/20">(Optional)</span>
+                </label>
                 <input
                   type="text"
+                  placeholder="e.g. Engineering"
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className={inputClass}
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-2">
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                  className="px-4 py-2 text-sm text-white/50 border border-white/[0.08] rounded-xl hover:bg-white/[0.05]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20"
                 >
-                  Create
+                  Create Period
                 </button>
               </div>
             </form>

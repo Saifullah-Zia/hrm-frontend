@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { payrollApi, PayrollPeriodDTO, PayrollDTO } from "@/services/payrollApi";
 import { useAuth } from "@/lib/useAuth";
 
@@ -9,16 +10,22 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+const inputClass =
+  "w-full px-3.5 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
+
+const selectClass =
+  "w-full px-3.5 py-2.5 text-sm rounded-xl bg-[#1a1d2e] border border-white/[0.08] text-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
+
 function StatusPill({ status }: { status?: string }) {
   const styles: Record<string, string> = {
-    PAID: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    APPROVED: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    REVIEWED: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    DRAFT: "bg-white/5 text-gray-400 border-white/10",
+    PAID: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
+    APPROVED: "bg-indigo-500/15 text-indigo-400 border-indigo-500/20",
+    REVIEWED: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+    DRAFT: "bg-white/5 text-white/40 border-white/10",
   };
   const cls = styles[status || "DRAFT"] || styles.DRAFT;
   return (
-    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${cls}`}>
+    <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold border ${cls}`}>
       {status || "DRAFT"}
     </span>
   );
@@ -94,7 +101,6 @@ export default function PayrollGenerationPage() {
       await loadPeriods();
     } catch (error) {
       console.error("Failed to create payroll period:", error);
-      alert("Failed to create payroll period. Please check the details and try again.");
     } finally {
       setCreatingPeriod(false);
     }
@@ -103,7 +109,7 @@ export default function PayrollGenerationPage() {
   const handleToggleLock = async () => {
     if (!selectedPeriod) return;
     if (!user?.id) {
-      setErrorMsg("Cannot identify current user. Please log out and log in again.");
+      setErrorMsg("Cannot identify current user.");
       return;
     }
     try {
@@ -116,12 +122,7 @@ export default function PayrollGenerationPage() {
       setPeriods((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error("Lock toggle failed:", msg);
-      setErrorMsg(
-        selectedPeriod.locked
-          ? `Failed to unlock period: ${msg}`
-          : `Failed to lock period: ${msg}`
-      );
+      setErrorMsg(selectedPeriod.locked ? `Failed to unlock period: ${msg}` : `Failed to lock period: ${msg}`);
     } finally {
       setTogglingLock(false);
     }
@@ -130,18 +131,16 @@ export default function PayrollGenerationPage() {
   const handleBulkGenerate = async () => {
     if (!selectedPeriod) return;
     if (!user?.id) {
-      setErrorMsg("Cannot identify current user. Please log out and log in again.");
+      setErrorMsg("Cannot identify current user.");
       return;
     }
     try {
       setErrorMsg(null);
       setGenerating(true);
-      const result = await payrollApi.generateBulkPayroll(selectedPeriod.id, user.id);
-      console.log("Bulk generate result:", result);
+      await payrollApi.generateBulkPayroll(selectedPeriod.id, user.id);
       await loadPayrolls(selectedPeriod.id);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error("Bulk generate failed:", msg);
       setErrorMsg(`Failed to generate payroll: ${msg}`);
     } finally {
       setGenerating(false);
@@ -152,9 +151,7 @@ export default function PayrollGenerationPage() {
     if (!user?.id) return;
     try {
       await payrollApi.approvePayroll(payrollId, user.id);
-      if (selectedPeriod) {
-        await loadPayrolls(selectedPeriod.id);
-      }
+      if (selectedPeriod) loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed to approve payroll:", error);
     }
@@ -163,9 +160,7 @@ export default function PayrollGenerationPage() {
   const handleMarkAsPaid = async (payrollId: number) => {
     try {
       await payrollApi.markAsPaid(payrollId);
-      if (selectedPeriod) {
-        await loadPayrolls(selectedPeriod.id);
-      }
+      if (selectedPeriod) loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed to mark payroll as paid:", error);
     }
@@ -174,288 +169,277 @@ export default function PayrollGenerationPage() {
   const handleRegenerate = async (payrollId: number) => {
     try {
       await payrollApi.regeneratePayroll(payrollId);
-      if (selectedPeriod) {
-        await loadPayrolls(selectedPeriod.id);
-      }
+      if (selectedPeriod) loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed to regenerate payroll:", error);
-      alert("Failed to regenerate. Make sure the period is unlocked.");
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+      <div className="min-h-screen bg-[#0f1117] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-white">Payroll Generation</h1>
-        <button
-          onClick={() => setShowCreatePeriodModal(true)}
-          className="px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-pink-500 hover:opacity-90 transition shadow-lg shadow-pink-500/20"
-        >
-          + Create Payroll Period
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#0f1117] p-6 text-white/90">
+      <div className="max-w-7xl mx-auto space-y-6">
 
-      {/* Inline error banner */}
-      {errorMsg && (
-        <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-sm">
-          <span className="text-rose-400 mt-0.5">⚠</span>
-          <span className="flex-1">{errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-rose-200 ml-2">✕</button>
+        {/* Header & Back Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard/admin/payroll"
+              className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
+              title="Back to Payroll Dashboard"
+            >
+              ← Back
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold text-white/90">Payroll Generation</h1>
+              <p className="text-sm text-white/35 mt-0.5">Generate period-based payrolls with actual calendar-day calculations</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCreatePeriodModal(true)}
+            className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 transition"
+          >
+            + Create Period
+          </button>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Period Selection */}
-        <div className="bg-[#12131c] border border-white/10 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Select Payroll Period</h2>
-          <div className="space-y-2">
-            {periods.map((period) => {
-              const isSelected = selectedPeriod?.id === period.id;
-              return (
-                <button
-                  key={period.id}
-                  onClick={() => handlePeriodSelect(period)}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition border ${
-                    isSelected
-                      ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white border-transparent"
-                      : "bg-[#1a1c26] text-gray-300 border-white/5 hover:bg-white/5"
-                  }`}
-                >
-                  <div className="font-medium">{period.month} {period.year}</div>
-                  <div className={`text-sm ${isSelected ? "text-white/80" : "text-gray-500"}`}>
-                    {period.locked ? "Locked" : "Open"}
-                    {period.department && ` - ${period.department}`}
+        {errorMsg && (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+            <span className="flex-1">{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white">✕</button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Period Selection Card */}
+          <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-3">
+            <h2 className="text-base font-semibold text-white/90">Select Payroll Period</h2>
+            <div className="space-y-2">
+              {periods.map((period) => {
+                const isSelected = selectedPeriod?.id === period.id;
+                return (
+                  <button
+                    key={period.id}
+                    onClick={() => handlePeriodSelect(period)}
+                    className={`w-full text-left p-3.5 rounded-xl transition border ${
+                      isSelected
+                        ? "bg-indigo-600/20 border-indigo-500/40 text-white"
+                        : "bg-white/[0.02] border-white/[0.06] text-white/70 hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">{period.month} {period.year}</div>
+                    <div className="text-xs text-white/40 mt-1">
+                      {period.locked ? "🔒 Locked" : "🔓 Open"}
+                      {period.department && ` • ${period.department}`}
+                    </div>
+                  </button>
+                );
+              })}
+              {periods.length === 0 && (
+                <p className="text-white/30 text-sm py-4 text-center">No payroll periods available</p>
+              )}
+            </div>
+          </div>
+
+          {/* Payroll Actions & Table */}
+          <div className="lg:col-span-2 space-y-4">
+            {selectedPeriod ? (
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+                  <div>
+                    <h2 className="text-base font-semibold text-white/90">
+                      {selectedPeriod.month} {selectedPeriod.year}
+                    </h2>
+                    <p className="text-xs text-white/40">
+                      {selectedPeriod.department || "All Departments"}
+                    </p>
                   </div>
-                </button>
-              );
-            })}
-            {periods.length === 0 && (
-              <p className="text-gray-500 text-sm">No payroll periods available</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleToggleLock}
+                      disabled={togglingLock}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold border transition disabled:opacity-50 ${
+                        selectedPeriod.locked
+                          ? "bg-white/[0.05] text-white/80 border-white/[0.1] hover:bg-white/[0.1]"
+                          : "bg-amber-500/15 text-amber-400 border-amber-500/20 hover:bg-amber-500/25"
+                      }`}
+                    >
+                      {togglingLock
+                        ? "Wait..."
+                        : selectedPeriod.locked
+                        ? "Unlock Period"
+                        : "Lock Period"}
+                    </button>
+
+                    {selectedPeriod.locked ? (
+                      <button
+                        onClick={handleBulkGenerate}
+                        disabled={generating}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition shadow-lg shadow-indigo-600/25"
+                      >
+                        {generating ? "Generating..." : "Generate Payroll"}
+                      </button>
+                    ) : (
+                      <span className="px-3 py-2 bg-white/[0.04] text-white/40 border border-white/[0.08] rounded-xl text-xs flex items-center">
+                        Lock period to generate
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {payrolls.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[650px]">
+                      <thead>
+                        <tr className="border-b border-white/[0.06]">
+                          {["Employee", "Basic Salary", "Present", "Gross Salary", "Net Salary", "Status", ""].map((h) => (
+                            <th key={h} className={`px-4 py-3 text-white/30 uppercase text-[11px] font-medium ${h === "" ? "text-right" : "text-left"}`}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04]">
+                        {payrolls.map((p) => (
+                          <tr key={p.id} className="hover:bg-white/[0.02]">
+                            <td className="px-4 py-3 font-medium text-white/85">
+                              {p.userName || `Employee ${p.userId}`}
+                            </td>
+                            <td className="px-4 py-3 text-white/60">
+                              Rs. {(p.basicSalary || p.salary || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-white/50">{p.presentDays || 0} days</td>
+                            <td className="px-4 py-3 text-white/60">
+                              Rs. {(p.grossSalary || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-indigo-400">
+                              Rs. {(p.netSalary || 0).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusPill status={p.status} />
+                            </td>
+                            <td className="px-4 py-3 text-right text-xs font-semibold space-x-2">
+                              {p.status === "DRAFT" && (
+                                <button
+                                  onClick={() => handleApprove(p.id)}
+                                  className="text-indigo-400 hover:text-indigo-300"
+                                >
+                                  Approve
+                                </button>
+                              )}
+                              {p.status === "APPROVED" && (
+                                <button
+                                  onClick={() => handleMarkAsPaid(p.id)}
+                                  className="text-emerald-400 hover:text-emerald-300"
+                                >
+                                  Mark Paid
+                                </button>
+                              )}
+                              {(p.status === "DRAFT" || p.status === "REVIEWED") && (
+                                <button
+                                  onClick={() => handleRegenerate(p.id)}
+                                  className="text-amber-400 hover:text-amber-300"
+                                >
+                                  Regenerate
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-white/30 text-sm">
+                    No payroll records generated for this period yet.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-10 text-center text-white/30 text-sm">
+                Select a payroll period from the left menu to manage and generate payrolls.
+              </div>
             )}
           </div>
         </div>
-
-        {/* Payroll Actions */}
-        <div className="lg:col-span-2">
-          {selectedPeriod ? (
-            <div className="bg-[#12131c] border border-white/10 rounded-xl p-6">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">
-                    {selectedPeriod.month} {selectedPeriod.year}
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    {selectedPeriod.department || "All Departments"}
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleToggleLock}
-                    disabled={togglingLock}
-                    className={`px-4 py-2 rounded-lg font-medium border transition disabled:opacity-50 ${
-                      selectedPeriod.locked
-                        ? "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
-                        : "bg-gradient-to-r from-amber-600 to-orange-500 text-white border-transparent hover:opacity-90"
-                    }`}
-                  >
-                    {togglingLock
-                      ? "Please wait..."
-                      : selectedPeriod.locked
-                      ? "Unlock Period"
-                      : "Lock Period"}
-                  </button>
-
-                  {selectedPeriod.locked ? (
-                    <button
-                      onClick={handleBulkGenerate}
-                      disabled={generating}
-                      className="px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-emerald-600 to-emerald-500 hover:opacity-90 disabled:opacity-50 transition"
-                    >
-                      {generating ? "Generating..." : "Generate Payroll"}
-                    </button>
-                  ) : (
-                    <span className="px-4 py-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg text-sm flex items-center">
-                      Period must be locked
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {payrolls.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-white/5">
-                    <thead>
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Employee
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Basic Salary
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Present Days
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Gross Salary
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Net Salary
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {payrolls.map((payroll) => (
-                        <tr key={payroll.id} className="hover:bg-white/[0.02]">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                            {payroll.userName || `Employee ${payroll.userId}`}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            PKR {payroll.basicSalary?.toLocaleString() || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {payroll.presentDays || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            PKR {payroll.grossSalary?.toLocaleString() || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                            PKR {payroll.netSalary?.toLocaleString() || 0}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <StatusPill status={payroll.status} />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            {payroll.status === "DRAFT" && (
-                              <button
-                                onClick={() => handleApprove(payroll.id)}
-                                className="text-blue-400 hover:text-blue-300 mr-3"
-                              >
-                                Approve
-                              </button>
-                            )}
-                            {payroll.status === "APPROVED" && (
-                              <button
-                                onClick={() => handleMarkAsPaid(payroll.id)}
-                                className="text-emerald-400 hover:text-emerald-300 mr-3"
-                              >
-                                Mark Paid
-                              </button>
-                            )}
-                            {(payroll.status === "DRAFT" || payroll.status === "REVIEWED") && (
-                              <button
-                                onClick={() => handleRegenerate(payroll.id)}
-                                className="text-orange-400 hover:text-orange-300"
-                              >
-                                Regenerate
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No payroll records for this period
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-[#12131c] border border-white/10 rounded-xl p-6 text-center text-gray-500">
-              Select a payroll period to view and generate payrolls
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Create Payroll Period Modal */}
+      {/* Modal */}
       {showCreatePeriodModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-[#14161f] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h2 className="text-xl font-bold text-white mb-4">Create Payroll Period</h2>
-            <form onSubmit={handleCreatePeriod}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setShowCreatePeriodModal(false)}
+        >
+          <div
+            className="bg-[#13151e] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-white/90 mb-4">Create Payroll Period</h2>
+            <form onSubmit={handleCreatePeriod} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
                   Month
                 </label>
                 <select
                   value={periodFormData.month}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, month: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
+                  className={selectClass}
                   required
                 >
                   {MONTHS.map((m) => (
-                    <option key={m} value={m} className="bg-[#0d0e14]">{m}</option>
+                    <option key={m} value={m} className="bg-[#1a1d2e] text-white">{m}</option>
                   ))}
                 </select>
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
                   Year
                 </label>
                 <input
                   type="number"
                   value={periodFormData.year}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, year: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
+                  className={inputClass}
                   required
-                  min={2000}
-                  max={2100}
                 />
               </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
-                  Department <span className="text-gray-600">(optional)</span>
+
+              <div>
+                <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wide">
+                  Department <span className="text-white/20">(Optional)</span>
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. Engineering"
                   value={periodFormData.department}
                   onChange={(e) => setPeriodFormData({ ...periodFormData, department: e.target.value })}
-                  placeholder="e.g. Engineering (leave blank for all departments)"
-                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
+                  className={inputClass}
                 />
               </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
-                  Company <span className="text-gray-600">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={periodFormData.company}
-                  onChange={(e) => setPeriodFormData({ ...periodFormData, company: e.target.value })}
-                  placeholder="e.g. JCAT Solutions"
-                  className="w-full px-3 py-2 bg-[#0d0e14] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500/50"
-                />
-              </div>
-              <div className="flex justify-end gap-3">
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCreatePeriodModal(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white transition"
+                  className="px-4 py-2 text-sm text-white/50 border border-white/[0.08] rounded-xl hover:bg-white/[0.05]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creatingPeriod}
-                  className="px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-pink-500 hover:opacity-90 disabled:opacity-50 transition shadow-lg shadow-pink-500/20"
+                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50"
                 >
-                  {creatingPeriod ? "Creating..." : "Create"}
+                  {creatingPeriod ? "Creating..." : "Create Period"}
                 </button>
               </div>
             </form>
@@ -465,4 +449,3 @@ export default function PayrollGenerationPage() {
     </div>
   );
 }
-

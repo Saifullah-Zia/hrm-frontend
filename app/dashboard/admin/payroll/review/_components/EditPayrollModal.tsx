@@ -9,6 +9,9 @@ interface EditPayrollModalProps {
   onSuccess: () => void;
 }
 
+const inputClass =
+  "w-full px-3.5 py-2 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
+
 export default function EditPayrollModal({ payroll, onClose, onSuccess }: EditPayrollModalProps) {
   const [bonuses, setBonuses] = useState<number>(payroll.totalBonuses || payroll.bonuses || 0);
   const [allowances, setAllowances] = useState<number>(payroll.totalAllowances || 0);
@@ -16,7 +19,6 @@ export default function EditPayrollModal({ payroll, onClose, onSuccess }: EditPa
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Real-time calculation preview
   const basicSalary = payroll.basicSalary || payroll.salary || 0;
   const grossSalary = basicSalary + Number(allowances || 0) + Number(bonuses || 0);
   const netSalary = grossSalary - Number(deductions || 0);
@@ -42,61 +44,56 @@ export default function EditPayrollModal({ payroll, onClose, onSuccess }: EditPa
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg transition-all">
-        <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 text-white/90" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center pb-3 border-b border-white/[0.08]">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Edit Payroll & Add Bonus</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Employee: <span className="font-semibold text-gray-700">{payroll.userName || `ID #${payroll.userId}`}</span>
+            <h2 className="text-base font-semibold text-white/90">Edit Payroll & Add Bonus</h2>
+            <p className="text-xs text-white/40 mt-0.5">
+              Employee: <span className="font-semibold text-white/80">{payroll.userName || `ID #${payroll.userId}`}</span>
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl font-bold p-1 rounded-lg hover:bg-gray-100"
-          >
+          <button onClick={onClose} className="text-white/30 hover:text-white/70">
             ✕
           </button>
         </div>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {/* Readonly Base Details */}
-          <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg text-xs text-gray-600">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 bg-white/[0.02] border border-white/[0.06] p-3 rounded-xl text-xs text-white/60">
             <div>
-              <span className="block font-medium text-gray-500">Basic Salary</span>
-              <span className="text-sm font-semibold text-gray-800">
-                PKR {basicSalary.toLocaleString()}
+              <span className="block text-white/40 mb-0.5">Basic Salary</span>
+              <span className="font-semibold text-white/90">
+                Rs. {basicSalary.toLocaleString()}
               </span>
             </div>
             <div>
-              <span className="block font-medium text-gray-500">Daily Rate</span>
-              <span className="text-sm font-semibold text-gray-800">
-                PKR {(payroll.dailySalary || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <span className="block text-white/40 mb-0.5">Daily Rate</span>
+              <span className="font-semibold text-white/90">
+                Rs. {(payroll.dailySalary || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
             <div>
-              <span className="block font-medium text-gray-500">Working / Absent Days</span>
-              <span className="text-sm font-semibold text-gray-800">
-                {payroll.workingDays || 0} days / <span className="text-red-600">{payroll.absentDays || 0} absents</span>
+              <span className="block text-white/40 mb-0.5">Working / Absents</span>
+              <span className="font-semibold text-white/90">
+                {payroll.workingDays || 0} days / <span className="text-rose-400">{payroll.absentDays || 0} absents</span>
               </span>
             </div>
             <div>
-              <span className="block font-medium text-gray-500">Unpaid / Late Days</span>
-              <span className="text-sm font-semibold text-gray-800">
+              <span className="block text-white/40 mb-0.5">Unpaid / Late Days</span>
+              <span className="font-semibold text-white/90">
                 {payroll.unpaidLeaveDays || 0} unpaid / {payroll.lateDays || 0} late
               </span>
             </div>
           </div>
 
-          {/* Bonus Field */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-white/60 mb-1">
               🎁 Bonus Amount (PKR)
             </label>
             <input
@@ -105,17 +102,13 @@ export default function EditPayrollModal({ payroll, onClose, onSuccess }: EditPa
               step="any"
               value={bonuses}
               onChange={(e) => setBonuses(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
-              placeholder="e.g. 5000"
+              className={inputClass}
+              placeholder="0"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Add performance, festive, or performance bonus for this period.
-            </p>
           </div>
 
-          {/* Allowances Field */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-white/60 mb-1">
               ➕ Total Allowances (PKR)
             </label>
             <input
@@ -124,14 +117,13 @@ export default function EditPayrollModal({ payroll, onClose, onSuccess }: EditPa
               step="any"
               value={allowances}
               onChange={(e) => setAllowances(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
-              placeholder="e.g. 2000"
+              className={inputClass}
+              placeholder="0"
             />
           </div>
 
-          {/* Total Deductions Field */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-white/60 mb-1">
               ➖ Total Deductions (PKR)
             </label>
             <input
@@ -140,42 +132,38 @@ export default function EditPayrollModal({ payroll, onClose, onSuccess }: EditPa
               step="any"
               value={deductions}
               onChange={(e) => setDeductions(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+              className={inputClass}
+              placeholder="0"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Includes auto-calculated attendance deductions. You can adjust if needed.
-            </p>
           </div>
 
-          {/* Dynamic Summary Preview */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1 text-sm">
-            <div className="flex justify-between text-gray-600 text-xs">
-              <span>Gross Salary (Basic + Bonus + Allowances):</span>
-              <span className="font-semibold text-gray-800">PKR {grossSalary.toLocaleString()}</span>
+          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 space-y-1 text-xs text-indigo-200">
+            <div className="flex justify-between">
+              <span>Gross Salary:</span>
+              <span className="font-semibold">Rs. {grossSalary.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-gray-600 text-xs">
+            <div className="flex justify-between">
               <span>Total Deductions:</span>
-              <span className="font-semibold text-red-600">- PKR {deductions.toLocaleString()}</span>
+              <span className="font-semibold text-rose-400">- Rs. {deductions.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between border-t border-blue-200 pt-1 font-bold text-base text-blue-900">
+            <div className="flex justify-between border-t border-indigo-500/20 pt-1 font-bold text-sm text-indigo-300">
               <span>Estimated Net Salary:</span>
-              <span>PKR {netSalary.toLocaleString()}</span>
+              <span>Rs. {netSalary.toLocaleString()}</span>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+              className="px-4 py-2 text-xs text-white/50 border border-white/[0.08] rounded-xl hover:bg-white/[0.05]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+              className="px-4 py-2 text-xs font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
