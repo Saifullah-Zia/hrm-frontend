@@ -31,7 +31,7 @@ function StatusPill({ status }: { status?: string }) {
   );
 }
 
-export default function PayrollGenerationPage() {
+export default function SuperAdminPayrollGenerationPage() {
   const { user } = useAuth();
   const [periods, setPeriods] = useState<PayrollPeriodDTO[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<PayrollPeriodDTO | null>(null);
@@ -191,7 +191,7 @@ export default function PayrollGenerationPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link
-              href="/dashboard/admin/payroll"
+              href="/dashboard/superadmin/payroll"
               className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
               title="Back to Payroll Dashboard"
             >

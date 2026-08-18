@@ -7,7 +7,7 @@ import { payrollApi, PayrollPolicyDTO } from "@/services/payrollApi";
 const inputClass =
   "w-full px-3.5 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
 
-export default function PayrollPoliciesPage() {
+export default function SuperAdminPayrollPoliciesPage() {
   const [policies, setPolicies] = useState<PayrollPolicyDTO[]>([]);
   const [activePolicy, setActivePolicy] = useState<PayrollPolicyDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,11 +58,7 @@ export default function PayrollPoliciesPage() {
   };
 
   const resetForm = () => {
-    setFreeLates(3);
-    setDeductionPerLate(100);
-    setUnpaidLeavePct(100);
-    setAbsentPct(100);
-    setDescription("");
+    setFreeLates(3); setDeductionPerLate(100); setUnpaidLeavePct(100); setAbsentPct(100); setDescription("");
   };
 
   const openCreateModal = () => { resetForm(); setShowCreateModal(true); };
@@ -89,10 +85,7 @@ export default function PayrollPoliciesPage() {
     e.preventDefault();
     try {
       await payrollApi.createPayrollPolicy({ ...buildPayload(), isActive: true });
-      setShowCreateModal(false);
-      resetForm();
-      loadPolicies();
-      loadActivePolicy();
+      setShowCreateModal(false); resetForm(); loadPolicies(); loadActivePolicy();
     } catch (error) { console.error("Failed to create payroll policy:", error); }
   };
 
@@ -101,10 +94,7 @@ export default function PayrollPoliciesPage() {
     if (!editingPolicy) return;
     try {
       await payrollApi.updatePayrollPolicy(editingPolicy.id, { ...buildPayload(), isActive: editingPolicy.isActive !== false });
-      setShowEditModal(false);
-      setEditingPolicy(null);
-      loadPolicies();
-      loadActivePolicy();
+      setShowEditModal(false); setEditingPolicy(null); loadPolicies(); loadActivePolicy();
     } catch (error) { console.error("Failed to update payroll policy:", error); }
   };
 
@@ -113,8 +103,7 @@ export default function PayrollPoliciesPage() {
       const policy = policies.find((p) => p.id === policyId);
       if (policy) {
         await payrollApi.updatePayrollPolicy(policyId, { ...policy, isActive: true });
-        loadPolicies();
-        loadActivePolicy();
+        loadPolicies(); loadActivePolicy();
       }
     } catch (error) { console.error("Failed to activate policy:", error); }
   };
@@ -137,7 +126,7 @@ export default function PayrollPoliciesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link
-              href="/dashboard/admin/payroll"
+              href="/dashboard/superadmin/payroll"
               className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
               title="Back to Payroll Dashboard"
             >
@@ -216,9 +205,7 @@ export default function PayrollPoliciesPage() {
                   const rules = parsePolicyJson(policy);
                   return (
                     <tr key={policy.id} className="hover:bg-white/[0.02] transition">
-                      <td className="px-5 py-4 font-medium text-white/85">
-                        {policy.description || `Policy #${policy.id}`}
-                      </td>
+                      <td className="px-5 py-4 font-medium text-white/85">{policy.description || `Policy #${policy.id}`}</td>
                       <td className="px-5 py-4 text-xs text-white/60">
                         <div>{rules.lates.freeLates} Free Lates</div>
                         <div className="text-white/40">Rs. {rules.lates.deductionPerLate} / late after</div>
@@ -229,23 +216,15 @@ export default function PayrollPoliciesPage() {
                       </td>
                       <td className="px-5 py-4">
                         {policy.isActive ? (
-                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                            Active
-                          </span>
+                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Active</span>
                         ) : (
-                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-white/[0.05] text-white/40 border border-white/[0.08]">
-                            Inactive
-                          </span>
+                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-white/[0.05] text-white/40 border border-white/[0.08]">Inactive</span>
                         )}
                       </td>
                       <td className="px-5 py-4 text-right text-xs font-semibold space-x-3">
-                        <button onClick={() => openEditModal(policy)} className="text-indigo-400 hover:text-indigo-300">
-                          Edit
-                        </button>
+                        <button onClick={() => openEditModal(policy)} className="text-indigo-400 hover:text-indigo-300">Edit</button>
                         {!policy.isActive && (
-                          <button onClick={() => handleActivate(policy.id)} className="text-emerald-400 hover:text-emerald-300">
-                            Set Active
-                          </button>
+                          <button onClick={() => handleActivate(policy.id)} className="text-emerald-400 hover:text-emerald-300">Set Active</button>
                         )}
                       </td>
                     </tr>

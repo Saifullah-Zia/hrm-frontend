@@ -38,6 +38,13 @@ export interface CreatePayrollPayload {
   status?: string;
 }
 
+export interface UpdatePayrollPayload {
+  totalBonuses?: number;
+  totalAllowances?: number;
+  deductions?: number;
+  status?: string;
+}
+
 export interface PayrollPeriodDTO {
   id: number;
   month: string;
@@ -123,20 +130,59 @@ export function parsePayrollPageResponse(data: unknown): PayrollPageResponse {
 
 export const payrollApi = {
   /**
-   * Paginated list — Spring: `GET /api/payroll?page=&size=&sort=`
+   * Paginated list.
+   * - Plain array response → client-side slice (pagination in frontend)
+   * - Spring Page / any object response → use existing parsePayrollPageResponse
    */
   getPage: async (params: {
     page: number;
     size: number;
     sort?: string;
+    search?: string;
   }): Promise<PayrollPageResponse> => {
     const res = await apiClient.get<unknown>("/api/payroll", {
       params: {
         page: params.page,
         size: params.size,
+        ...(params.search ? { search: params.search } : {}),
         ...(params.sort ? { sort: params.sort } : { sort: "id,desc" }),
       },
     });
+
+
+    // Plain array → apply client-side pagination
+    if (Array.isArray(res.data)) {
+      let all = res.data as PayrollDTO[];
+      
+      // If array length equals requested size, check if fetching full endpoint returns more records
+      if (all.length >= params.size) {
+        try {
+          const fullRes = await apiClient.get<unknown>("/api/payroll");
+          if (Array.isArray(fullRes.data) && fullRes.data.length >= all.length) {
+            all = fullRes.data as PayrollDTO[];
+          }
+        } catch {
+          // fallback to initial `all`
+        }
+      }
+
+      const totalElements = all.length;
+      const { page, size } = params;
+      const totalPages = Math.max(1, Math.ceil(totalElements / size));
+      const safePage = Math.min(page, Math.max(0, totalPages - 1));
+      const content = all.slice(safePage * size, (safePage + 1) * size);
+      return {
+        content,
+        totalElements,
+        totalPages,
+        number: safePage,
+        size,
+        first: safePage === 0,
+        last: safePage >= totalPages - 1,
+      };
+    }
+
+    // Any object (Spring Page, custom wrapper, etc.) → existing parser handles it
     return parsePayrollPageResponse(res.data);
   },
 
@@ -187,8 +233,19 @@ export const payrollApi = {
     return res.data;
   },
 
-  update: async (id: number, payload: CreatePayrollPayload): Promise<PayrollDTO> => {
+  update: async (id: number, payload: UpdatePayrollPayload): Promise<PayrollDTO> => {
     const res = await apiClient.put<PayrollDTO>(`/api/payroll/${id}`, payload);
+    return res.data;
+  },
+
+  deleteBulk: async (ids: number[]): Promise<void> => {
+    await apiClient.delete("/api/payroll/bulk", { data: ids });
+  },
+
+  approveBulk: async (ids: number[], approvedBy: number): Promise<PayrollDTO[]> => {
+    const res = await apiClient.put<PayrollDTO[]>("/api/payroll/bulk-approve", ids, {
+      params: { approvedBy },
+    });
     return res.data;
   },
 

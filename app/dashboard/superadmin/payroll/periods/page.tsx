@@ -18,7 +18,7 @@ const inputClass =
 const selectClass =
   "w-full px-3.5 py-2.5 text-sm rounded-xl bg-[#1a1d2e] border border-white/[0.08] text-white/90 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-colors";
 
-export default function PayrollPeriodsPage() {
+export default function SuperAdminPayrollPeriodsPage() {
   const { user } = useAuth();
   const [periods, setPeriods] = useState<PayrollPeriodDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +91,7 @@ export default function PayrollPeriodsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link
-              href="/dashboard/admin/payroll"
+              href="/dashboard/superadmin/payroll"
               className="p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.08] transition"
               title="Back to Payroll Dashboard"
             >
