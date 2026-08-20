@@ -40,8 +40,13 @@ export default function AdminDashboard() {
           apiClient.get("/api/departments"),              // ✅ GET /api/departments
         ]);
 
+        const allUsers: any[] = usersRes.data ?? [];
+        const trackedEmployees = allUsers.filter(
+          (u: any) => u.role?.toUpperCase() !== "ADMIN" && u.role?.toUpperCase() !== "SUPERADMIN"
+        );
+
         setStats({
-          employees:        usersRes.data?.length        ?? 0,
+          employees:        trackedEmployees.length,
           pendingLeaves:    leavesRes.data?.length       ?? 0,
           attendanceToday: distinctUserAttendanceCountOnLocalDate(attendanceRes.data),
           payrollProcessed: payrollTotal,
