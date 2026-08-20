@@ -8,6 +8,7 @@ import { exportMonthlyAttendanceCsv } from "@/lib/attendanceExport";
 import {
   getUsersWithPermissions,
   setWebCheckInAccess,
+  setOutsideAccess,
   UserWithPermission,
 } from "@/services/userPermissionsApi";
 import { Toast } from "@/app/components/Toast";
@@ -144,6 +145,21 @@ export default function AttendanceOverviewPage() {
       setToast({ message: `Web check-in ${!currentValue ? "enabled" : "disabled"} successfully.`, type: "success" });
     } catch {
       setToast({ message: "Failed to update access", type: "error" });
+    } finally {
+      setPermTogglingId(null);
+    }
+  };
+
+  const handleToggleOutsideAccess = async (userId: number, currentValue: boolean) => {
+    setPermTogglingId(userId);
+    try {
+      await setOutsideAccess(userId, !currentValue);
+      setPermissions(prev =>
+        prev.map(u => u.id === userId ? { ...u, outsideAccessAllowed: !currentValue } : u)
+      );
+      setToast({ message: `Remote access (outside office Wi-Fi) ${!currentValue ? "enabled" : "disabled"}.`, type: "success" });
+    } catch {
+      setToast({ message: "Failed to update remote access permission", type: "error" });
     } finally {
       setPermTogglingId(null);
     }
@@ -1011,16 +1027,18 @@ export default function AttendanceOverviewPage() {
           </div>
         )}
 
-        {/* ── Web Check-In Access Panel ── */}
+        {/* ── Access & Remote Permissions Panel ── */}
         {showAccessPanel && isAdminOrSuperAdmin() && (
           <div className="bg-[#13151e] border border-violet-500/20 rounded-2xl p-4 sm:p-6 mb-6">
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-white/90 font-semibold">Web Check-In Access</h2>
-              <span className="text-xs text-white/30">{permissions.filter(u => u.webCheckInAllowed).length} of {permissions.length} enabled</span>
+              <h2 className="text-white/90 font-semibold">Access & Remote Permissions</h2>
+              <span className="text-xs text-white/30">
+                Remote: {permissions.filter(u => u.outsideAccessAllowed).length} allowed · Web: {permissions.filter(u => u.webCheckInAllowed).length} enabled
+              </span>
             </div>
             <p className="text-white/40 text-xs mb-4">
-              Employees with access <span className="text-emerald-400/80">enabled</span> can use the HRM web app to check in/out.
-              All others must use the <span className="text-amber-400/80">biometric device</span>.
+              Toggle <span className="text-sky-400">Remote Access</span> to allow employees to access HRM outside Office Wi-Fi (e.g. Work from Home).
+              Toggle <span className="text-emerald-400">Web Check-In</span> to allow manual check-in on web.
             </p>
 
             {permLoading ? (
@@ -1030,11 +1048,11 @@ export default function AttendanceOverviewPage() {
             ) : permissions.length === 0 ? (
               <p className="text-white/30 text-sm">No employees found.</p>
             ) : (
-              <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
                 {permissions.map(u => (
                   <div
                     key={u.id}
-                    className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/[0.03] transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between px-3.5 py-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-colors gap-3"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/30 to-indigo-500/20 text-violet-300 flex items-center justify-center text-xs font-bold shrink-0">
@@ -1046,34 +1064,67 @@ export default function AttendanceOverviewPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleToggleAccess(u.id, u.webCheckInAllowed)}
-                      disabled={permTogglingId === u.id}
-                      className="relative shrink-0 ml-3 disabled:opacity-60 disabled:cursor-wait"
-                      title={u.webCheckInAllowed ? "Click to disable web check-in" : "Click to enable web check-in"}
-                    >
-                      <span
-                        className={`flex items-center w-11 h-6 rounded-full border transition-all duration-200 ${
-                          u.webCheckInAllowed
-                            ? "bg-emerald-500/25 border-emerald-500/40"
-                            : "bg-white/[0.05] border-white/[0.12]"
-                        }`}
-                      >
-                        <span
-                          className={`w-4 h-4 rounded-full shadow transition-all duration-200 mx-1 ${
-                            u.webCheckInAllowed
-                              ? "translate-x-5 bg-emerald-400"
-                              : "translate-x-0 bg-white/30"
-                          }`}
-                        />
-                      </span>
-                    </button>
+                    <div className="flex items-center gap-6 self-end sm:self-auto shrink-0">
+                      {/* Remote Access Toggle */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-white/40">Remote:</span>
+                        <button
+                          onClick={() => handleToggleOutsideAccess(u.id, u.outsideAccessAllowed)}
+                          disabled={permTogglingId === u.id}
+                          className="relative shrink-0 disabled:opacity-60 disabled:cursor-wait"
+                          title={u.outsideAccessAllowed ? "Click to restrict to Office Wi-Fi" : "Click to allow remote access"}
+                        >
+                          <span
+                            className={`flex items-center w-10 h-5.5 rounded-full border transition-all duration-200 ${
+                              u.outsideAccessAllowed
+                                ? "bg-sky-500/25 border-sky-500/40"
+                                : "bg-white/[0.05] border-white/[0.12]"
+                            }`}
+                          >
+                            <span
+                              className={`w-3.5 h-3.5 rounded-full shadow transition-all duration-200 mx-1 ${
+                                u.outsideAccessAllowed
+                                  ? "translate-x-4 bg-sky-400"
+                                  : "translate-x-0 bg-white/30"
+                              }`}
+                            />
+                          </span>
+                        </button>
+                        <span className={`text-[11px] font-medium w-14 ${u.outsideAccessAllowed ? "text-sky-400" : "text-amber-400/80"}`}>
+                          {u.outsideAccessAllowed ? "Any Net" : "Office Wi-Fi"}
+                        </span>
+                      </div>
 
-                    <span className={`ml-3 text-xs font-medium w-16 text-right shrink-0 ${
-                      u.webCheckInAllowed ? "text-emerald-400" : "text-white/25"
-                    }`}>
-                      {u.webCheckInAllowed ? "Web ✓" : "Device only"}
-                    </span>
+                      {/* Web Check-in Toggle */}
+                      <div className="flex items-center gap-2 border-l border-white/[0.06] pl-4">
+                        <span className="text-[11px] text-white/40">Web Check-in:</span>
+                        <button
+                          onClick={() => handleToggleAccess(u.id, u.webCheckInAllowed)}
+                          disabled={permTogglingId === u.id}
+                          className="relative shrink-0 disabled:opacity-60 disabled:cursor-wait"
+                          title={u.webCheckInAllowed ? "Click to disable web check-in" : "Click to enable web check-in"}
+                        >
+                          <span
+                            className={`flex items-center w-10 h-5.5 rounded-full border transition-all duration-200 ${
+                              u.webCheckInAllowed
+                                ? "bg-emerald-500/25 border-emerald-500/40"
+                                : "bg-white/[0.05] border-white/[0.12]"
+                            }`}
+                          >
+                            <span
+                              className={`w-3.5 h-3.5 rounded-full shadow transition-all duration-200 mx-1 ${
+                                u.webCheckInAllowed
+                                  ? "translate-x-4 bg-emerald-400"
+                                  : "translate-x-0 bg-white/30"
+                              }`}
+                            />
+                          </span>
+                        </button>
+                        <span className={`text-[11px] font-medium w-14 ${u.webCheckInAllowed ? "text-emerald-400" : "text-white/25"}`}>
+                          {u.webCheckInAllowed ? "Web ✓" : "Biometric"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

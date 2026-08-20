@@ -6,6 +6,7 @@ export interface UserWithPermission {
   email: string;
   role: string;
   webCheckInAllowed: boolean;
+  outsideAccessAllowed: boolean;
 }
 
 /** Fetches all users including their webCheckInAllowed flag */
@@ -20,4 +21,12 @@ export async function setWebCheckInAccess(
   allowed: boolean
 ): Promise<void> {
   await apiClient.patch(`/api/users/${userId}/web-checkin-access`, { allowed });
+}
+
+/** Admin: enable or disable access outside Office Wi-Fi for a specific employee */
+export async function setOutsideAccess(
+  userId: number,
+  allowed: boolean
+): Promise<void> {
+  await apiClient.patch(`/api/users/${userId}/outside-access`, { allowed });
 }
