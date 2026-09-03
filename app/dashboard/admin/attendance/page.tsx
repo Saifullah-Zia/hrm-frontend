@@ -12,6 +12,7 @@ import {
   UserWithPermission,
 } from "@/services/userPermissionsApi";
 import { Toast } from "@/app/components/Toast";
+import { hasRealCheckIn, hasRealCheckOut } from "@/lib/officeHours";
 
 /* ─── types ─────────────────────────────────────────────────────────────────── */
 
@@ -984,11 +985,11 @@ export default function AttendanceOverviewPage() {
                         </td>
                         {/* Check in */}
                         <td className="px-5 py-4 text-white/60 text-sm font-mono whitespace-nowrap">
-                          {formatTime(record.checkIn)}
+                          {hasRealCheckIn(record.checkIn) ? formatTime(record.checkIn) : "—"}
                         </td>
                         {/* Check out */}
                         <td className="px-5 py-4 text-white/60 text-sm font-mono whitespace-nowrap">
-                          {formatTime(record.checkOut)}
+                          {hasRealCheckOut(record.checkIn, record.checkOut) ? formatTime(record.checkOut) : "—"}
                         </td>
                         {/* Actions */}
                         {isAdminOrSuperAdmin() && (

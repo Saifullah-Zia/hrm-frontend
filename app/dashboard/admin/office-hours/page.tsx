@@ -83,7 +83,7 @@ export default function AdminOfficeHoursPage() {
       <div>
         <h1 className="text-2xl font-bold text-white/90 tracking-tight">Office hours</h1>
         <p className="text-white/40 text-sm mt-1">
-          Set the official start and end of the workday. Check-in after start plus the grace period is marked as LATE; on time is PRESENT.
+          Set the official start and end of the workday. Check-in after start plus the grace period is marked as LATE; on time is PRESENT. Overnight shifts (for example 5:00 PM–2:00 AM) auto check-out 15 minutes after end — only if the employee actually checked in.
         </p>
       </div>
 

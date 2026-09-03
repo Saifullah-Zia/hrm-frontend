@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import { attendanceCorrectionApi, AttendanceCorrectionRequestDTO } from "@/services/attendanceCorrectionApi";
 import AttendanceClockCard from "@/app/components/employee/AttendanceClockCard";
+import { hasRealCheckIn, hasRealCheckOut } from "@/lib/officeHours";
 
 /* ─── helpers ──────────────────────────────────────────────────────────────── */
 
@@ -13,6 +14,8 @@ const STATUS_COLORS: Record<string, string> = {
   PRESENT: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   ABSENT: "bg-rose-500/15 text-rose-400 border-rose-500/20",
   LATE: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  ON_LEAVE: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  UNPAID_LEAVE: "bg-purple-500/15 text-purple-400 border-purple-500/20",
 };
 
 const isAttended = (status: string) =>
@@ -434,8 +437,8 @@ export default function EmployeeAttendancePage() {
                             {row.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-white/60">{formatTime(row.checkIn)}</td>
-                        <td className="px-4 py-3 text-white/60">{formatTime(row.checkOut)}</td>
+                        <td className="px-4 py-3 text-white/60">{hasRealCheckIn(row.checkIn) ? formatTime(row.checkIn) : "—"}</td>
+                        <td className="px-4 py-3 text-white/60">{hasRealCheckOut(row.checkIn, row.checkOut) ? formatTime(row.checkOut) : "—"}</td>
                       </tr>
                     ))
                   )}

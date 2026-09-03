@@ -199,7 +199,7 @@ export function exportMonthlyAttendanceCsv(options: {
 
       if (isOffDay(day)) {
         checkOutRow.push("");
-      } else if (record && record.checkOut) {
+      } else if (record && record.checkIn && record.checkOut) {
         checkOutRow.push(formatPktTime(record.checkOut));
       } else {
         checkOutRow.push("");

@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import { getUsersWithPermissions } from "@/services/userPermissionsApi";
+import { officeHoursApi } from "@/services/officeHoursApi";
+import {
+  AUTO_CHECKOUT_AFTER_END_MINUTES,
+  autoCheckoutInstant,
+  hasRealCheckIn,
+  hasRealCheckOut,
+  shouldAutoCheckoutOpenShift,
+} from "@/lib/officeHours";
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
@@ -54,6 +62,7 @@ export default function AttendanceClockCard({ userId }: Props) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const autoCheckoutSentForId = useRef<number | null>(null);
 
   /* ── fetch today's attendance record for this user ── */
   const { data: allRecords, isLoading } = useQuery({
@@ -83,33 +92,27 @@ export default function AttendanceClockCard({ userId }: Props) {
   // Find any open shift (checked-in but not yet checked-out).
   // This handles overnight shifts: e.g. check-in at 5 PM (date = July 14)
   // and checkout at 2 AM next day (todayPKT = July 15 → todayRecord = undefined).
-  // The open record is picked up regardless of date so the checkout button
-  // stays enabled and the check-in time remains visible.
+  // Leave / unpaid rows with a stray checkout and no check-in are ignored so they
+  // cannot block web check-in for the next working day.
   const openRecord: AttendanceDTO | undefined = allRecords?.find(
-    (r) => !!r.checkIn && !r.checkOut
+    (r) =>
+      hasRealCheckIn(r.checkIn) &&
+      !hasRealCheckOut(r.checkIn, r.checkOut) &&
+      r.status !== "ON_LEAVE" &&
+      r.status !== "UNPAID_LEAVE"
   );
 
   // Active record: prefer the open overnight shift; otherwise use today's record.
   const activeRecord = openRecord ?? todayRecord;
 
-  const hasCheckedIn = !!activeRecord?.checkIn;
-  const hasCheckedOut = !!activeRecord?.checkOut;
+  const hasCheckedIn = hasRealCheckIn(activeRecord?.checkIn);
+  const hasCheckedOut = hasRealCheckOut(activeRecord?.checkIn, activeRecord?.checkOut);
+  const onLeaveToday =
+    todayRecord?.status === "ON_LEAVE" || todayRecord?.status === "UNPAID_LEAVE";
 
-  /* ── office hours (for display only) ── */
   const { data: officeHours } = useQuery({
     queryKey: ["office-hours"],
-    queryFn: () =>
-      fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/api/settings/office-hours`, {
-        headers: {
-          Authorization: `Bearer ${(() => {
-            try {
-              const raw = localStorage.getItem("hrm-auth");
-              if (raw) return JSON.parse(raw)?.state?.token ?? "";
-              return localStorage.getItem("token") ?? "";
-            } catch { return ""; }
-          })()}`,
-        },
-      }).then((r) => r.json()),
+    queryFn: () => officeHoursApi.get(),
   });
 
   // Format office hours to 12hr for display
@@ -163,6 +166,7 @@ export default function AttendanceClockCard({ userId }: Props) {
       queryClient.invalidateQueries({ queryKey: ["employee-attendance-paginated", userId] });
     },
     onError: (err: Error) => {
+      autoCheckoutSentForId.current = null;
       setSuccess(null);
       setError(err.message || "Failed to check out");
     },
@@ -170,6 +174,29 @@ export default function AttendanceClockCard({ userId }: Props) {
 
   const isActing = checkInMutation.isPending || checkOutMutation.isPending;
   const weekendDisabled = isWeekend();
+
+  /* Close an open punch after workday end + 15 min (e.g. 2:15 AM). Never runs on leave. */
+  useEffect(() => {
+    if (!officeHours || !openRecord) return;
+
+    const runCheckout = () => {
+      if (autoCheckoutSentForId.current === openRecord.id) return;
+      if (checkOutMutation.isPending) return;
+      autoCheckoutSentForId.current = openRecord.id;
+      checkOutMutation.mutate();
+    };
+
+    if (shouldAutoCheckoutOpenShift(openRecord, officeHours)) {
+      runCheckout();
+      return;
+    }
+
+    const at = autoCheckoutInstant(openRecord.date, officeHours);
+    const delay = at.getTime() - Date.now();
+    if (delay <= 0 || delay > 36 * 60 * 60 * 1000) return;
+    const timer = window.setTimeout(runCheckout, delay);
+    return () => window.clearTimeout(timer);
+  }, [officeHours, openRecord, checkOutMutation]);
 
   /* ─── render ─────────────────────────────────────────────────────────────── */
   return (
@@ -201,6 +228,8 @@ export default function AttendanceClockCard({ userId }: Props) {
               ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
               : (todayRecord?.status ?? "IN SHIFT") === "IN SHIFT"
                 ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20"
+                : (todayRecord?.status === "ON_LEAVE" || todayRecord?.status === "UNPAID_LEAVE")
+                  ? "bg-blue-500/15 text-blue-400 border-blue-500/20"
                 : "bg-rose-500/15 text-rose-400 border-rose-500/20"
             }`}>
             {todayRecord?.status ?? "IN SHIFT"}
@@ -235,9 +264,16 @@ export default function AttendanceClockCard({ userId }: Props) {
       {/* Status message */}
       {isLoading ? (
         <p className="text-white/30 text-xs mb-4">Loading today's record...</p>
+      ) : onLeaveToday && !hasCheckedIn ? (
+        <p className="text-blue-300/70 text-xs mb-4">
+          On leave today — no check-in or check-out.
+        </p>
       ) : hasCheckedIn && !hasCheckedOut ? (
         <p className="text-white/40 text-xs mb-4">
-          Checked in — use Check out when you leave.
+          Checked in — use Check out when you leave. If you forget, checkout is
+          recorded automatically {AUTO_CHECKOUT_AFTER_END_MINUTES} minutes after
+          office end
+          {officeHours?.workdayEnd ? ` (${formatOfficeTime(officeHours.workdayEnd)})` : ""}.
         </p>
       ) : weekendDisabled ? (
         <p className="text-amber-400/70 text-xs mb-4">
@@ -245,7 +281,7 @@ export default function AttendanceClockCard({ userId }: Props) {
         </p>
       ) : hasCheckedOut ? (
         <p className="text-emerald-400/70 text-xs mb-4">
-          ✅ Shift complete for today.
+          ✅ Shift complete for today. You can check in again after the next shift starts.
         </p>
       ) : (
         <p className="text-white/30 text-xs mb-4">
@@ -283,7 +319,7 @@ export default function AttendanceClockCard({ userId }: Props) {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => checkInMutation.mutate()}
-            disabled={isActing || isLoading || hasCheckedIn || weekendDisabled}
+            disabled={isActing || isLoading || hasCheckedIn || weekendDisabled || (onLeaveToday && !hasCheckedIn)}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 text-sm font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={weekendDisabled ? "Check-in disabled on weekends" : undefined}
           >
