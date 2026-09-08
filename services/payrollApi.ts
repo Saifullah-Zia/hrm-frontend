@@ -85,6 +85,15 @@ export type CreatePayrollPolicyPayload = Omit<
   "id" | "createdAt" | "updatedAt"
 >;
 
+export interface BulkPayrollResult {
+  success: boolean;
+  message: string;
+  generatedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  details?: string;
+}
+
 /** Spring Data `Page<PayrollDTO>` JSON (camelCase) or a plain array from older APIs */
 export interface PayrollPageResponse {
   content: PayrollDTO[];
@@ -323,8 +332,8 @@ export const payrollApi = {
     return res.data;
   },
 
-  generateBulkPayroll: async (payrollPeriodId: number, generatedBy: number): Promise<string> => {
-    const res = await apiClient.post<string>("/api/payroll/generate/bulk", null, {
+  generateBulkPayroll: async (payrollPeriodId: number, generatedBy: number): Promise<BulkPayrollResult> => {
+    const res = await apiClient.post<BulkPayrollResult>("/api/payroll/generate/bulk", null, {
       params: { payrollPeriodId, generatedBy },
     });
     return res.data;

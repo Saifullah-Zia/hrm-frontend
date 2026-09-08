@@ -131,8 +131,10 @@ export default function SuperAdminPayrollGenerationPage() {
     try {
       setErrorMsg(null);
       setGenerating(true);
-      await payrollApi.generateBulkPayroll(selectedPeriod.id, generatedBy);
+      const res = await payrollApi.generateBulkPayroll(selectedPeriod.id, generatedBy);
+      console.log("Bulk generation result:", res);
       await loadPayrolls(selectedPeriod.id);
+      await loadPeriods();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       setErrorMsg(`Failed to generate payroll: ${msg}`);
