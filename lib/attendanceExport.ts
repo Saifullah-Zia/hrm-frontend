@@ -44,6 +44,8 @@ function mapStatus(status: string | null | undefined): string {
       return "O";
     case "UNPAID_LEAVE":
       return "UL";
+    case "HOLIDAY":
+      return "H";
     default:
       return "A";
   }
@@ -219,4 +221,3 @@ export function exportMonthlyAttendanceCsv(options: {
 
   return sortedUsers.length;
 }
-
