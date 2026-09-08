@@ -41,7 +41,16 @@ function overlapDaysInYear(startStr: string, endStr: string, year: number): numb
   const lo = start.getTime() > y0.getTime() ? start : y0;
   const hi = end.getTime() < y1.getTime() ? end : y1;
   if (lo.getTime() > hi.getTime()) return 0;
-  return Math.floor((hi.getTime() - lo.getTime()) / 86_400_000) + 1;
+  let count = 0;
+  const curr = new Date(lo);
+  while (curr <= hi) {
+    const day = curr.getDay();
+    if (day !== 0 && day !== 6) {
+      count++;
+    }
+    curr.setDate(curr.getDate() + 1);
+  }
+  return count;
 }
 
 function estimateBalancesFromLeaves(
@@ -75,10 +84,19 @@ function estimateBalancesFromLeaves(
 
 function inclusiveDays(start: string, end: string): number {
   if (!start || !end) return 0;
-  const a = new Date(`${start}T12:00:00`).getTime();
-  const b = new Date(`${end}T12:00:00`).getTime();
-  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return 0;
-  return Math.floor((b - a) / 86_400_000) + 1;
+  const a = new Date(`${start.slice(0, 10)}T12:00:00`);
+  const b = new Date(`${end.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return 0;
+  let count = 0;
+  const curr = new Date(a);
+  while (curr <= b) {
+    const day = curr.getDay();
+    if (day !== 0 && day !== 6) {
+      count++;
+    }
+    curr.setDate(curr.getDate() + 1);
+  }
+  return count;
 }
 
 function policySummary(p: LeavePolicyDto): string[] {

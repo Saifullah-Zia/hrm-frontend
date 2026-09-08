@@ -52,8 +52,20 @@ const fmt = (d: string) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 const daysBetween = (start: string, end: string) => {
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  return Math.max(1, Math.round(ms / 86_400_000) + 1);
+  if (!start || !end) return 0;
+  const a = new Date(`${start.slice(0, 10)}T12:00:00`);
+  const b = new Date(`${end.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return 0;
+  let count = 0;
+  const curr = new Date(a);
+  while (curr <= b) {
+    const day = curr.getDay();
+    if (day !== 0 && day !== 6) {
+      count++;
+    }
+    curr.setDate(curr.getDate() + 1);
+  }
+  return count;
 };
 
 function durationForLeave(leave: LeaveDto): number {
