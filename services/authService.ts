@@ -60,7 +60,11 @@ export async function loginUser(credentials: {
   email: string;
   password: string;
 }): Promise<LoginSession> {
-  const response = await api.post<LoginResponse>("/api/auth/login", credentials);
+  const cleanEmail = credentials.email.trim().toLowerCase();
+  const response = await api.post<LoginResponse>("/api/auth/login", {
+    email: cleanEmail,
+    password: credentials.password,
+  });
   const token = response.data.accessToken;
   const userId = parseUserId(response.data.userId);
 
@@ -70,7 +74,7 @@ export async function loginUser(credentials: {
     name: response.data.name,
     userId,
     email: response.data.email,
-    emailFallback: credentials.email,
+    emailFallback: cleanEmail,
   });
 
   return {
@@ -78,7 +82,7 @@ export async function loginUser(credentials: {
     userId,
     role: response.data.role,
     name: response.data.name,
-    email: response.data.email ?? credentials.email,
+    email: response.data.email ?? cleanEmail,
   };
 }
 
@@ -89,7 +93,8 @@ export async function registerUser(data: {
   name?: string;
   role?: string;
 }): Promise<string> {
-  const response = await api.post<string>("/api/auth/register", data, {
+  const cleanData = { ...data, email: data.email.trim().toLowerCase() };
+  const response = await api.post<string>("/api/auth/register", cleanData, {
     // Spring may respond with text/plain; axios still puts body in data
     transformResponse: [(raw) => {
       if (typeof raw !== "string") return raw;
@@ -114,8 +119,9 @@ export async function registerUser(data: {
 }
 
 export async function verifyEmail(email: string, otp: string): Promise<string> {
+  const cleanEmail = email.trim().toLowerCase();
   const { data } = await api.post<string>("/api/auth/verify-email", null, {
-    params: { email, otp },
+    params: { email: cleanEmail, otp },
     transformResponse: [(raw) => {
       if (typeof raw !== "string") return raw;
       const t = raw.trim();
@@ -133,8 +139,9 @@ export async function verifyEmail(email: string, otp: string): Promise<string> {
 }
 
 export async function resendVerificationOtp(email: string): Promise<string> {
+  const cleanEmail = email.trim().toLowerCase();
   const { data } = await api.post<string>("/api/auth/resend-otp", null, {
-    params: { email },
+    params: { email: cleanEmail },
     transformResponse: [(raw) => {
       if (typeof raw !== "string") return raw;
       const t = raw.trim();
@@ -152,8 +159,9 @@ export async function resendVerificationOtp(email: string): Promise<string> {
 }
 
 export async function forgotPassword(email: string): Promise<string> {
+  const cleanEmail = email.trim().toLowerCase();
   const { data } = await api.post<string>("/api/auth/forgot-password", null, {
-    params: { email },
+    params: { email: cleanEmail },
     transformResponse: [(raw) => {
       if (typeof raw !== "string") return raw;
       const t = raw.trim();
@@ -175,8 +183,9 @@ export async function resetPassword(
   otp: string,
   newPassword: string
 ): Promise<string> {
+  const cleanEmail = email.trim().toLowerCase();
   const { data } = await api.post<string>("/api/auth/reset-password", null, {
-    params: { email, otp, newPassword },
+    params: { email: cleanEmail, otp, newPassword },
     transformResponse: [(raw) => {
       if (typeof raw !== "string") return raw;
       const t = raw.trim();
