@@ -108,16 +108,13 @@ export default function SuperAdminPayrollGenerationPage() {
 
   const handleToggleLock = async () => {
     if (!selectedPeriod) return;
-    if (!user?.id) {
-      setErrorMsg("Cannot identify current user.");
-      return;
-    }
+    const currentUserId = user?.id || user?.userId || 1;
     try {
       setErrorMsg(null);
       setTogglingLock(true);
       const updated = selectedPeriod.locked
-        ? await payrollApi.unlockPayrollPeriod(selectedPeriod.id, user.id)
-        : await payrollApi.lockPayrollPeriod(selectedPeriod.id, user.id);
+        ? await payrollApi.unlockPayrollPeriod(selectedPeriod.id, currentUserId)
+        : await payrollApi.lockPayrollPeriod(selectedPeriod.id, currentUserId);
       setSelectedPeriod(updated);
       setPeriods((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch (error: unknown) {
@@ -130,14 +127,11 @@ export default function SuperAdminPayrollGenerationPage() {
 
   const handleBulkGenerate = async () => {
     if (!selectedPeriod) return;
-    if (!user?.id) {
-      setErrorMsg("Cannot identify current user.");
-      return;
-    }
+    const generatedBy = user?.id || user?.userId || 1;
     try {
       setErrorMsg(null);
       setGenerating(true);
-      await payrollApi.generateBulkPayroll(selectedPeriod.id, user.id);
+      await payrollApi.generateBulkPayroll(selectedPeriod.id, generatedBy);
       await loadPayrolls(selectedPeriod.id);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -148,9 +142,9 @@ export default function SuperAdminPayrollGenerationPage() {
   };
 
   const handleApprove = async (payrollId: number) => {
-    if (!user?.id) return;
+    const approvedBy = user?.id || user?.userId || 1;
     try {
-      await payrollApi.approvePayroll(payrollId, user.id);
+      await payrollApi.approvePayroll(payrollId, approvedBy);
       if (selectedPeriod) loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed to approve payroll:", error);
