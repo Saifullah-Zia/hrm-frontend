@@ -19,6 +19,7 @@ export default function SuperAdminPayrollPoliciesPage() {
   const [deductionPerLate, setDeductionPerLate] = useState<number>(100);
   const [unpaidLeavePct, setUnpaidLeavePct] = useState<number>(100);
   const [absentPct, setAbsentPct] = useState<number>(100);
+  const [taxEnabled, setTaxEnabled] = useState<boolean>(true);
   const [description, setDescription] = useState<string>("");
 
   useEffect(() => {
@@ -47,29 +48,41 @@ export default function SuperAdminPayrollPoliciesPage() {
     }
   };
 
+  const DEFAULT_TAX_SLABS = [
+    { minAnnual: 0, maxAnnual: 600000, fixedTax: 0, taxRate: 0 },
+    { minAnnual: 600000, maxAnnual: 1200000, fixedTax: 0, taxRate: 5 },
+    { minAnnual: 1200000, maxAnnual: 2200000, fixedTax: 30000, taxRate: 15 },
+    { minAnnual: 2200000, maxAnnual: 3200000, fixedTax: 180000, taxRate: 25 },
+    { minAnnual: 3200000, maxAnnual: 4100000, fixedTax: 430000, taxRate: 30 },
+    { minAnnual: 4100000, maxAnnual: 99999999, fixedTax: 700000, taxRate: 35 },
+  ];
+
   const parsePolicyJson = (policy: PayrollPolicyDTO) => {
     let lates = { freeLates: 3, deductionPerLate: 100 };
     let unpaid = { deductionPercentage: 100 };
     let absent = { deductionPercentage: 100 };
+    let tax = { enabled: true, slabs: DEFAULT_TAX_SLABS };
     try { if (policy.lateDeductionRule) lates = JSON.parse(policy.lateDeductionRule); } catch {}
     try { if (policy.unpaidLeaveDeductionRule) unpaid = JSON.parse(policy.unpaidLeaveDeductionRule); } catch {}
     try { if (policy.absentDeductionRule) absent = JSON.parse(policy.absentDeductionRule); } catch {}
-    return { lates, unpaid, absent };
+    try { if (policy.incomeTaxRule) tax = JSON.parse(policy.incomeTaxRule); } catch {}
+    return { lates, unpaid, absent, tax };
   };
 
   const resetForm = () => {
-    setFreeLates(3); setDeductionPerLate(100); setUnpaidLeavePct(100); setAbsentPct(100); setDescription("");
+    setFreeLates(3); setDeductionPerLate(100); setUnpaidLeavePct(100); setAbsentPct(100); setTaxEnabled(true); setDescription("");
   };
 
   const openCreateModal = () => { resetForm(); setShowCreateModal(true); };
 
   const openEditModal = (policy: PayrollPolicyDTO) => {
     setEditingPolicy(policy);
-    const { lates, unpaid, absent } = parsePolicyJson(policy);
+    const { lates, unpaid, absent, tax } = parsePolicyJson(policy);
     setFreeLates(lates.freeLates ?? 3);
     setDeductionPerLate(lates.deductionPerLate ?? 100);
     setUnpaidLeavePct(unpaid.deductionPercentage ?? 100);
     setAbsentPct(absent.deductionPercentage ?? 100);
+    setTaxEnabled(tax.enabled !== false);
     setDescription(policy.description || "");
     setShowEditModal(true);
   };
@@ -78,6 +91,7 @@ export default function SuperAdminPayrollPoliciesPage() {
     lateDeductionRule: JSON.stringify({ freeLates: Number(freeLates), deductionPerLate: Number(deductionPerLate) }),
     unpaidLeaveDeductionRule: JSON.stringify({ deductionPercentage: Number(unpaidLeavePct) }),
     absentDeductionRule: JSON.stringify({ deductionPercentage: Number(absentPct) }),
+    incomeTaxRule: JSON.stringify({ enabled: taxEnabled, slabs: DEFAULT_TAX_SLABS }),
     description,
   });
 
@@ -165,7 +179,7 @@ export default function SuperAdminPayrollPoliciesPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
                 <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Late Deduction Rule</span>
                 <p className="text-sm font-bold text-white/90">{activeRules.lates.freeLates} Free Lates Allowed</p>
@@ -183,6 +197,11 @@ export default function SuperAdminPayrollPoliciesPage() {
                 <p className="text-sm font-bold text-white/90">{activeRules.absent.deductionPercentage}% Deduction</p>
                 <p className="text-xs text-white/50 mt-1">Deducts 1 full daily salary per unexcused absent day</p>
               </div>
+              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
+                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Income Tax (Withholding)</span>
+                <p className="text-sm font-bold text-white/90">{activeRules.tax.enabled !== false ? "Enabled" : "Disabled"}</p>
+                <p className="text-xs text-white/50 mt-1">Standard FBR tax slabs applied to annual gross</p>
+              </div>
             </div>
           </div>
         )}
@@ -193,7 +212,7 @@ export default function SuperAdminPayrollPoliciesPage() {
             <table className="w-full text-sm min-w-[650px]">
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  {["Description", "Late Penalty", "Unpaid / Absent Rate", "Status", ""].map((h) => (
+                  {["Description", "Late Penalty", "Unpaid / Absent Rate", "Income Tax", "Status", ""].map((h) => (
                     <th key={h} className={`px-5 py-3.5 text-white/30 uppercase text-[11px] font-medium ${h === "" ? "text-right" : "text-left"}`}>
                       {h}
                     </th>
@@ -214,6 +233,11 @@ export default function SuperAdminPayrollPoliciesPage() {
                         <div>Unpaid: {rules.unpaid.deductionPercentage}%</div>
                         <div>Absent: {rules.absent.deductionPercentage}%</div>
                       </td>
+                      <td className="px-5 py-4 text-xs text-white/60">
+                        <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${rules.tax.enabled !== false ? "bg-indigo-500/15 text-indigo-300" : "bg-white/5 text-white/40"}`}>
+                          {rules.tax.enabled !== false ? "FBR Slabs On" : "Off"}
+                        </span>
+                      </td>
                       <td className="px-5 py-4">
                         {policy.isActive ? (
                           <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Active</span>
@@ -232,7 +256,7 @@ export default function SuperAdminPayrollPoliciesPage() {
                 })}
                 {policies.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-12 text-center text-sm text-white/25">
+                    <td colSpan={6} className="px-5 py-12 text-center text-sm text-white/25">
                       No policies found. Create one to get started.
                     </td>
                   </tr>
@@ -297,8 +321,25 @@ export default function SuperAdminPayrollPoliciesPage() {
                     <input type="number" min="0" max="100" value={absentPct} onChange={(e) => setAbsentPct(Number(e.target.value))} className={inputClass} required />
                     <p className="text-[10px] text-white/30 mt-1">Set to 0% for no extra policy penalty</p>
                   </div>
-
                 </div>
+              </div>
+
+              <div className="border-t border-white/[0.06] pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest">🏛️ Income Tax (Withholding Tax)</h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={taxEnabled}
+                      onChange={(e) => setTaxEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+                <p className="text-xs text-white/40">
+                  {taxEnabled ? "Income Tax withholding enabled based on standard Pakistan FBR salaried slabs." : "Income Tax withholding is disabled for this policy."}
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.06]">

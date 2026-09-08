@@ -72,6 +72,7 @@ export interface PayrollPolicyDTO {
   lateDeductionRule?: string;
   unpaidLeaveDeductionRule?: string;
   absentDeductionRule?: string;
+  incomeTaxRule?: string;
   isActive: boolean;
   description?: string;
   createdAt?: string;
