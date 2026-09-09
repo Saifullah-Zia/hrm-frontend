@@ -20,6 +20,8 @@ export default function PayrollPoliciesPage() {
   const [unpaidLeavePct, setUnpaidLeavePct] = useState<number>(100);
   const [absentPct, setAbsentPct] = useState<number>(100);
   const [taxEnabled, setTaxEnabled] = useState<boolean>(true);
+  const [taxMode, setTaxMode] = useState<"SLABS" | "PERCENTAGE">("PERCENTAGE");
+  const [taxPercentage, setTaxPercentage] = useState<number>(5.0);
   const [description, setDescription] = useState<string>("");
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function PayrollPoliciesPage() {
     let lates = { freeLates: 3, deductionPerLate: 100 };
     let unpaid = { deductionPercentage: 100 };
     let absent = { deductionPercentage: 100 };
-    let tax = { enabled: true, slabs: DEFAULT_TAX_SLABS };
+    let tax = { enabled: true, type: "PERCENTAGE", percentage: 5.0, slabs: DEFAULT_TAX_SLABS };
     try { if (policy.lateDeductionRule) lates = JSON.parse(policy.lateDeductionRule); } catch {}
     try { if (policy.unpaidLeaveDeductionRule) unpaid = JSON.parse(policy.unpaidLeaveDeductionRule); } catch {}
     try { if (policy.absentDeductionRule) absent = JSON.parse(policy.absentDeductionRule); } catch {}
@@ -75,6 +77,8 @@ export default function PayrollPoliciesPage() {
     setUnpaidLeavePct(100);
     setAbsentPct(100);
     setTaxEnabled(true);
+    setTaxMode("PERCENTAGE");
+    setTaxPercentage(5.0);
     setDescription("");
   };
 
@@ -88,6 +92,8 @@ export default function PayrollPoliciesPage() {
     setUnpaidLeavePct(unpaid.deductionPercentage ?? 100);
     setAbsentPct(absent.deductionPercentage ?? 100);
     setTaxEnabled(tax.enabled !== false);
+    setTaxMode(tax.type === "PERCENTAGE" || (tax.percentage !== undefined && !tax.type) ? "PERCENTAGE" : "SLABS");
+    setTaxPercentage(tax.percentage ?? 5.0);
     setDescription(policy.description || "");
     setShowEditModal(true);
   };
@@ -96,7 +102,12 @@ export default function PayrollPoliciesPage() {
     lateDeductionRule: JSON.stringify({ freeLates: Number(freeLates), deductionPerLate: Number(deductionPerLate) }),
     unpaidLeaveDeductionRule: JSON.stringify({ deductionPercentage: Number(unpaidLeavePct) }),
     absentDeductionRule: JSON.stringify({ deductionPercentage: Number(absentPct) }),
-    incomeTaxRule: JSON.stringify({ enabled: taxEnabled, slabs: DEFAULT_TAX_SLABS }),
+    incomeTaxRule: JSON.stringify({
+      enabled: taxEnabled,
+      type: taxMode,
+      percentage: Number(taxPercentage),
+      slabs: DEFAULT_TAX_SLABS
+    }),
     description,
   });
 
@@ -104,10 +115,7 @@ export default function PayrollPoliciesPage() {
     e.preventDefault();
     try {
       await payrollApi.createPayrollPolicy({ ...buildPayload(), isActive: true });
-      setShowCreateModal(false);
-      resetForm();
-      loadPolicies();
-      loadActivePolicy();
+      setShowCreateModal(false); resetForm(); loadPolicies(); loadActivePolicy();
     } catch (error) { console.error("Failed to create payroll policy:", error); }
   };
 
@@ -116,10 +124,7 @@ export default function PayrollPoliciesPage() {
     if (!editingPolicy) return;
     try {
       await payrollApi.updatePayrollPolicy(editingPolicy.id, { ...buildPayload(), isActive: editingPolicy.isActive !== false });
-      setShowEditModal(false);
-      setEditingPolicy(null);
-      loadPolicies();
-      loadActivePolicy();
+      setShowEditModal(false); setEditingPolicy(null); loadPolicies(); loadActivePolicy();
     } catch (error) { console.error("Failed to update payroll policy:", error); }
   };
 
@@ -128,8 +133,7 @@ export default function PayrollPoliciesPage() {
       const policy = policies.find((p) => p.id === policyId);
       if (policy) {
         await payrollApi.updatePayrollPolicy(policyId, { ...policy, isActive: true });
-        loadPolicies();
-        loadActivePolicy();
+        loadPolicies(); loadActivePolicy();
       }
     } catch (error) { console.error("Failed to activate policy:", error); }
   };
@@ -160,59 +164,59 @@ export default function PayrollPoliciesPage() {
             </Link>
             <div>
               <h1 className="text-xl font-semibold text-white/90">Payroll Policies</h1>
-              <p className="text-sm text-white/35 mt-0.5">Configure late arrival penalties, unpaid leave rates, and absence deductions</p>
+              <p className="text-xs text-white/40 mt-0.5">Manage deduction rules, late penalties & tax percentage</p>
             </div>
           </div>
           <button
             onClick={openCreateModal}
-            className="px-4 py-2.5 bg-indigo-600 text-white font-medium text-sm rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 transition"
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/20 flex items-center gap-2"
           >
-            + Create New Policy
+            <span>+</span> Create Policy
           </button>
         </div>
 
-        {/* Active Policy Card */}
-        {activePolicy && activeRules && (
-          <div className="bg-indigo-500/[0.07] border border-indigo-500/20 rounded-2xl p-6">
-            <div className="flex justify-between items-start mb-5">
-              <div>
-                <span className="px-2.5 py-1 bg-emerald-500/15 text-emerald-400 text-[11px] font-semibold rounded-full border border-emerald-500/20">
-                  ACTIVE POLICY
-                </span>
-                <h2 className="text-base font-semibold text-white/90 mt-2">
-                  {activePolicy.description || "Default Company Policy"}
-                </h2>
+        {/* Active Policy Overview */}
+        {activeRules && (
+          <div className="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <h2 className="text-sm font-semibold text-indigo-300">Active Policy Rules</h2>
               </div>
-              <button
-                onClick={() => openEditModal(activePolicy)}
-                className="text-xs bg-white/[0.04] text-indigo-400 font-semibold px-3 py-1.5 rounded-xl border border-indigo-500/20 hover:bg-indigo-500/10 transition"
-              >
-                Edit Active Policy
-              </button>
+              <span className="text-xs text-white/40">{activePolicy?.description || `Policy #${activePolicy?.id}`}</span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
               <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
-                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Late Deduction Rule</span>
-                <p className="text-sm font-bold text-white/90">{activeRules.lates.freeLates} Free Lates Allowed</p>
-                <p className="text-xs text-white/50 mt-1">
-                  Deduction: <span className="font-semibold text-rose-400">Rs. {activeRules.lates.deductionPerLate}</span> per late after free lates
+                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Late Penalty</span>
+                <p className="text-sm font-bold text-white/90">Rs. {activeRules.lates.deductionPerLate}</p>
+                <p className="text-xs text-white/50 mt-1">{activeRules.lates.freeLates} free lates per month</p>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
+                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Unpaid Leave Rate</span>
+                <p className="text-sm font-bold text-white/90">{activeRules.unpaid.deductionPercentage}%</p>
+                <p className="text-xs text-white/50 mt-1">Deduction per unpaid day</p>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
+                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Absence Rate</span>
+                <p className="text-sm font-bold text-white/90">{activeRules.absent.deductionPercentage}%</p>
+                <p className="text-xs text-white/50 mt-1">Deduction per absent day</p>
+              </div>
+              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
+                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Income Tax Mode</span>
+                <p className="text-sm font-bold text-white/90">
+                  {activeRules.tax.enabled !== false
+                    ? activeRules.tax.type === "PERCENTAGE" || (activeRules.tax.percentage !== undefined && !activeRules.tax.type)
+                      ? `Flat ${activeRules.tax.percentage}%`
+                      : "FBR Slabs"
+                    : "Disabled"}
                 </p>
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
-                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Unpaid Leave Rule</span>
-                <p className="text-sm font-bold text-white/90">{activeRules.unpaid.deductionPercentage}% Deduction</p>
-                <p className="text-xs text-white/50 mt-1">Deducts 1 full daily salary per unpaid leave day</p>
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
-                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Absent Deduction Rule</span>
-                <p className="text-sm font-bold text-white/90">{activeRules.absent.deductionPercentage}% Deduction</p>
-                <p className="text-xs text-white/50 mt-1">Deducts 1 full daily salary per unexcused absent day</p>
-              </div>
-              <div className="bg-white/[0.03] border border-white/[0.06] p-4 rounded-xl">
-                <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wide block mb-2">Income Tax (Withholding)</span>
-                <p className="text-sm font-bold text-white/90">{activeRules.tax.enabled !== false ? "Enabled" : "Disabled"}</p>
-                <p className="text-xs text-white/50 mt-1">Standard FBR tax slabs applied to annual gross</p>
+                <p className="text-xs text-white/50 mt-1">
+                  {activeRules.tax.enabled !== false
+                    ? activeRules.tax.type === "PERCENTAGE"
+                      ? `Fixed ${activeRules.tax.percentage}% flat withholding`
+                      : "Progressive annual slabs"
+                    : "Tax withholding disabled"}
+                </p>
               </div>
             </div>
           </div>
@@ -234,11 +238,10 @@ export default function PayrollPoliciesPage() {
               <tbody className="divide-y divide-white/[0.04]">
                 {policies.map((policy) => {
                   const rules = parsePolicyJson(policy);
+                  const isFlatTax = rules.tax.type === "PERCENTAGE" || (rules.tax.percentage !== undefined && !rules.tax.type);
                   return (
                     <tr key={policy.id} className="hover:bg-white/[0.02] transition">
-                      <td className="px-5 py-4 font-medium text-white/85">
-                        {policy.description || `Policy #${policy.id}`}
-                      </td>
+                      <td className="px-5 py-4 font-medium text-white/85">{policy.description || `Policy #${policy.id}`}</td>
                       <td className="px-5 py-4 text-xs text-white/60">
                         <div>{rules.lates.freeLates} Free Lates</div>
                         <div className="text-white/40">Rs. {rules.lates.deductionPerLate} / late after</div>
@@ -249,28 +252,20 @@ export default function PayrollPoliciesPage() {
                       </td>
                       <td className="px-5 py-4 text-xs text-white/60">
                         <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${rules.tax.enabled !== false ? "bg-indigo-500/15 text-indigo-300" : "bg-white/5 text-white/40"}`}>
-                          {rules.tax.enabled !== false ? "FBR Slabs On" : "Off"}
+                          {rules.tax.enabled !== false ? (isFlatTax ? `Flat ${rules.tax.percentage}%` : "FBR Slabs") : "Off"}
                         </span>
                       </td>
                       <td className="px-5 py-4">
                         {policy.isActive ? (
-                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                            Active
-                          </span>
+                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Active</span>
                         ) : (
-                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-white/[0.05] text-white/40 border border-white/[0.08]">
-                            Inactive
-                          </span>
+                          <span className="inline-flex px-2.5 py-1 text-[11px] font-semibold rounded-full bg-white/[0.05] text-white/40 border border-white/[0.08]">Inactive</span>
                         )}
                       </td>
                       <td className="px-5 py-4 text-right text-xs font-semibold space-x-3">
-                        <button onClick={() => openEditModal(policy)} className="text-indigo-400 hover:text-indigo-300">
-                          Edit
-                        </button>
+                        <button onClick={() => openEditModal(policy)} className="text-indigo-400 hover:text-indigo-300">Edit</button>
                         {!policy.isActive && (
-                          <button onClick={() => handleActivate(policy.id)} className="text-emerald-400 hover:text-emerald-300">
-                            Set Active
-                          </button>
+                          <button onClick={() => handleActivate(policy.id)} className="text-emerald-400 hover:text-emerald-300">Set Active</button>
                         )}
                       </td>
                     </tr>
@@ -346,7 +341,7 @@ export default function PayrollPoliciesPage() {
                 </div>
               </div>
 
-              <div className="border-t border-white/[0.06] pt-4">
+              <div className="border-t border-white/[0.06] pt-4 space-y-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest">🏛️ Income Tax (Withholding Tax)</h3>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -359,9 +354,61 @@ export default function PayrollPoliciesPage() {
                     <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                   </label>
                 </div>
-                <p className="text-xs text-white/40">
-                  {taxEnabled ? "Income Tax withholding enabled based on standard Pakistan FBR salaried slabs." : "Income Tax withholding is disabled for this policy."}
-                </p>
+
+                {taxEnabled && (
+                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">Tax Calculation Mode</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTaxMode("PERCENTAGE")}
+                          className={`px-3 py-2 text-xs font-medium rounded-lg border transition ${
+                            taxMode === "PERCENTAGE"
+                              ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-300 font-semibold"
+                              : "bg-white/[0.02] border-white/[0.08] text-white/50 hover:text-white"
+                          }`}
+                        >
+                          Flat Percentage (%)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTaxMode("SLABS")}
+                          className={`px-3 py-2 text-xs font-medium rounded-lg border transition ${
+                            taxMode === "SLABS"
+                              ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-300 font-semibold"
+                              : "bg-white/[0.02] border-white/[0.08] text-white/50 hover:text-white"
+                          }`}
+                        >
+                          Progressive Slabs
+                        </button>
+                      </div>
+                    </div>
+
+                    {taxMode === "PERCENTAGE" ? (
+                      <div>
+                        <label className="block text-xs text-white/50 mb-1">Custom Tax Percentage (%)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={taxPercentage}
+                          onChange={(e) => setTaxPercentage(Number(e.target.value))}
+                          className={inputClass}
+                          required
+                        />
+                        <p className="text-[10px] text-white/40 mt-1">
+                          Applies a flat {taxPercentage}% tax on monthly gross salary (e.g. 5% of 100,000 = PKR 5,000).
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-white/40">
+                        Applies standard FBR Pakistan salaried tax brackets dynamically to annual income.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-white/[0.06]">
