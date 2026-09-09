@@ -52,11 +52,11 @@ export default function SuperAdminPayrollPoliciesPage() {
 
   const DEFAULT_TAX_SLABS = [
     { minAnnual: 0, maxAnnual: 600000, fixedTax: 0, taxRate: 0 },
-    { minAnnual: 600000, maxAnnual: 1200000, fixedTax: 0, taxRate: 5 },
-    { minAnnual: 1200000, maxAnnual: 2200000, fixedTax: 30000, taxRate: 15 },
-    { minAnnual: 2200000, maxAnnual: 3200000, fixedTax: 180000, taxRate: 25 },
-    { minAnnual: 3200000, maxAnnual: 4100000, fixedTax: 430000, taxRate: 30 },
-    { minAnnual: 4100000, maxAnnual: 99999999, fixedTax: 700000, taxRate: 35 },
+    { minAnnual: 600000, maxAnnual: 1200000, fixedTax: 0, taxRate: 1 },
+    { minAnnual: 1200000, maxAnnual: 2200000, fixedTax: 6000, taxRate: 11 },
+    { minAnnual: 2200000, maxAnnual: 3200000, fixedTax: 116000, taxRate: 20 },
+    { minAnnual: 3200000, maxAnnual: 4100000, fixedTax: 316000, taxRate: 25 },
+    { minAnnual: 4100000, maxAnnual: 99999999, fixedTax: 541000, taxRate: 29 },
   ];
 
   const parsePolicyJson = (policy: PayrollPolicyDTO) => {
