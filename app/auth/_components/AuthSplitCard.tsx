@@ -457,32 +457,46 @@ export default function AuthSplitCard({ initialMode = "login" }: AuthSplitCardPr
               isRegisterMode ? "translate-x-0 left-0" : "translate-x-full left-0"
             }`}
           >
-            <div className="relative w-full h-full bg-gradient-to-br from-[#fc0175] via-[#7c3aed] to-[#4f46e5] p-12 flex flex-col justify-between items-center text-center shadow-2xl overflow-hidden">
+            <div className="relative w-full h-full flex flex-col justify-between items-center text-center shadow-2xl overflow-hidden">
               
-              {/* Decorative Animated Elements */}
-              <div className="absolute top-[-20%] right-[-20%] w-[350px] h-[350px] bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              <div className="absolute bottom-[-20%] left-[-20%] w-[350px] h-[350px] bg-black/20 rounded-full blur-2xl pointer-events-none" />
+              {/* Office Background Image */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/office-bg.png"
+                alt="JCAT Solutions Office"
+                className="absolute inset-0 w-full h-full object-cover object-center"
+              />
+
+              {/* Layered Overlay: dark base + brand gradient tint for readability */}
+              <div className="absolute inset-0 bg-black/60" />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#fc0175]/30 via-[#7c3aed]/20 to-[#0a0c14]/80" />
+
+              {/* Subtle top vignette */}
+              <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 to-transparent" />
+              {/* Subtle bottom vignette */}
+              <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent" />
 
               {/* Branding Top */}
-              <div className="relative z-10 flex flex-col items-center gap-3 pt-6">
-                <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 p-2.5 flex items-center justify-center shadow-xl">
+              <div className="relative z-10 flex flex-col items-center gap-3 pt-10">
+                <div className="w-16 h-16 rounded-2xl bg-black/40 backdrop-blur-md border border-white/20 p-2.5 flex items-center justify-center shadow-xl ring-1 ring-white/10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={BRAND_LOGO_PATH} alt={BRAND_FULL_NAME} className="w-full h-full object-contain drop-shadow-md" />
                 </div>
-                <h3 className="text-white font-extrabold text-xl tracking-tight drop-shadow-sm">
+                <h3 className="text-white font-extrabold text-xl tracking-tight drop-shadow-lg">
                   {BRAND_FULL_NAME}
                 </h3>
+                <span className="text-[#fc0175] text-xs font-semibold tracking-widest uppercase drop-shadow">Human Resource Management</span>
               </div>
 
               {/* Dynamic Sliding Text & Action */}
-              <div className="relative z-10 my-auto max-w-sm space-y-4">
+              <div className="relative z-10 my-auto max-w-sm space-y-4 px-4">
                 {isRegisterMode ? (
                   <>
-                    <h2 className="text-3xl font-extrabold text-white tracking-tight leading-snug">
-                      Already Registered?
+                    <h2 className="text-3xl font-extrabold text-white tracking-tight leading-snug drop-shadow-lg">
+                      Already Part of the Team?
                     </h2>
-                    <p className="text-white/80 text-sm leading-relaxed">
-                      To keep connected with your organization, please log in with your existing account.
+                    <p className="text-white/80 text-sm leading-relaxed drop-shadow">
+                      Sign in to access your payslips, attendance records, leave requests, and everything else in one place.
                     </p>
                     <button
                       type="button"
@@ -494,25 +508,37 @@ export default function AuthSplitCard({ initialMode = "login" }: AuthSplitCardPr
                   </>
                 ) : (
                   <>
-                    <h2 className="text-3xl font-extrabold text-white tracking-tight leading-snug">
-                      Hello, Colleague!
+                    <h2 className="text-3xl font-extrabold text-white tracking-tight leading-snug drop-shadow-lg">
+                      Streamline Your HR Operations
                     </h2>
-                    <p className="text-white/80 text-sm leading-relaxed">
-                      Enter your personal details and start your workspace journey with us today.
+                    <p className="text-white/80 text-sm leading-relaxed drop-shadow">
+                      Manage attendance, payroll, leaves, and employee records — all from a single, powerful platform built for modern workplaces.
                     </p>
                     <button
                       type="button"
                       onClick={() => toggleMode(true)}
                       className="mt-6 px-8 py-3 bg-white/15 hover:bg-white/25 text-white font-bold text-sm rounded-xl border border-white/30 backdrop-blur-md transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
                     >
-                      SIGN UP
+                      JOIN YOUR TEAM
                     </button>
                   </>
                 )}
               </div>
 
+              {/* Feature Pills */}
+              <div className="relative z-10 flex flex-wrap justify-center gap-2 px-6 pb-4">
+                {["Payroll", "Attendance", "Leave Mgmt", "Employee Records"].map((feat) => (
+                  <span
+                    key={feat}
+                    className="px-3 py-1 rounded-full text-[10px] font-semibold text-white/70 bg-white/10 border border-white/15 backdrop-blur-sm"
+                  >
+                    {feat}
+                  </span>
+                ))}
+              </div>
+
               {/* Footer text */}
-              <div className="relative z-10 text-white/50 text-xs font-medium">
+              <div className="relative z-10 text-white/40 text-xs font-medium pb-6">
                 © {new Date().getFullYear()} JCAT Solutions HRM. All rights reserved.
               </div>
             </div>
