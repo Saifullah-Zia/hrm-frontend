@@ -5,6 +5,8 @@ import Link from "next/link";
 import { payrollApi, PayrollPeriodDTO, PayrollDTO } from "@/services/payrollApi";
 import { useAuth } from "@/lib/useAuth";
 import EditPayrollModal from "./_components/EditPayrollModal";
+import PayslipModal from "@/app/components/PayslipModal";
+import { openPayslipPrintView } from "@/lib/payslipExport";
 
 export default function SuperAdminPayrollReviewPage() {
   const { user } = useAuth();
@@ -55,10 +57,14 @@ export default function SuperAdminPayrollReviewPage() {
     setShowPayslipModal(true);
   };
 
-  const handleDownloadPdf = async (payrollId: number) => {
-    const success = await payrollApi.downloadPayslipPdf(payrollId);
-    if (!success) {
-      alert("Failed to download payslip PDF");
+  const handleDownloadPdf = async (payroll: PayrollDTO) => {
+    try {
+      const success = await payrollApi.downloadPayslipPdf(payroll.id);
+      if (!success) {
+        openPayslipPrintView(payroll, payroll.userName || `Employee ${payroll.userId}`);
+      }
+    } catch {
+      openPayslipPrintView(payroll, payroll.userName || `Employee ${payroll.userId}`);
     }
   };
 
@@ -287,7 +293,7 @@ export default function SuperAdminPayrollReviewPage() {
                                 View
                               </button>
                               <button
-                                onClick={() => handleDownloadPdf(payroll.id)}
+                                onClick={() => handleDownloadPdf(payroll)}
                                 className="text-emerald-400 hover:text-emerald-300"
                               >
                                 PDF
@@ -325,52 +331,11 @@ export default function SuperAdminPayrollReviewPage() {
       )}
 
       {/* Payslip View Modal */}
-      {showPayslipModal && selectedPayroll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowPayslipModal(false)}>
-          <div className="bg-[#13151e] border border-white/[0.08] rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 text-white/90" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center border-b border-white/[0.08] pb-3">
-              <h2 className="text-base font-semibold text-white/90">
-                Payslip Preview - {selectedPayroll.userName || `ID #${selectedPayroll.userId}`}
-              </h2>
-              <button onClick={() => setShowPayslipModal(false)} className="text-white/30 hover:text-white/70">
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2 text-sm text-white/70">
-              <div className="flex justify-between">
-                <span>Basic Salary:</span>
-                <span className="font-semibold text-white">
-                  Rs. {(selectedPayroll.basicSalary || selectedPayroll.salary || 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Bonuses:</span>
-                <span className="font-semibold text-emerald-400">
-                  + Rs. {(selectedPayroll.totalBonuses || selectedPayroll.bonuses || 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Deductions:</span>
-                <span className="font-semibold text-rose-400">
-                  - Rs. {(selectedPayroll.totalDeductions || selectedPayroll.deductions || 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-white/[0.08] pt-2 font-bold text-base text-indigo-400">
-                <span>Net Take-Home Salary:</span>
-                <span>Rs. {(selectedPayroll.netSalary || 0).toLocaleString()}</span>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => handleDownloadPdf(selectedPayroll.id)}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-500"
-              >
-                Download PDF
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PayslipModal
+        payroll={selectedPayroll}
+        isOpen={showPayslipModal}
+        onClose={() => setShowPayslipModal(false)}
+      />
     </div>
   );
 }
