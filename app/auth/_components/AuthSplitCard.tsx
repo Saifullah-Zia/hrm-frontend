@@ -478,9 +478,9 @@ export default function AuthSplitCard({ initialMode = "login" }: AuthSplitCardPr
 
               {/* Branding Top */}
               <div className="relative z-10 flex flex-col items-center gap-3 pt-10">
-                <div className="w-16 h-16 rounded-2xl bg-black/40 backdrop-blur-md border border-white/20 p-2.5 flex items-center justify-center shadow-xl ring-1 ring-white/10">
+                <div className="w-20 h-20 rounded-2xl bg-black/50 backdrop-blur-md border border-white/20 p-2 flex items-center justify-center shadow-2xl ring-1 ring-[#fc0175]/30" style={{ boxShadow: '0 0 32px rgba(252,1,117,0.25), 0 8px 32px rgba(0,0,0,0.5)' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={BRAND_LOGO_PATH} alt={BRAND_FULL_NAME} className="w-full h-full object-contain drop-shadow-md" />
+                  <img src="/jcat-icon.png" alt="JCAT Icon" className="w-full h-full object-contain drop-shadow-md" />
                 </div>
                 <h3 className="text-white font-extrabold text-xl tracking-tight drop-shadow-lg">
                   {BRAND_FULL_NAME}
