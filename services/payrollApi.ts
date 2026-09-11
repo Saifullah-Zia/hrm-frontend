@@ -145,14 +145,12 @@ export function parsePayrollPageResponse(data: unknown): PayrollPageResponse {
 
 export const payrollApi = {
   /**
-   * Paginated list.
-   * - Plain array response → client-side slice (pagination in frontend)
-   * - Spring Page / any object response → use existing parsePayrollPageResponse
+   * Paginated list — calls GET /api/payroll?page=N&size=N&search=...
+   * Backend always returns a Spring Page<PayRollDto> JSON object.
    */
   getPage: async (params: {
     page: number;
     size: number;
-    sort?: string;
     search?: string;
   }): Promise<PayrollPageResponse> => {
     const res = await apiClient.get<unknown>("/api/payroll", {
@@ -160,44 +158,8 @@ export const payrollApi = {
         page: params.page,
         size: params.size,
         ...(params.search ? { search: params.search } : {}),
-        ...(params.sort ? { sort: params.sort } : { sort: "id,desc" }),
       },
     });
-
-
-    // Plain array → apply client-side pagination
-    if (Array.isArray(res.data)) {
-      let all = res.data as PayrollDTO[];
-      
-      // If array length equals requested size, check if fetching full endpoint returns more records
-      if (all.length >= params.size) {
-        try {
-          const fullRes = await apiClient.get<unknown>("/api/payroll");
-          if (Array.isArray(fullRes.data) && fullRes.data.length >= all.length) {
-            all = fullRes.data as PayrollDTO[];
-          }
-        } catch {
-          // fallback to initial `all`
-        }
-      }
-
-      const totalElements = all.length;
-      const { page, size } = params;
-      const totalPages = Math.max(1, Math.ceil(totalElements / size));
-      const safePage = Math.min(page, Math.max(0, totalPages - 1));
-      const content = all.slice(safePage * size, (safePage + 1) * size);
-      return {
-        content,
-        totalElements,
-        totalPages,
-        number: safePage,
-        size,
-        first: safePage === 0,
-        last: safePage >= totalPages - 1,
-      };
-    }
-
-    // Any object (Spring Page, custom wrapper, etc.) → existing parser handles it
     return parsePayrollPageResponse(res.data);
   },
 

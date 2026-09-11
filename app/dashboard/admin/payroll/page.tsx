@@ -77,7 +77,7 @@ export default function PayrollManagementPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PayrollDTO | null>(null);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -90,7 +90,7 @@ export default function PayrollManagementPage() {
   async function loadPayrolls(pageNum = page, pageSz = pageSize) {
     setLoading(true);
     try {
-      const pay = await payrollApi.getPage({ page: pageNum, size: pageSz, sort: "id,desc" });
+      const pay = await payrollApi.getPage({ page: pageNum, size: pageSz });
       setPayrolls(pay.content);
       setTotalElements(pay.totalElements);
       setTotalPages(Math.max(1, pay.totalPages));
