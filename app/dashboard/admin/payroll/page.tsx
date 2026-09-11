@@ -66,6 +66,36 @@ function DeleteModal({ open, onClose, onConfirm, loading }: { open: boolean; onC
   );
 }
 
+// ─── Unlock Modal ─────────────────────────────────────────────────────────────
+
+function UnlockModal({ open, onClose, onConfirm, loading }: { open: boolean; onClose: () => void; onConfirm: () => Promise<void>; loading: boolean }) {
+  async function handleUnlock() { await onConfirm(); onClose(); }
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
+          <Icon d={ICONS.lock} className="w-5 h-5 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-white/90">Unlock Payroll Record?</h2>
+          <p className="text-xs text-white/40">Revert status from PAID to APPROVED</p>
+        </div>
+      </div>
+      <p className="text-sm text-white/60 mb-6">
+        Unlocking this payroll record will revert its status back to <span className="text-indigo-400 font-semibold">APPROVED</span>. Once unlocked, you can edit or delete this record.
+      </p>
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="px-4 py-2 text-sm text-white/50 border border-white/[0.08] rounded-xl hover:bg-white/[0.05]">
+          Cancel
+        </button>
+        <button onClick={handleUnlock} disabled={loading} className="px-4 py-2 text-sm bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-xl disabled:opacity-50 flex items-center gap-1.5">
+          {loading ? "Unlocking..." : "🔓 Unlock Record"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PayrollManagementPage() {
@@ -73,10 +103,13 @@ export default function PayrollManagementPage() {
   const [payrolls, setPayrolls] = useState<PayrollDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [unlockLoading, setUnlockLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [showDelete, setShowDelete] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PayrollDTO | null>(null);
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [unlockTarget, setUnlockTarget] = useState<PayrollDTO | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
   const [totalElements, setTotalElements] = useState(0);
@@ -124,6 +157,42 @@ export default function PayrollManagementPage() {
     }
   }
 
+  // ─── Single Unlock ────────────────────────────────────────────────────────
+
+  async function handleUnlock() {
+    if (!unlockTarget) return;
+    setUnlockLoading(true);
+    try {
+      await payrollApi.update(unlockTarget.id, { status: "APPROVED" });
+      await loadPayrolls(page, pageSize);
+      setToast({ message: `🔓 Unlocked payroll for ${unlockTarget.userName || "employee"} to APPROVED. You can now delete it.`, type: "success" });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Failed to unlock payroll", type: "error" });
+    } finally {
+      setUnlockLoading(false);
+      setShowUnlock(false);
+      setUnlockTarget(null);
+    }
+  }
+
+  async function handleBulkUnlock() {
+    const paidRecords = payrolls.filter((p) => selectedIds.includes(p.id) && p.status === "PAID");
+    if (paidRecords.length === 0) return;
+    if (!confirm(`Unlock ${paidRecords.length} selected PAID record(s)? Status will revert to APPROVED so they can be deleted.`)) return;
+    setBulkLoading(true);
+    try {
+      for (const p of paidRecords) {
+        await payrollApi.update(p.id, { status: "APPROVED" });
+      }
+      await loadPayrolls(page, pageSize);
+      setToast({ message: `🔓 Unlocked ${paidRecords.length} record(s) to APPROVED`, type: "success" });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Bulk unlock failed", type: "error" });
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
   // ─── Bulk Actions ─────────────────────────────────────────────────────────
 
   async function handleBulkDelete() {
@@ -132,11 +201,11 @@ export default function PayrollManagementPage() {
     const paidCount = payrolls.filter((p) => selectedIds.includes(p.id) && p.status === "PAID").length;
     const deletableCount = selectedIds.length - paidCount;
     if (deletableCount === 0) {
-      setToast({ message: "🔒 All selected records are PAID and cannot be deleted.", type: "info" });
+      setToast({ message: "🔒 All selected records are PAID and locked. Click 'Unlock Selected' first to allow deletion.", type: "info" });
       return;
     }
     const msg = paidCount > 0
-      ? `Delete ${deletableCount} record(s)? ${paidCount} PAID record(s) will be skipped — paid payrolls cannot be deleted.`
+      ? `Delete ${deletableCount} record(s)? ${paidCount} PAID record(s) will be skipped — unlock them first if you wish to delete.`
       : `Delete ${deletableCount} selected payroll record(s)? This cannot be undone.`;
     if (!confirm(msg)) return;
     setBulkLoading(true);
@@ -309,10 +378,15 @@ export default function PayrollManagementPage() {
               <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs">
                 <span className="font-semibold text-indigo-300">{selectedIds.length} selected</span>
                 {paidSelected > 0 && (
-                  <span className="flex items-center gap-1 text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                  <button
+                    onClick={handleBulkUnlock}
+                    disabled={bulkLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 text-amber-300 font-medium rounded-lg transition disabled:opacity-50 cursor-pointer"
+                    title="Unlock selected PAID records to APPROVED so they can be deleted"
+                  >
                     <Icon d={ICONS.lock} className="w-3 h-3" />
-                    {paidSelected} PAID (cannot delete)
-                  </span>
+                    Unlock Selected ({paidSelected})
+                  </button>
                 )}
                 <button
                   onClick={handleBulkApprove}
@@ -333,7 +407,7 @@ export default function PayrollManagementPage() {
                   onClick={handleBulkDelete}
                   disabled={bulkLoading || deletable === 0}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-lg transition disabled:opacity-50"
-                  title={deletable === 0 ? "All selected records are PAID and cannot be deleted" : undefined}
+                  title={deletable === 0 ? "Unlock selected PAID records first before deleting" : undefined}
                 >
                   <Icon d={ICONS.trash} className="w-3 h-3" />
                   Delete {deletable > 0 && deletable < selectedIds.length ? `(${deletable})` : "Selected"}
@@ -429,12 +503,13 @@ export default function PayrollManagementPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           {p.status === "PAID" ? (
-                            <span
-                              className="p-1.5 rounded-lg text-white/15 inline-flex cursor-not-allowed"
-                              title="Paid payrolls are permanent financial records and cannot be deleted"
+                            <button
+                              onClick={() => { setUnlockTarget(p); setShowUnlock(true); }}
+                              className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/20 transition inline-flex items-center gap-1 cursor-pointer"
+                              title="PAID record is locked. Click to unlock first before deleting."
                             >
                               <Icon d={ICONS.lock} className="w-3.5 h-3.5" />
-                            </span>
+                            </button>
                           ) : (
                             <button
                               onClick={() => { setDeleteTarget(p); setShowDelete(true); }}
@@ -506,6 +581,12 @@ export default function PayrollManagementPage() {
         onClose={() => { setShowDelete(false); setDeleteTarget(null); }}
         onConfirm={handleDelete}
         loading={deleteLoading}
+      />
+      <UnlockModal
+        open={showUnlock}
+        onClose={() => { setShowUnlock(false); setUnlockTarget(null); }}
+        onConfirm={handleUnlock}
+        loading={unlockLoading}
       />
     </div>
   );
