@@ -56,7 +56,7 @@ export default function EmployeePayslipsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-white/90 tracking-tight">My payslips</h1>
         <p className="text-white/40 text-sm mt-1">

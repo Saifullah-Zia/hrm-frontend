@@ -181,7 +181,7 @@ export default function PayrollGenerationPage() {
 
   return (
     <div className="min-h-screen bg-[#0f1117] p-6 text-white/90">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
 
         {/* Header & Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

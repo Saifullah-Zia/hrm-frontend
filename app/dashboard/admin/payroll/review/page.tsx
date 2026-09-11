@@ -178,7 +178,7 @@ export default function PayrollReviewPage() {
 
   return (
     <div className="min-h-screen bg-[#0f1117] p-6 text-white/90">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
 
         {/* Toast Notification */}
         {toastMessage && (
