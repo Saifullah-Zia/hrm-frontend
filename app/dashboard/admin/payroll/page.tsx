@@ -17,6 +17,7 @@ const ICONS = {
   plus:      "M12 4v16m8-8H4",
   search:    "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
   trash:     "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
+  lock:      "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
   wallet:    "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m0-4h4m0 0v4m0-4V9a2 2 0 00-2-2h-2",
   calendar:  "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
   cog:       "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
@@ -127,12 +128,24 @@ export default function PayrollManagementPage() {
 
   async function handleBulkDelete() {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Delete ${selectedIds.length} selected payroll record(s)? This cannot be undone.`)) return;
+    // Count PAID records in the selection so the user knows some will be skipped
+    const paidCount = payrolls.filter((p) => selectedIds.includes(p.id) && p.status === "PAID").length;
+    const deletableCount = selectedIds.length - paidCount;
+    if (deletableCount === 0) {
+      setToast({ message: "🔒 All selected records are PAID and cannot be deleted.", type: "info" });
+      return;
+    }
+    const msg = paidCount > 0
+      ? `Delete ${deletableCount} record(s)? ${paidCount} PAID record(s) will be skipped — paid payrolls cannot be deleted.`
+      : `Delete ${deletableCount} selected payroll record(s)? This cannot be undone.`;
+    if (!confirm(msg)) return;
     setBulkLoading(true);
     try {
-      await payrollApi.deleteBulk(selectedIds);
+      const result = await payrollApi.deleteBulk(selectedIds);
       await loadPayrolls(page, pageSize);
-      setToast({ message: `🗑️ Deleted ${selectedIds.length} payroll record(s)`, type: "success" });
+      // result is the backend message string
+      const backendMsg = typeof result === "string" ? result : `🗑️ Deleted ${deletableCount} payroll record(s)`;
+      setToast({ message: `🗑️ ${backendMsg}`, type: "success" });
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : "Bulk delete failed", type: "error" });
     } finally {
@@ -289,40 +302,51 @@ export default function PayrollManagementPage() {
           </div>
 
           {/* Bulk action bar */}
-          {selectedIds.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs">
-              <span className="font-semibold text-indigo-300">{selectedIds.length} selected</span>
-              <button
-                onClick={handleBulkApprove}
-                disabled={bulkLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition disabled:opacity-50"
-              >
-                <Icon d={ICONS.check} className="w-3 h-3" />
-                Approve Selected
-              </button>
-              <button
-                onClick={handleBulkPay}
-                disabled={bulkLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition disabled:opacity-50 font-bold"
-              >
-                💳 Pay Selected
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-lg transition disabled:opacity-50"
-              >
-                <Icon d={ICONS.trash} className="w-3 h-3" />
-                Delete Selected
-              </button>
-              <button
-                onClick={() => setSelectedIds([])}
-                className="ml-auto text-white/40 hover:text-white/70 px-2 py-1"
-              >
-                Clear
-              </button>
-            </div>
-          )}
+          {selectedIds.length > 0 && (() => {
+            const paidSelected = payrolls.filter((p) => selectedIds.includes(p.id) && p.status === "PAID").length;
+            const deletable = selectedIds.length - paidSelected;
+            return (
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs">
+                <span className="font-semibold text-indigo-300">{selectedIds.length} selected</span>
+                {paidSelected > 0 && (
+                  <span className="flex items-center gap-1 text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                    <Icon d={ICONS.lock} className="w-3 h-3" />
+                    {paidSelected} PAID (cannot delete)
+                  </span>
+                )}
+                <button
+                  onClick={handleBulkApprove}
+                  disabled={bulkLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+                >
+                  <Icon d={ICONS.check} className="w-3 h-3" />
+                  Approve Selected
+                </button>
+                <button
+                  onClick={handleBulkPay}
+                  disabled={bulkLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition disabled:opacity-50 font-bold"
+                >
+                  💳 Pay Selected
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkLoading || deletable === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+                  title={deletable === 0 ? "All selected records are PAID and cannot be deleted" : undefined}
+                >
+                  <Icon d={ICONS.trash} className="w-3 h-3" />
+                  Delete {deletable > 0 && deletable < selectedIds.length ? `(${deletable})` : "Selected"}
+                </button>
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="ml-auto text-white/40 hover:text-white/70 px-2 py-1"
+                >
+                  Clear
+                </button>
+              </div>
+            );
+          })()}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[900px]">
@@ -404,13 +428,22 @@ export default function PayrollManagementPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => { setDeleteTarget(p); setShowDelete(true); }}
-                            className="p-1.5 rounded-lg text-white/25 hover:text-rose-400 hover:bg-rose-500/10 transition"
-                            title="Delete"
-                          >
-                            <Icon d={ICONS.trash} className="w-3.5 h-3.5" />
-                          </button>
+                          {p.status === "PAID" ? (
+                            <span
+                              className="p-1.5 rounded-lg text-white/15 inline-flex cursor-not-allowed"
+                              title="Paid payrolls are permanent financial records and cannot be deleted"
+                            >
+                              <Icon d={ICONS.lock} className="w-3.5 h-3.5" />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => { setDeleteTarget(p); setShowDelete(true); }}
+                              className="p-1.5 rounded-lg text-white/25 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                              title="Delete"
+                            >
+                              <Icon d={ICONS.trash} className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
