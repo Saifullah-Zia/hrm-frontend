@@ -21,6 +21,11 @@ export interface PayrollDTO {
   totalAllowances?: number;
   totalBonuses?: number;
   totalDeductions?: number;
+  lateDeduction?: number;
+  fbrTaxDeduction?: number;
+  taxDeduction?: number;
+  unpaidLeaveDeduction?: number;
+  absentDeduction?: number;
   grossSalary?: number;
   generatedBy?: number;
   generatedAt?: string;

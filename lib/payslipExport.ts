@@ -55,6 +55,22 @@ export function openPayslipPrintView(p: PayrollDTO, employeeName: string) {
   });
   const payslipId = `PS-${p.month?.replace("-", "") ?? "000000"}-${String(p.id).padStart(4, "0")}`;
 
+  const totalDed = p.totalDeductions || p.deductions || 0;
+  const lateDays = p.lateDays || 0;
+  let lateDeduction = p.lateDeduction;
+  if (lateDeduction === undefined || lateDeduction === null) {
+    if (lateDays > 0) {
+      if (lateDays > 3) lateDeduction = (lateDays - 3) * 100;
+      else if (lateDays > 2 && totalDed === (lateDays - 2) * 100) lateDeduction = (lateDays - 2) * 100;
+      else if (totalDed > 0 && (p.absentDays || 0) === 0 && (p.unpaidLeaveDays || 0) === 0) lateDeduction = totalDed;
+      else lateDeduction = 0;
+    } else {
+      lateDeduction = 0;
+    }
+  }
+
+  const fbrTaxDeduction = p.fbrTaxDeduction ?? p.taxDeduction ?? 0;
+
   w.document.write(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -334,7 +350,9 @@ export function openPayslipPrintView(p: PayrollDTO, employeeName: string) {
         <tr><th>Description</th><th class="num">Amount (${COMPANY.currency})</th></tr>
       </thead>
       <tbody>
-        <tr class="row-deduction"><td>Total deductions</td><td class="num">${fmt(p.deductions)}</td></tr>
+        <tr class="row-deduction"><td>Late deduction</td><td class="num">${fmt(lateDeduction)}</td></tr>
+        <tr class="row-deduction"><td>FBR tax deduction</td><td class="num">${fmt(fbrTaxDeduction)}</td></tr>
+        <tr class="row-deduction" style="font-weight: 700;"><td>Total deductions</td><td class="num">${fmt(totalDed)}</td></tr>
       </tbody>
     </table>
 

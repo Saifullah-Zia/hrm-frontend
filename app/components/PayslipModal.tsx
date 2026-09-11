@@ -40,6 +40,30 @@ export default function PayslipModal({
     }
   };
 
+  const totalDed = payroll.totalDeductions || payroll.deductions || 0;
+  const lateDays = payroll.lateDays || 0;
+
+  let lateDeduction = payroll.lateDeduction;
+  if (lateDeduction === undefined || lateDeduction === null) {
+    if (lateDays > 0) {
+      if (lateDays > 3) {
+        lateDeduction = (lateDays - 3) * 100;
+      } else if (lateDays > 2 && totalDed === (lateDays - 2) * 100) {
+        lateDeduction = (lateDays - 2) * 100;
+      } else if (totalDed > 0 && (payroll.absentDays || 0) === 0 && (payroll.unpaidLeaveDays || 0) === 0) {
+        lateDeduction = totalDed;
+      } else {
+        lateDeduction = 0;
+      }
+    } else {
+      lateDeduction = 0;
+    }
+  }
+
+  const fbrTaxDeduction = payroll.fbrTaxDeduction ?? payroll.taxDeduction ?? 0;
+  const unpaidLeaveDeduction = payroll.unpaidLeaveDeduction ?? ((payroll.unpaidLeaveDays || 0) * (payroll.dailySalary || 0));
+  const absentDeduction = payroll.absentDeduction ?? ((payroll.absentDays || 0) * (payroll.dailySalary || 0));
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start sm:items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto" onClick={onClose}>
       <div
@@ -121,9 +145,33 @@ export default function PayslipModal({
                 <span className="text-gray-500">Total Bonuses:</span>
                 <span className="font-medium">PKR {fmtMoney(payroll.totalBonuses || payroll.bonuses)}</span>
               </div>
-              <div className="flex justify-between text-red-600">
-                <span className="text-gray-500">Total Deductions:</span>
-                <span className="font-medium">- PKR {fmtMoney(payroll.totalDeductions || payroll.deductions)}</span>
+
+              <div className="border-t border-gray-100 pt-2 mt-2 space-y-1.5 text-xs">
+                <div className="flex justify-between text-red-600">
+                  <span className="text-gray-500">Late Deduction:</span>
+                  <span className="font-medium">- PKR {fmtMoney(lateDeduction)}</span>
+                </div>
+                <div className="flex justify-between text-red-600">
+                  <span className="text-gray-500">FBR Tax Deduction:</span>
+                  <span className="font-medium">- PKR {fmtMoney(fbrTaxDeduction)}</span>
+                </div>
+                {unpaidLeaveDeduction > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span className="text-gray-500">Unpaid Leave Deduction:</span>
+                    <span className="font-medium">- PKR {fmtMoney(unpaidLeaveDeduction)}</span>
+                  </div>
+                )}
+                {absentDeduction > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span className="text-gray-500">Absent Deduction:</span>
+                    <span className="font-medium">- PKR {fmtMoney(absentDeduction)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between text-red-600 font-semibold pt-1 border-t border-gray-100">
+                <span className="text-gray-700">Total Deductions:</span>
+                <span>- PKR {fmtMoney(totalDed)}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between font-semibold text-gray-900">
                 <span>Gross Salary:</span>
