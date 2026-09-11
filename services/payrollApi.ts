@@ -264,6 +264,25 @@ export const payrollApi = {
     return res.data;
   },
 
+  payBulk: async (ids: number[]): Promise<PayrollDTO[]> => {
+    try {
+      const res = await apiClient.put<PayrollDTO[]>("/api/payroll/bulk-pay", ids);
+      return res.data;
+    } catch {
+      // Fallback if endpoint is unavailable: process each item individually
+      const results: PayrollDTO[] = [];
+      for (const id of ids) {
+        try {
+          const paid = await payrollApi.markAsPaid(id);
+          results.push(paid);
+        } catch (e) {
+          console.error(`Failed to mark payroll ${id} as paid`, e);
+        }
+      }
+      return results;
+    }
+  },
+
   delete: async (id: number): Promise<string> => {
     const res = await apiClient.delete<string>(`/api/payroll/${id}`);
     return typeof res.data === "string" ? res.data : "";

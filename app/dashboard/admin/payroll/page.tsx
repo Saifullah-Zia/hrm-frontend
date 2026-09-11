@@ -155,6 +155,21 @@ export default function PayrollManagementPage() {
     }
   }
 
+  async function handleBulkPay() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Mark ${selectedIds.length} selected payroll record(s) as PAID?`)) return;
+    setBulkLoading(true);
+    try {
+      await payrollApi.payBulk(selectedIds);
+      await loadPayrolls(page, pageSize);
+      setToast({ message: `💳 Marked ${selectedIds.length} payroll record(s) as PAID`, type: "success" });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : "Bulk pay failed", type: "error" });
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
   // ─── Selection ────────────────────────────────────────────────────────────
 
   const filtered = payrolls.filter(
@@ -284,6 +299,13 @@ export default function PayrollManagementPage() {
               >
                 <Icon d={ICONS.check} className="w-3 h-3" />
                 Approve Selected
+              </button>
+              <button
+                onClick={handleBulkPay}
+                disabled={bulkLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition disabled:opacity-50 font-bold"
+              >
+                💳 Pay Selected
               </button>
               <button
                 onClick={handleBulkDelete}

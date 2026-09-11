@@ -128,14 +128,30 @@ export default function SuperAdminPayrollReviewPage() {
     }
   };
 
+  const handleBulkPay = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Mark ${selectedIds.length} selected payroll record(s) as PAID?`)) return;
+
+    try {
+      setActionLoading(true);
+      await payrollApi.payBulk(selectedIds);
+      showToast(`Successfully marked ${selectedIds.length} payroll record(s) as PAID!`);
+      if (selectedPeriod) loadPayrolls(selectedPeriod.id);
+    } catch (error) {
+      console.error("Failed bulk pay:", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleApproveAllForMonth = async () => {
     if (!selectedPeriod || payrolls.length === 0 || !user?.id) return;
-    const unapprovedIds = payrolls.filter((p) => p.status !== "APPROVED" && p.status !== "PAID").map((p) => p.id);
+    const unapprovedIds = payrolls.filter((p) => (p.status || "DRAFT").toUpperCase() === "DRAFT").map((p) => p.id);
     if (unapprovedIds.length === 0) {
-      showToast("All payrolls for this month are already approved!");
+      showToast("All pending payrolls for this month are already approved!");
       return;
     }
-    if (!confirm(`Approve ALL ${unapprovedIds.length} pending payroll(s) for ${selectedPeriod.month} ${selectedPeriod.year}?`)) return;
+    if (!confirm(`Approve ALL ${unapprovedIds.length} pending draft payroll(s) for ${selectedPeriod.month} ${selectedPeriod.year}?`)) return;
 
     try {
       setActionLoading(true);
@@ -144,6 +160,54 @@ export default function SuperAdminPayrollReviewPage() {
       await loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed approve all:", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePayAllApprovedForMonth = async () => {
+    if (!selectedPeriod || payrolls.length === 0) return;
+    const approvedIds = payrolls.filter((p) => p.status === "APPROVED").map((p) => p.id);
+    if (approvedIds.length === 0) {
+      showToast("No approved payrolls ready for payment. Please approve pending draft payrolls first!");
+      return;
+    }
+    if (!confirm(`Mark ALL ${approvedIds.length} APPROVED payroll(s) for ${selectedPeriod.month} ${selectedPeriod.year} as PAID?`)) return;
+
+    try {
+      setActionLoading(true);
+      await payrollApi.payBulk(approvedIds);
+      showToast(`Marked all ${approvedIds.length} approved payrolls as PAID for ${selectedPeriod.month} ${selectedPeriod.year}!`);
+      await loadPayrolls(selectedPeriod.id);
+    } catch (error) {
+      console.error("Failed pay all approved:", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveOne = async (id: number) => {
+    if (!user?.id) return;
+    try {
+      setActionLoading(true);
+      await payrollApi.approvePayroll(id, user.id);
+      showToast("Payroll record approved!");
+      if (selectedPeriod) loadPayrolls(selectedPeriod.id);
+    } catch (error) {
+      console.error("Failed single approve:", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePayOne = async (id: number) => {
+    try {
+      setActionLoading(true);
+      await payrollApi.markAsPaid(id);
+      showToast("Payroll record marked as PAID!");
+      if (selectedPeriod) loadPayrolls(selectedPeriod.id);
+    } catch (error) {
+      console.error("Failed single pay:", error);
     } finally {
       setActionLoading(false);
     }
@@ -165,6 +229,14 @@ export default function SuperAdminPayrollReviewPage() {
     if (statusFilter === "ALL") return true;
     return (p.status || "DRAFT").toUpperCase() === statusFilter.toUpperCase();
   });
+
+  const draftCount = payrolls.filter((p) => (p.status || "DRAFT").toUpperCase() === "DRAFT").length;
+  const approvedCount = payrolls.filter((p) => p.status === "APPROVED").length;
+  const paidCount = payrolls.filter((p) => p.status === "PAID").length;
+
+  const selectedNetSum = payrolls
+    .filter((p) => selectedIds.includes(p.id))
+    .reduce((acc, p) => acc + (p.netSalary || 0), 0);
 
   if (loading) {
     return (
@@ -200,12 +272,12 @@ export default function SuperAdminPayrollReviewPage() {
             <div>
               <h1 className="text-xl font-semibold text-white/90">Payroll Review & Management</h1>
               <p className="text-sm text-white/35 mt-0.5">
-                Filter by month and status, edit bonuses, approve payrolls, or export CSV reports
+                Batch approve draft payrolls, mark all approved payrolls as paid, or export CSV reports
               </p>
             </div>
           </div>
 
-          {/* Quick Month & Action Controls */}
+          {/* Quick Month & Primary Actions */}
           {selectedPeriod && (
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -225,7 +297,7 @@ export default function SuperAdminPayrollReviewPage() {
 
               <button
                 onClick={handleExportCsv}
-                className="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition shadow-lg flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-white/90 rounded-xl transition shadow flex items-center gap-1.5"
                 title="Export monthly payroll data to CSV file"
               >
                 📥 Export CSV
@@ -263,81 +335,125 @@ export default function SuperAdminPayrollReviewPage() {
             </div>
           </div>
 
-          {/* Payroll List */}
+          {/* Payroll List & Actions */}
           <div className="lg:col-span-2 space-y-4">
             {selectedPeriod ? (
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-white/90">
-                        {selectedPeriod.month} {selectedPeriod.year} Payrolls
-                      </h2>
-                      <span className="text-xs text-white/40">
-                        Showing {filteredPayrolls.length} of {payrolls.length} employee record(s)
-                      </span>
-                    </div>
 
-                    {/* Status Filter Dropdown */}
-                    <div className="flex items-center gap-1.5 ml-2">
-                      <span className="text-xs text-white/40">Status:</span>
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-2.5 py-1 text-xs rounded-lg bg-[#1a1d2e] border border-white/[0.1] text-white/90 focus:outline-none cursor-pointer"
-                      >
-                        <option value="ALL">All Statuses</option>
-                        <option value="APPROVED">Approved Only</option>
-                        <option value="PAID">Paid Only</option>
-                        <option value="DRAFT">Draft Only</option>
-                      </select>
-                    </div>
+                {/* Section Title & Header Actions */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
+                  <div>
+                    <h2 className="text-base font-semibold text-white/90">
+                      {selectedPeriod.month} {selectedPeriod.year} Payrolls
+                    </h2>
+                    <span className="text-xs text-white/40">
+                      Showing {filteredPayrolls.length} of {payrolls.length} employee record(s)
+                    </span>
                   </div>
 
-                  {/* Actions Header */}
+                  {/* Header Actions: Batch Approve & Batch Pay */}
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleApproveAllForMonth}
-                      disabled={actionLoading || payrolls.every((p) => p.status === "APPROVED" || p.status === "PAID")}
-                      className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition disabled:opacity-40"
+                      disabled={actionLoading || draftCount === 0}
+                      className="px-3.5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-600/20 disabled:opacity-40 flex items-center gap-1.5"
+                      title="Approve all draft payrolls for this month"
                     >
-                      ✓ Approve All Pending
+                      ✓ Approve All Pending ({draftCount})
                     </button>
+
                     <button
-                      onClick={handleExportCsv}
-                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white rounded-xl transition"
+                      onClick={handlePayAllApprovedForMonth}
+                      disabled={actionLoading || approvedCount === 0}
+                      className="px-3.5 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition shadow-lg shadow-emerald-600/20 disabled:opacity-40 flex items-center gap-1.5"
+                      title="Mark all approved payrolls as PAID at once"
                     >
-                      📥 CSV
+                      💳 Pay All Approved ({approvedCount})
                     </button>
                   </div>
+                </div>
 
-                  {/* Bulk Action Bar */}
-                  {selectedIds.length > 0 && (
-                    <div className="w-full flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 p-2 rounded-xl text-xs mt-2">
-                      <span className="font-medium text-indigo-300 px-1">
+                {/* Status Filter Tab Pills */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { key: "ALL", label: `All (${payrolls.length})` },
+                      { key: "DRAFT", label: `Draft (${draftCount})` },
+                      { key: "APPROVED", label: `Approved (${approvedCount})` },
+                      { key: "PAID", label: `Paid (${paidCount})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setStatusFilter(tab.key)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition ${
+                          statusFilter === tab.key
+                            ? "bg-indigo-600/25 border-indigo-500/50 text-indigo-300"
+                            : "bg-white/[0.02] border-white/[0.06] text-white/50 hover:text-white hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleExportCsv}
+                    className="px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl transition flex items-center gap-1"
+                  >
+                    📥 Export CSV
+                  </button>
+                </div>
+
+                {/* Floating Bulk Action Bar for Selected Rows */}
+                {selectedIds.length > 0 && (
+                  <div className="w-full flex flex-wrap items-center justify-between gap-3 bg-[#181b28] border border-indigo-500/30 p-3 rounded-2xl shadow-2xl animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold text-xs">
                         {selectedIds.length} Selected
                       </span>
+                      {selectedNetSum > 0 && (
+                        <span className="text-xs text-white/60">
+                          Total Payout: <strong className="text-emerald-400 font-semibold">Rs. {selectedNetSum.toLocaleString()}</strong>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={handleBulkApprove}
                         disabled={actionLoading}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition shadow disabled:opacity-50 flex items-center gap-1"
                       >
-                        Approve Selected
+                        ✓ Approve Selected
+                      </button>
+                      <button
+                        onClick={handleBulkPay}
+                        disabled={actionLoading}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition shadow disabled:opacity-50 flex items-center gap-1"
+                      >
+                        💳 Pay Selected
                       </button>
                       <button
                         onClick={handleBulkDelete}
                         disabled={actionLoading}
-                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-lg transition disabled:opacity-50"
+                        className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition shadow disabled:opacity-50 flex items-center gap-1"
                       >
-                        Delete Selected
+                        🗑️ Delete Selected
+                      </button>
+                      <button
+                        onClick={() => setSelectedIds([])}
+                        className="text-xs text-white/40 hover:text-white px-2 py-1"
+                      >
+                        Clear
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
+                {/* Payroll Table */}
                 {filteredPayrolls.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[750px]">
+                    <table className="w-full text-sm min-w-[780px]">
                       <thead>
                         <tr className="border-b border-white/[0.06]">
                           <th className="px-3 py-3 text-center w-10">
@@ -348,92 +464,118 @@ export default function SuperAdminPayrollReviewPage() {
                               className="rounded border-white/20 bg-white/5 text-indigo-600 cursor-pointer"
                             />
                           </th>
-                          {["Employee", "Basic Salary", "Bonus", "Deductions", "Net Salary", "Status", ""].map((h) => (
-                            <th key={h} className={`px-4 py-3 text-white/30 uppercase text-[11px] font-medium ${h === "" ? "text-right" : "text-left"}`}>
+                          {["Employee", "Basic Salary", "Bonus", "Deductions", "Net Salary", "Status", "Actions"].map((h) => (
+                            <th key={h} className={`px-4 py-3 text-white/30 uppercase text-[11px] font-medium ${h === "Actions" ? "text-right" : "text-left"}`}>
                               {h}
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04]">
-                        {filteredPayrolls.map((payroll) => (
-                          <tr
-                            key={payroll.id}
-                            className={`hover:bg-white/[0.02] transition ${
-                              selectedIds.includes(payroll.id) ? "bg-indigo-500/[0.05]" : ""
-                            }`}
-                          >
-                            <td className="px-3 py-4 text-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.includes(payroll.id)}
-                                onChange={() => handleSelectOne(payroll.id)}
-                                className="rounded border-white/20 bg-white/5 text-indigo-600 cursor-pointer"
-                              />
-                            </td>
-                            <td className="px-4 py-4 font-medium text-white/85">
-                              {payroll.userName || `Employee ${payroll.userId}`}
-                            </td>
-                            <td className="px-4 py-4 text-white/60">
-                              Rs. {(payroll.basicSalary || payroll.salary || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-4 font-medium text-emerald-400">
-                              + Rs. {(payroll.totalBonuses || payroll.bonuses || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-4 text-rose-400">
-                              - Rs. {(payroll.totalDeductions || payroll.deductions || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-4 font-medium text-indigo-400">
-                              Rs. {(payroll.netSalary || 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-4">
-                              <span
-                                className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                                  payroll.status === "PAID"
-                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                                    : payroll.status === "APPROVED"
-                                    ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/20"
-                                    : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                                }`}
-                              >
-                                {payroll.status || "DRAFT"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-right text-xs font-semibold space-x-2">
-                              <button
-                                onClick={() => setEditingPayroll(payroll)}
-                                className="text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-1 rounded-lg border border-indigo-500/20 transition"
-                                title="Edit Bonuses & Allowances"
-                              >
-                                Edit / Bonus
-                              </button>
-                              <button
-                                onClick={() => handleViewPayslip(payroll)}
-                                className="text-white/60 hover:text-white"
-                              >
-                                View
-                              </button>
-                              <button
-                                onClick={() => handleDownloadPdf(payroll)}
-                                className="text-emerald-400 hover:text-emerald-300"
-                              >
-                                PDF
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {filteredPayrolls.map((payroll) => {
+                          const isDraft = (payroll.status || "DRAFT").toUpperCase() === "DRAFT";
+                          const isApproved = payroll.status === "APPROVED";
+                          const isPaid = payroll.status === "PAID";
+
+                          return (
+                            <tr
+                              key={payroll.id}
+                              className={`hover:bg-white/[0.02] transition ${
+                                selectedIds.includes(payroll.id) ? "bg-indigo-500/[0.05]" : ""
+                              }`}
+                            >
+                              <td className="px-3 py-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.includes(payroll.id)}
+                                  onChange={() => handleSelectOne(payroll.id)}
+                                  className="rounded border-white/20 bg-white/5 text-indigo-600 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-4 font-medium text-white/85">
+                                {payroll.userName || `Employee ${payroll.userId}`}
+                              </td>
+                              <td className="px-4 py-4 text-white/60">
+                                Rs. {(payroll.basicSalary || payroll.salary || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-4 font-medium text-emerald-400">
+                                + Rs. {(payroll.totalBonuses || payroll.bonuses || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-4 text-rose-400">
+                                - Rs. {(payroll.totalDeductions || payroll.deductions || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-4 font-semibold text-white/90">
+                                Rs. {(payroll.netSalary || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-4">
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                                    isPaid
+                                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                      : isApproved
+                                      ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"
+                                      : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                                  }`}
+                                >
+                                  {isPaid ? "💳 Paid" : isApproved ? "✓ Approved" : "⏳ Draft"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-right text-xs font-semibold space-x-2">
+                                {isDraft && (
+                                  <button
+                                    onClick={() => handleApproveOne(payroll.id)}
+                                    disabled={actionLoading}
+                                    className="text-indigo-300 hover:text-white bg-indigo-600/20 hover:bg-indigo-600/40 px-2.5 py-1 rounded-lg border border-indigo-500/30 transition"
+                                    title="Approve single payroll"
+                                  >
+                                    ✓ Approve
+                                  </button>
+                                )}
+                                {isApproved && (
+                                  <button
+                                    onClick={() => handlePayOne(payroll.id)}
+                                    disabled={actionLoading}
+                                    className="text-emerald-300 hover:text-white bg-emerald-600/20 hover:bg-emerald-600/40 px-2.5 py-1 rounded-lg border border-emerald-500/30 transition font-bold"
+                                    title="Mark single payroll as Paid"
+                                  >
+                                    💳 Mark Paid
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setEditingPayroll(payroll)}
+                                  className="text-white/60 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] px-2.5 py-1 rounded-lg border border-white/[0.08] transition"
+                                  title="Edit Bonuses & Allowances"
+                                >
+                                  Edit / Bonus
+                                </button>
+                                <button
+                                  onClick={() => handleViewPayslip(payroll)}
+                                  className="text-white/60 hover:text-white"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadPdf(payroll)}
+                                  className="text-indigo-400 hover:text-indigo-300"
+                                >
+                                  PDF
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 ) : (
                   <div className="text-center py-10 text-white/30 text-sm">
-                    No payroll records found for this period.
+                    No payroll records found for this status filter.
                   </div>
                 )}
               </div>
             ) : (
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-10 text-center text-white/30 text-sm">
-                Select a payroll period to review and approve employee payrolls.
+                Select a payroll period to review, approve, and pay employee payrolls.
               </div>
             )}
           </div>
