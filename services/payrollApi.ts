@@ -113,24 +113,38 @@ export interface PayrollPageResponse {
 export function parsePayrollPageResponse(data: unknown): PayrollPageResponse {
   if (Array.isArray(data)) {
     const content = data as PayrollDTO[];
+    const totalElements = content.length;
+    const size = content.length || 10;
+    const totalPages = Math.max(1, Math.ceil(totalElements / size));
     return {
       content,
-      totalElements: content.length,
-      totalPages: 1,
+      totalElements,
+      totalPages,
       number: 0,
-      size: content.length || 10,
+      size,
       first: true,
       last: true,
     };
   }
+
   const o = data as Record<string, unknown>;
+
+  // Spring Boot 3.x / 4.x serializes Page metadata inside a nested `page` object:
+  // { content: [...], page: { size, number, totalElements, totalPages } }
+  // Spring Boot 2.x / legacy puts them at root level.
+  // We check both so this works with either version.
+  const pageObj =
+    o.page && typeof o.page === "object"
+      ? (o.page as Record<string, unknown>)
+      : o;
+
   const content = (Array.isArray(o.content) ? o.content : []) as PayrollDTO[];
-  const totalElements = Number(o.totalElements ?? content.length);
-  const size = Number(o.size ?? (content.length || 10));
-  const number = Number(o.number ?? 0);
+  const totalElements = Number(pageObj.totalElements ?? content.length);
+  const size = Number(pageObj.size ?? (content.length || 10));
+  const number = Number(pageObj.number ?? 0);
   const totalPages = Math.max(
     1,
-    Number(o.totalPages ?? Math.ceil(totalElements / Math.max(1, size)))
+    Number(pageObj.totalPages ?? Math.ceil(totalElements / Math.max(1, size)))
   );
   return {
     content,
@@ -138,10 +152,14 @@ export function parsePayrollPageResponse(data: unknown): PayrollPageResponse {
     totalPages,
     number,
     size,
-    first: typeof o.first === "boolean" ? o.first : number === 0,
-    last: typeof o.last === "boolean" ? o.last : number >= totalPages - 1,
+    first: typeof pageObj.first === "boolean" ? pageObj.first : number === 0,
+    last:
+      typeof pageObj.last === "boolean"
+        ? pageObj.last
+        : number >= totalPages - 1,
   };
 }
+
 
 export const payrollApi = {
   /**
