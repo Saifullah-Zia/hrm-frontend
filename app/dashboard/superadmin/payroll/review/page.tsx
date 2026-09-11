@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/useAuth";
 import EditPayrollModal from "./_components/EditPayrollModal";
 import PayslipModal from "@/app/components/PayslipModal";
 import { openPayslipPrintView } from "@/lib/payslipExport";
+import { exportPayrollCsv } from "@/lib/payrollCsvExport";
 
 export default function SuperAdminPayrollReviewPage() {
   const { user } = useAuth();
@@ -19,16 +20,27 @@ export default function SuperAdminPayrollReviewPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadPeriods();
   }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   const loadPeriods = async () => {
     try {
       setLoading(true);
       const data = await payrollApi.getAllPayrollPeriods();
       setPeriods(data);
+      if (data.length > 0 && !selectedPeriod) {
+        setSelectedPeriod(data[0]);
+        loadPayrolls(data[0].id);
+      }
     } catch (error) {
       console.error("Failed to load payroll periods:", error);
     } finally {
@@ -70,7 +82,7 @@ export default function SuperAdminPayrollReviewPage() {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(payrolls.map((p) => p.id));
+      setSelectedIds(filteredPayrolls.map((p) => p.id));
     } else {
       setSelectedIds([]);
     }
@@ -91,6 +103,7 @@ export default function SuperAdminPayrollReviewPage() {
     try {
       setActionLoading(true);
       await payrollApi.deleteBulk(selectedIds);
+      showToast(`Deleted ${selectedIds.length} payroll record(s).`);
       if (selectedPeriod) loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed bulk delete:", error);
@@ -106,6 +119,7 @@ export default function SuperAdminPayrollReviewPage() {
     try {
       setActionLoading(true);
       await payrollApi.approveBulk(selectedIds, user.id);
+      showToast(`Successfully approved ${selectedIds.length} payroll record(s)!`);
       if (selectedPeriod) loadPayrolls(selectedPeriod.id);
     } catch (error) {
       console.error("Failed bulk approve:", error);
@@ -113,6 +127,44 @@ export default function SuperAdminPayrollReviewPage() {
       setActionLoading(false);
     }
   };
+
+  const handleApproveAllForMonth = async () => {
+    if (!selectedPeriod || payrolls.length === 0 || !user?.id) return;
+    const unapprovedIds = payrolls.filter((p) => p.status !== "APPROVED" && p.status !== "PAID").map((p) => p.id);
+    if (unapprovedIds.length === 0) {
+      showToast("All payrolls for this month are already approved!");
+      return;
+    }
+    if (!confirm(`Approve ALL ${unapprovedIds.length} pending payroll(s) for ${selectedPeriod.month} ${selectedPeriod.year}?`)) return;
+
+    try {
+      setActionLoading(true);
+      await payrollApi.approveBulk(unapprovedIds, user.id);
+      showToast(`Approved all ${unapprovedIds.length} payrolls for ${selectedPeriod.month} ${selectedPeriod.year}!`);
+      await loadPayrolls(selectedPeriod.id);
+    } catch (error) {
+      console.error("Failed approve all:", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (!selectedPeriod) return;
+    const targetPayrolls = filteredPayrolls.length > 0 ? filteredPayrolls : payrolls;
+    if (targetPayrolls.length === 0) {
+      showToast("No payroll records available to export for this selection.");
+      return;
+    }
+    const label = `${selectedPeriod.month}_${selectedPeriod.year}${statusFilter !== "ALL" ? `_${statusFilter}` : ""}`;
+    const count = exportPayrollCsv(targetPayrolls, label);
+    showToast(`Exported ${count} payroll record(s) to CSV file!`);
+  };
+
+  const filteredPayrolls = payrolls.filter((p) => {
+    if (statusFilter === "ALL") return true;
+    return (p.status || "DRAFT").toUpperCase() === statusFilter.toUpperCase();
+  });
 
   if (loading) {
     return (
@@ -122,11 +174,18 @@ export default function SuperAdminPayrollReviewPage() {
     );
   }
 
-  const allSelected = payrolls.length > 0 && selectedIds.length === payrolls.length;
+  const allSelected = filteredPayrolls.length > 0 && selectedIds.length === filteredPayrolls.length;
 
   return (
     <div className="min-h-screen bg-[#0f1117] p-6 text-white/90">
       <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl font-medium text-sm border border-emerald-400/30 transition animate-bounce">
+            ✓ {toastMessage}
+          </div>
+        )}
 
         {/* Header & Back Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -141,10 +200,38 @@ export default function SuperAdminPayrollReviewPage() {
             <div>
               <h1 className="text-xl font-semibold text-white/90">Payroll Review & Management</h1>
               <p className="text-sm text-white/35 mt-0.5">
-                Select a period, edit employee bonuses, or perform bulk approval and deletion
+                Filter by month and status, edit bonuses, approve payrolls, or export CSV reports
               </p>
             </div>
           </div>
+
+          {/* Quick Month & Action Controls */}
+          {selectedPeriod && (
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={selectedPeriod.id}
+                onChange={(e) => {
+                  const p = periods.find((item) => item.id === Number(e.target.value));
+                  if (p) handlePeriodSelect(p);
+                }}
+                className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#1a1d2e] border border-white/[0.1] text-white focus:outline-none cursor-pointer"
+              >
+                {periods.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-[#1a1d2e] text-white">
+                    📅 {p.month} {p.year} {p.locked ? "(Locked)" : ""}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={handleExportCsv}
+                className="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition shadow-lg flex items-center gap-1.5"
+                title="Export monthly payroll data to CSV file"
+              >
+                📥 Export CSV
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -181,18 +268,52 @@ export default function SuperAdminPayrollReviewPage() {
             {selectedPeriod ? (
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
-                  <div>
-                    <h2 className="text-base font-semibold text-white/90">
-                      {selectedPeriod.month} {selectedPeriod.year} Payrolls
-                    </h2>
-                    <span className="text-xs text-white/40">
-                      Total: {payrolls.length} employee record(s)
-                    </span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div>
+                      <h2 className="text-base font-semibold text-white/90">
+                        {selectedPeriod.month} {selectedPeriod.year} Payrolls
+                      </h2>
+                      <span className="text-xs text-white/40">
+                        Showing {filteredPayrolls.length} of {payrolls.length} employee record(s)
+                      </span>
+                    </div>
+
+                    {/* Status Filter Dropdown */}
+                    <div className="flex items-center gap-1.5 ml-2">
+                      <span className="text-xs text-white/40">Status:</span>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="px-2.5 py-1 text-xs rounded-lg bg-[#1a1d2e] border border-white/[0.1] text-white/90 focus:outline-none cursor-pointer"
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="APPROVED">Approved Only</option>
+                        <option value="PAID">Paid Only</option>
+                        <option value="DRAFT">Draft Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Actions Header */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleApproveAllForMonth}
+                      disabled={actionLoading || payrolls.every((p) => p.status === "APPROVED" || p.status === "PAID")}
+                      className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition disabled:opacity-40"
+                    >
+                      ✓ Approve All Pending
+                    </button>
+                    <button
+                      onClick={handleExportCsv}
+                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white rounded-xl transition"
+                    >
+                      📥 CSV
+                    </button>
                   </div>
 
                   {/* Bulk Action Bar */}
                   {selectedIds.length > 0 && (
-                    <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 p-2 rounded-xl text-xs">
+                    <div className="w-full flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 p-2 rounded-xl text-xs mt-2">
                       <span className="font-medium text-indigo-300 px-1">
                         {selectedIds.length} Selected
                       </span>
@@ -214,7 +335,7 @@ export default function SuperAdminPayrollReviewPage() {
                   )}
                 </div>
 
-                {payrolls.length > 0 ? (
+                {filteredPayrolls.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm min-w-[750px]">
                       <thead>
@@ -235,7 +356,7 @@ export default function SuperAdminPayrollReviewPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04]">
-                        {payrolls.map((payroll) => (
+                        {filteredPayrolls.map((payroll) => (
                           <tr
                             key={payroll.id}
                             className={`hover:bg-white/[0.02] transition ${
