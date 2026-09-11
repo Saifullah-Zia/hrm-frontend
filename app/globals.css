@@ -47,6 +47,37 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   GLOBAL CURSOR POINTER FIX FOR ALL INTERACTIVE ELEMENTS
+   ═══════════════════════════════════════════════════════════════ */
+button,
+a,
+select,
+summary,
+[role="button"],
+[role="tab"],
+[role="link"],
+[role="checkbox"],
+[role="menuitem"],
+[role="switch"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+label[for],
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    PREMIUM LIGHT MODE — Full contrast fix for ALL pages
    ═══════════════════════════════════════════════════════════════ */
 html.light {
