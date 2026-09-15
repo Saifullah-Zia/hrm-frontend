@@ -38,6 +38,8 @@ const ICONS = {
   cog: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z",
   chevronDown: "M19 9l-7 7-7-7",
   chevronRight: "M9 5l7 7-7 7",
+  lock: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
+  lockOpen: "M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z",
 };
 
 export type NavItem = {
@@ -192,6 +194,30 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
   const [probationPendingCount, setProbationPendingCount] = useState(0);
   const [employeeNoticeCount, setEmployeeNoticeCount] = useState(0);
+  const [isPayrollUnlocked, setIsPayrollUnlocked] = useState(false);
+
+  // Check payroll unlock status from sessionStorage and listen to changes
+  useEffect(() => {
+    const checkUnlock = () => {
+      if (typeof window !== "undefined") {
+        const token = sessionStorage.getItem("payroll_elevated_token");
+        setIsPayrollUnlocked(!!token);
+      }
+    };
+    checkUnlock();
+
+    const handleUnlockChange = (e: Event) => {
+      const customEvent = e as CustomEvent<boolean>;
+      if (customEvent.detail !== undefined) {
+        setIsPayrollUnlocked(customEvent.detail);
+      } else {
+        checkUnlock();
+      }
+    };
+
+    window.addEventListener("payroll-unlocked-changed", handleUnlockChange);
+    return () => window.removeEventListener("payroll-unlocked-changed", handleUnlockChange);
+  }, [pathname]);
 
   // Group expansion state
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -349,6 +375,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(item.href + "/");
 
+    const isPayrollItem = item.href.includes("/payroll");
     const badge = getItemBadge(item.label);
 
     return (
@@ -371,7 +398,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </span>
         <span className="truncate">{item.label}</span>
 
-        {badge ? (
+        {isPayrollItem ? (
+          <span
+            className={`ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all ${
+              isPayrollUnlocked
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/25"
+                : "bg-amber-500/10 text-amber-400 border-amber-500/25"
+            }`}
+            title={isPayrollUnlocked ? "Payroll access unlocked" : "Payroll access protected"}
+          >
+            <Icon d={isPayrollUnlocked ? ICONS.lockOpen : ICONS.lock} />
+          </span>
+        ) : badge ? (
           <span className={`ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full ${badge.color} px-1.5 text-[10px] font-extrabold text-white shadow-lg ring-2 ring-white/10 transition-all duration-300`}>
             {badge.count}
           </span>
