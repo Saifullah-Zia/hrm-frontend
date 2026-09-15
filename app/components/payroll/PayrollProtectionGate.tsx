@@ -25,6 +25,7 @@ export default function PayrollProtectionGate({ children }: PayrollProtectionGat
   const [otpSent, setOtpSent] = useState<boolean>(false);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const hasAutoSentRef = useRef<boolean>(false);
 
   // Timer for resend cooldown
   useEffect(() => {
@@ -57,12 +58,14 @@ export default function PayrollProtectionGate({ children }: PayrollProtectionGat
 
   // Initial check on mount
   useEffect(() => {
+    let isSubscribed = true;
+
     const checkStatus = async () => {
       setIsChecking(true);
       const token = typeof window !== "undefined" ? sessionStorage.getItem("payroll_elevated_token") : null;
       if (token) {
         const valid = await payrollOtpApi.checkElevatedStatus();
-        if (valid) {
+        if (valid && isSubscribed) {
           setIsUnlocked(true);
           setIsChecking(false);
           return;
@@ -70,12 +73,20 @@ export default function PayrollProtectionGate({ children }: PayrollProtectionGat
           sessionStorage.removeItem("payroll_elevated_token");
         }
       }
-      // If not unlocked, auto-send code on load
+      if (!isSubscribed) return;
       setIsChecking(false);
-      handleSendOtp();
+
+      if (!hasAutoSentRef.current) {
+        hasAutoSentRef.current = true;
+        handleSendOtp();
+      }
     };
 
     checkStatus();
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [handleSendOtp]);
 
   // Verify OTP handler
