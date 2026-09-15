@@ -31,11 +31,11 @@ export default function SuperAdminDashboard() {
           leavesRes,
           announcementsRes,
         ] = await Promise.all([
-          apiClient.get("/api/users"),                 // ✅ GET /api/users
-          apiClient.get("/api/departments"),           // ✅ GET /api/departments
+          apiClient.get("/api/users").catch(() => ({ data: [] })),
+          apiClient.get("/api/departments").catch(() => ({ data: [] })),
           payrollApi.getTotalCount(),
-          apiClient.get("/api/leave/status/PENDING"),  // ✅ GET /api/leave/status/{status}
-          announcementApi.getAll(),                    // ✅ GET /api/announcements
+          apiClient.get("/api/leave/status/PENDING").catch(() => ({ data: [] })),
+          announcementApi.getAll().catch(() => []),
         ]);
 
         const allUsers: any[] = usersRes.data ?? [];

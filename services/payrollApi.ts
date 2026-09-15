@@ -183,12 +183,16 @@ export const payrollApi = {
 
   /** Total payroll rows (uses page size 1 to read `totalElements` when backend is paginated). */
   getTotalCount: async (): Promise<number> => {
-    const res = await apiClient.get<unknown>("/api/payroll", {
-      params: { page: 0, size: 1, sort: "id,desc" },
-    });
-    const parsed = parsePayrollPageResponse(res.data);
-    if (Array.isArray(res.data)) return parsed.content.length;
-    return parsed.totalElements;
+    try {
+      const res = await apiClient.get<unknown>("/api/payroll", {
+        params: { page: 0, size: 1, sort: "id,desc" },
+      });
+      const parsed = parsePayrollPageResponse(res.data);
+      if (Array.isArray(res.data)) return parsed.content.length;
+      return parsed.totalElements;
+    } catch {
+      return 0;
+    }
   },
 
   /** @deprecated Prefer getPage — kept for callers that expect a full list (loads first page only if API is paginated). */

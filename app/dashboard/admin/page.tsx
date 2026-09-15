@@ -32,12 +32,12 @@ export default function AdminDashboard() {
           announcementsRes,
           departmentsRes,
         ] = await Promise.all([
-          apiClient.get("/api/users"),                    // ✅ GET /api/users
-          apiClient.get("/api/leave/status/PENDING"),     // ✅ GET /api/leave/status/{status}
-          apiClient.get("/api/attendance"),               // ✅ GET /api/attendance
+          apiClient.get("/api/users").catch(() => ({ data: [] })),
+          apiClient.get("/api/leave/status/PENDING").catch(() => ({ data: [] })),
+          apiClient.get("/api/attendance").catch(() => ({ data: [] })),
           payrollApi.getTotalCount(),
-          announcementApi.getAll(),                       // ✅ GET /api/announcements
-          apiClient.get("/api/departments"),              // ✅ GET /api/departments
+          announcementApi.getAll().catch(() => []),
+          apiClient.get("/api/departments").catch(() => ({ data: [] })),
         ]);
 
         const allUsers: any[] = usersRes.data ?? [];
