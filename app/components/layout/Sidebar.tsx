@@ -11,6 +11,7 @@ import { leaveApi } from "@/services/leaveApi";
 import { attendanceCorrectionApi } from "@/services/attendanceCorrectionApi";
 import { probationApi } from "@/services/probationApi";
 import { noticeApi } from "@/services/noticeApi";
+import { getAvatarUrl } from "@/lib/avatarUrl";
 
 // ── Icons (inline SVG to avoid extra dependencies) ──────────
 const Icon = ({ d }: { d: string }) => (
@@ -453,10 +454,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* User info */}
       <div className="px-4 py-4 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
-            <span className="text-indigo-300 text-sm font-semibold">
-              {user?.username?.[0]?.toUpperCase() ?? "U"}
-            </span>
+          <div className="w-9 h-9 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+            {getAvatarUrl(user?.profilePicture) ? (
+              <img
+                src={getAvatarUrl(user?.profilePicture)}
+                alt={user?.username ?? "User Avatar"}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <span className="text-indigo-300 text-sm font-semibold">
+                {user?.username?.[0]?.toUpperCase() ?? "U"}
+              </span>
+            )}
           </div>
           <div className="min-w-0">
             <p className="text-white/90 text-sm font-medium truncate">

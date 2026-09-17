@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { notificationApi } from "@/services/notificationApi";
 import { announcementApi } from "@/services/announcementApi";
+import { employeeProfileApi } from "@/services/employeeProfileApi";
+import { getAvatarUrl } from "@/lib/avatarUrl";
 import { NotificationDTO } from "@/app/types/notification";
 import {
   countUnreadIncludingAnnouncements,
@@ -19,7 +21,7 @@ interface NavbarProps {
 }
 
 export default function Navbar({ onMenuClick }: NavbarProps) {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateAvatarState } = useAuthStore();
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -29,6 +31,19 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    if (user?.userId && !user?.profilePicture) {
+      employeeProfileApi
+        .getForEmployeeAccount(user.userId, { email: user.email })
+        .then((prof) => {
+          if (prof?.profilePicture) {
+            updateAvatarState(prof.profilePicture);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user?.userId, user?.profilePicture, user?.email, updateAvatarState]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "dark" | "light";
@@ -257,24 +272,41 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   );
 
   // ── Shared: user avatar dropdown ───────────────────────────────────────────
-  const UserMenu = () => (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => { setDropdownOpen(!dropdownOpen); setNotifOpen(false); }}
-        className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-white/[0.05] border border-transparent hover:border-white/[0.06] transition-all"
-      >
-        <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
-          <span className="text-indigo-300 text-xs font-bold">
-            {user?.username?.[0]?.toUpperCase() ?? "U"}
+  const UserMenu = () => {
+    const avatarUrl = getAvatarUrl(user?.profilePicture);
+    const [imgError, setImgError] = useState(false);
+
+    useEffect(() => {
+      setImgError(false);
+    }, [user?.profilePicture]);
+
+    return (
+      <div className="relative" ref={dropdownRef}>
+        <button
+          onClick={() => { setDropdownOpen(!dropdownOpen); setNotifOpen(false); }}
+          className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-white/[0.05] border border-transparent hover:border-white/[0.06] transition-all"
+        >
+          <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+            {avatarUrl && !imgError ? (
+              <img
+                src={avatarUrl}
+                alt={user?.username ?? "User Avatar"}
+                className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <span className="text-indigo-300 text-xs font-bold">
+                {user?.username?.[0]?.toUpperCase() ?? "U"}
+              </span>
+            )}
+          </div>
+          <span className="text-white/70 text-sm font-medium hidden sm:block max-w-[100px] truncate">
+            {user?.username ?? "User"}
           </span>
-        </div>
-        <span className="text-white/70 text-sm font-medium hidden sm:block max-w-[100px] truncate">
-          {user?.username ?? "User"}
-        </span>
-        <svg className="w-3.5 h-3.5 text-white/30 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <svg className="w-3.5 h-3.5 text-white/30 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
 
       {dropdownOpen && (
         <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1d28] border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50">
@@ -298,6 +330,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
       )}
     </div>
   );
+};
 
   return (
     <header className="flex items-center justify-between px-4 md:px-6 h-16 bg-[#13151e] border-b border-white/[0.06] flex-shrink-0">

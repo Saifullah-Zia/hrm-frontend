@@ -444,6 +444,22 @@ export const employeeProfileApi = {
     const res = await apiClient.delete(`/api/employee-profiles/${id}`);
     return res.data;
   },
+
+  uploadAvatar: async (file: File, targetUserId?: number): Promise<EmployeeProfileDto> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const url = targetUserId
+      ? `/api/employee-profiles/${targetUserId}/avatar`
+      : "/api/employee-profiles/me/avatar";
+
+    const res = await apiClient.post<unknown>(url, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const profile = normalizeProfile(res.data, targetUserId);
+    if (!profile) throw new Error("Invalid avatar upload response");
+    return profile;
+  },
 };
 
 // ─── Salary OTP helpers ───────────────────────────────────────────────────────

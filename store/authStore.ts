@@ -16,6 +16,7 @@ interface AuthUser {
   userId?: number;
   email?: string;
   token: string;
+  profilePicture?: string;
 }
 
 interface AuthState {
@@ -24,11 +25,12 @@ interface AuthState {
   isAuthenticated: boolean;
   setToken: (
     token: string,
-    loginMeta?: { userId?: number; email?: string; name?: string; role?: string }
+    loginMeta?: { userId?: number; email?: string; name?: string; role?: string; profilePicture?: string }
   ) => void;
   logout: () => void;
   getRedirectPath: () => string;
-  updateProfileState: (name: string, email?: string) => void;
+  updateProfileState: (name: string, email?: string, profilePicture?: string) => void;
+  updateAvatarState: (profilePicture: string) => void;
 }
 
 function decodeJwt(token: string) {
@@ -105,6 +107,7 @@ export const useAuthStore = create<AuthState>()(
           userId,
           email: loginMeta?.email ?? payload.email ?? payload.sub,
           token,
+          profilePicture: loginMeta?.profilePicture ?? payload.profilePicture,
         };
 
         localStorage.setItem("token", token);
@@ -126,15 +129,22 @@ export const useAuthStore = create<AuthState>()(
         return getDashboardRoute(user.role);
       },
 
-      updateProfileState: (name: string, email?: string) => {
+      updateProfileState: (name: string, email?: string, profilePicture?: string) => {
         const current = get().user;
         if (!current) return;
         const updated = {
           ...current,
           username: name,
           ...(email ? { email } : {}),
+          ...(profilePicture !== undefined ? { profilePicture } : {}),
         };
         set({ user: updated });
+      },
+
+      updateAvatarState: (profilePicture: string) => {
+        const current = get().user;
+        if (!current) return;
+        set({ user: { ...current, profilePicture } });
       },
     }),
     {

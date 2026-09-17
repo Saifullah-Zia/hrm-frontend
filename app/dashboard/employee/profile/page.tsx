@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { parseUserId } from "@/lib/parseUserId";
+import { getAvatarUrl } from "@/lib/avatarUrl";
 import {
   employeeProfileApi,
   EmployeeProfileDto,
@@ -23,10 +24,11 @@ const inputClass =
   "w-full px-3 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/90 placeholder:text-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/40 transition-colors";
 
 export default function EmployeeProfilePage() {
-  const { user } = useAuthStore();
+  const { user, updateAvatarState } = useAuthStore();
   const userId = parseUserId(user?.userId);
   const qc = useQueryClient();
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ["employee-profile", userId, user?.email],
@@ -55,6 +57,31 @@ export default function EmployeeProfilePage() {
   });
 
   const [draft, setDraft] = useState<EmployeeProfileDto | null>(null);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setToast({ message: "File size exceeds 5MB limit.", type: "error" });
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const updated = await employeeProfileApi.uploadAvatar(file);
+      if (updated.profilePicture) {
+        updateAvatarState(updated.profilePicture);
+        setDraft((prev) => (prev ? { ...prev, profilePicture: updated.profilePicture } : prev));
+        qc.invalidateQueries({ queryKey: ["employee-profile", userId] });
+        setToast({ message: "Profile picture updated successfully!", type: "success" });
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || "Failed to upload avatar.";
+      setToast({ message: msg, type: "error" });
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
+    }
+  };
 
   useEffect(() => {
     if (profileQuery.data) setDraft({ ...profileQuery.data });
@@ -206,6 +233,73 @@ export default function EmployeeProfilePage() {
         >
           {profileQuery.isFetching ? "Refreshing…" : "Refresh"}
         </button>
+      </div>
+
+      {/* Profile Picture Upload Card */}
+      <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6 shadow-xl">
+        <div className="relative group cursor-pointer" onClick={() => document.getElementById("avatar-file-input")?.click()}>
+          <div className="w-24 h-24 rounded-full bg-indigo-500/20 border-2 border-indigo-500/40 flex items-center justify-center overflow-hidden shadow-xl relative">
+            {getAvatarUrl(draft.profilePicture) ? (
+              <img
+                src={getAvatarUrl(draft.profilePicture)}
+                alt={user?.username ?? "Avatar"}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-3xl font-bold text-indigo-300">
+                {user?.username?.[0]?.toUpperCase() ?? "U"}
+              </span>
+            )}
+
+            {/* Hover overlay with camera icon */}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white text-xs font-medium">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Change</span>
+            </div>
+
+            {/* Loading spinner */}
+            {avatarUploading && (
+              <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-white/20 border-t-indigo-500 rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+
+          {/* Camera badge button at corner */}
+          <div className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-indigo-600 border-2 border-[#13151e] flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+        </div>
+
+        <input
+          id="avatar-file-input"
+          type="file"
+          accept="image/png, image/jpeg, image/webp"
+          className="hidden"
+          onChange={handleAvatarChange}
+        />
+
+        <div className="text-center sm:text-left space-y-1">
+          <h2 className="text-lg font-semibold text-white/90">{user?.username}</h2>
+          <p className="text-white/40 text-xs">{user?.email}</p>
+          <p className="text-white/30 text-xs">
+            JPG, PNG, or WEBP (Max 5MB). Image will be resized & stripped of EXIF data.
+          </p>
+          <button
+            type="button"
+            onClick={() => document.getElementById("avatar-file-input")?.click()}
+            disabled={avatarUploading}
+            className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            {avatarUploading ? "Uploading..." : "Upload Photo"}
+          </button>
+        </div>
       </div>
 
       {showProbation && (

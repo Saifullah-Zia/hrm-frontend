@@ -4,17 +4,20 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
 import apiClient from "@/lib/apiClient";
 import { Toast } from "@/app/components/Toast";
+import { employeeProfileApi } from "@/services/employeeProfileApi";
+import { getAvatarUrl } from "@/lib/avatarUrl";
 
 type ToastState = { message: string; type: "success" | "error" | "info" } | null;
 
 export default function SettingsPage() {
-  const { user, updateProfileState } = useAuthStore();
+  const { user, updateProfileState, updateAvatarState } = useAuthStore();
   const userId = user?.userId;
 
   // Profile Form States
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Password Form States
   const [oldPassword, setOldPassword] = useState("");
@@ -62,6 +65,29 @@ export default function SettingsPage() {
       setToast({ message: errMsg, type: "error" });
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setToast({ message: "File size exceeds 5MB limit.", type: "error" });
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const updated = await employeeProfileApi.uploadAvatar(file);
+      if (updated.profilePicture) {
+        updateAvatarState(updated.profilePicture);
+        setToast({ message: "Profile picture updated successfully!", type: "success" });
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || "Failed to upload avatar.";
+      setToast({ message: msg, type: "error" });
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
     }
   };
 
@@ -132,7 +158,49 @@ export default function SettingsPage() {
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div>
               <h2 className="text-base font-semibold text-white/80">Personal Information</h2>
-              <p className="text-white/35 text-xs mt-0.5">Update your display name and email address</p>
+              <p className="text-white/35 text-xs mt-0.5">Update your display name, email, and photo</p>
+            </div>
+
+            {/* Avatar upload section */}
+            <div className="flex items-center gap-4 py-2 border-b border-white/[0.06]">
+              <div className="relative group cursor-pointer" onClick={() => document.getElementById("settings-avatar-input")?.click()}>
+                <div className="w-16 h-16 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center overflow-hidden relative shadow-md">
+                  {getAvatarUrl(user?.profilePicture) ? (
+                    <img
+                      src={getAvatarUrl(user?.profilePicture)}
+                      alt={user?.username ?? "Avatar"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xl font-bold text-indigo-300">
+                      {user?.username?.[0]?.toUpperCase() ?? "U"}
+                    </span>
+                  )}
+                  {avatarUploading && (
+                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-indigo-500 rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <input
+                id="settings-avatar-input"
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+              <div>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("settings-avatar-input")?.click()}
+                  disabled={avatarUploading}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  {avatarUploading ? "Uploading..." : "Change Avatar"}
+                </button>
+                <p className="text-white/30 text-[11px] mt-1">JPG, PNG, WEBP up to 5MB</p>
+              </div>
             </div>
 
             <div className="space-y-3.5">
