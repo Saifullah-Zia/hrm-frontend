@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
-import { getUsersWithPermissions } from "@/services/userPermissionsApi";
+import { getMyPermissions } from "@/services/userPermissionsApi";
 import { officeHoursApi } from "@/services/officeHoursApi";
 import {
   AUTO_CHECKOUT_AFTER_END_MINUTES,
@@ -76,13 +76,13 @@ export default function AttendanceClockCard({ userId }: Props) {
   });
 
   /* ── fetch web check-in permission for this user ── */
-  const { data: usersPermissions, isLoading: permLoading } = useQuery({
-    queryKey: ["user-permissions"],
-    queryFn: () => getUsersWithPermissions(),
+  const { data: userPermission, isLoading: permLoading } = useQuery({
+    queryKey: ["my-user-permissions", userId],
+    queryFn: () => getMyPermissions(),
     enabled: typeof userId === "number",
     staleTime: 30_000, // cache for 30s
   });
-  const webCheckInAllowed = usersPermissions?.find((u) => u.id === userId)?.webCheckInAllowed ?? null;
+  const webCheckInAllowed = userPermission?.webCheckInAllowed ?? null;
 
   // Find today's record in PKT (used for status badge)
   const todayRecord: AttendanceDTO | undefined = allRecords?.find(
