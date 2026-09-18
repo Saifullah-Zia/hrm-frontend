@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { parseUserId } from "@/lib/parseUserId";
-import { getAvatarUrl } from "@/lib/avatarUrl";
+import { getAvatarUrl, getUserInitials } from "@/lib/avatarUrl";
 import {
   employeeProfileApi,
   EmployeeProfileDto,
@@ -29,6 +29,7 @@ export default function EmployeeProfilePage() {
   const qc = useQueryClient();
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ["employee-profile", userId, user?.email],
@@ -239,15 +240,16 @@ export default function EmployeeProfilePage() {
       <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6 shadow-xl">
         <div className="relative group cursor-pointer" onClick={() => document.getElementById("avatar-file-input")?.click()}>
           <div className="w-24 h-24 rounded-full bg-indigo-500/20 border-2 border-indigo-500/40 flex items-center justify-center overflow-hidden shadow-xl relative">
-            {getAvatarUrl(draft.profilePicture) ? (
+            {getAvatarUrl(draft?.profilePicture) && !imgError ? (
               <img
-                src={getAvatarUrl(draft.profilePicture)}
+                src={getAvatarUrl(draft?.profilePicture)}
                 alt={user?.username ?? "Avatar"}
                 className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
               />
             ) : (
-              <span className="text-3xl font-bold text-indigo-300">
-                {user?.username?.[0]?.toUpperCase() ?? "U"}
+              <span className="text-2xl font-bold text-indigo-300">
+                {getUserInitials(user?.username)}
               </span>
             )}
 

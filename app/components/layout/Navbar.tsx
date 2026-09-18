@@ -6,7 +6,7 @@ import { useAuthStore } from "@/store/authStore";
 import { notificationApi } from "@/services/notificationApi";
 import { announcementApi } from "@/services/announcementApi";
 import { employeeProfileApi } from "@/services/employeeProfileApi";
-import { getAvatarUrl } from "@/lib/avatarUrl";
+import { getAvatarUrl, getUserInitials } from "@/lib/avatarUrl";
 import { NotificationDTO } from "@/app/types/notification";
 import {
   countUnreadIncludingAnnouncements,
@@ -296,7 +296,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
               />
             ) : (
               <span className="text-indigo-300 text-xs font-bold">
-                {user?.username?.[0]?.toUpperCase() ?? "U"}
+                {getUserInitials(user?.username)}
               </span>
             )}
           </div>
