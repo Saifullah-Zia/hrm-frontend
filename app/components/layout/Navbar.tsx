@@ -7,6 +7,7 @@ import { notificationApi } from "@/services/notificationApi";
 import { announcementApi } from "@/services/announcementApi";
 import { employeeProfileApi } from "@/services/employeeProfileApi";
 import { getAvatarUrl, getUserInitials } from "@/lib/avatarUrl";
+import { useVisibleInterval } from "@/lib/useVisibleInterval";
 import { NotificationDTO } from "@/app/types/notification";
 import {
   countUnreadIncludingAnnouncements,
@@ -138,9 +139,10 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
   // Initial unread count + poll every 30s (all roles — employees see e.g. new payroll)
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
   }, [user?.role]);
+
+  // Poll only while the tab is visible
+  useVisibleInterval(fetchUnreadCount, 30000);
 
   // Close dropdowns on outside click
   useEffect(() => {

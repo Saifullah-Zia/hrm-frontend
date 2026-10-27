@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { attendanceApi, AttendanceDTO } from "@/services/attendanceApi";
 import apiClient from "@/lib/apiClient";
+import { useVisibleInterval } from "@/lib/useVisibleInterval";
 import { exportMonthlyAttendanceCsv } from "@/lib/attendanceExport";
 import {
   getUsersWithPermissions,
@@ -220,10 +221,7 @@ export default function AttendanceOverviewPage() {
   }, [fetchAllAndUsers]);
 
   /* ── Auto-poll every 60 s so check-outs appear without page reload ── */
-  useEffect(() => {
-    const interval = setInterval(() => { fetchAllAndUsers(); }, 60_000);
-    return () => clearInterval(interval);
-  }, [fetchAllAndUsers]);
+  useVisibleInterval(fetchAllAndUsers, 60_000);
 
   // Reset page to 0 when filters change to avoid empty pages
   useEffect(() => {

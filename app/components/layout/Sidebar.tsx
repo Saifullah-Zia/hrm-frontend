@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,7 @@ import { attendanceCorrectionApi } from "@/services/attendanceCorrectionApi";
 import { probationApi } from "@/services/probationApi";
 import { noticeApi } from "@/services/noticeApi";
 import { getAvatarUrl, getUserInitials } from "@/lib/avatarUrl";
+import { useVisibleInterval } from "@/lib/useVisibleInterval";
 
 function SidebarAvatar({ user }: { user: { profilePicture?: string; username?: string } | null }) {
   const avatarUrl = getAvatarUrl(user?.profilePicture);
@@ -280,23 +281,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   // ── Chat unread count ────────────────────────────────────────
+  const fetchChatUnreadCount = useCallback(async () => {
+    try {
+      const conversations = await chatApi.getMyConversations();
+      const totalUnread = conversations.reduce((acc, conv) => acc + (conv.unreadCount ?? 0), 0);
+      setUnreadChatCount(totalUnread);
+    } catch (err) {
+      console.error("Failed to fetch unread chat count:", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) {
       setUnreadChatCount(0);
       return;
     }
 
-    const fetchUnreadCount = async () => {
-      try {
-        const conversations = await chatApi.getMyConversations();
-        const totalUnread = conversations.reduce((acc, conv) => acc + (conv.unreadCount ?? 0), 0);
-        setUnreadChatCount(totalUnread);
-      } catch (err) {
-        console.error("Failed to fetch unread chat count:", err);
-      }
-    };
-
-    fetchUnreadCount();
+    fetchChatUnreadCount();
 
     const handleCustomEvent = (e: Event) => {
       const customEvent = e as CustomEvent<number>;
@@ -306,15 +307,33 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     };
 
     window.addEventListener("unread-chat-count-changed", handleCustomEvent);
-    const interval = setInterval(fetchUnreadCount, 8000);
 
     return () => {
       window.removeEventListener("unread-chat-count-changed", handleCustomEvent);
-      clearInterval(interval);
     };
-  }, [user, pathname]);
+  }, [user, fetchChatUnreadCount]);
+
+  // Poll only while the tab is visible (was every 8s + refetch on every navigation)
+  useVisibleInterval(fetchChatUnreadCount, 30_000, !!user);
 
   // ── Pending leave, correction & probation counts ──────────────────
+  const isAdminRole = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+
+  const fetchPendingCounts = useCallback(async () => {
+    try {
+      const [leaves, corrections, probation] = await Promise.all([
+        leaveApi.getByStatus("PENDING"),
+        attendanceCorrectionApi.getPending(),
+        probationApi.getPendingConfirmation(),
+      ]);
+      setPendingLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
+      setPendingCorrectionCount(Array.isArray(corrections) ? corrections.length : 0);
+      setProbationPendingCount(Array.isArray(probation) ? probation.length : 0);
+    } catch {
+      // Silently ignore
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) {
       setPendingLeaveCount(0);
@@ -322,51 +341,34 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       setProbationPendingCount(0);
       return;
     }
-    const r = user.role;
-    if (r !== "SUPERADMIN" && r !== "ADMIN") return;
-
-    const fetchPendingCounts = async () => {
-      try {
-        const [leaves, corrections, probation] = await Promise.all([
-          leaveApi.getByStatus("PENDING"),
-          attendanceCorrectionApi.getPending(),
-          probationApi.getPendingConfirmation(),
-        ]);
-        setPendingLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
-        setPendingCorrectionCount(Array.isArray(corrections) ? corrections.length : 0);
-        setProbationPendingCount(Array.isArray(probation) ? probation.length : 0);
-      } catch {
-        // Silently ignore
-      }
-    };
-
+    if (!isAdminRole) return;
     fetchPendingCounts();
-    const interval = setInterval(fetchPendingCounts, 60_000);
-    return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isAdminRole, fetchPendingCounts]);
+
+  useVisibleInterval(fetchPendingCounts, 60_000, !!user && isAdminRole);
 
   // ── Notice count (EMPLOYEE only) ──────────────────────────────
+  const noticeUserId = user?.role === "EMPLOYEE" ? user.userId : undefined;
+
+  const fetchNoticeCount = useCallback(async () => {
+    if (typeof noticeUserId !== "number") return;
+    try {
+      const notices = await noticeApi.getNoticesByUserId(noticeUserId);
+      setEmployeeNoticeCount(Array.isArray(notices) ? notices.length : 0);
+    } catch {
+      // Silently ignore
+    }
+  }, [noticeUserId]);
+
   useEffect(() => {
     if (!user || user.role !== "EMPLOYEE") {
       setEmployeeNoticeCount(0);
       return;
     }
-    const userId = user.userId;
-    if (typeof userId !== "number") return;
-
-    const fetchNoticeCount = async () => {
-      try {
-        const notices = await noticeApi.getNoticesByUserId(userId);
-        setEmployeeNoticeCount(Array.isArray(notices) ? notices.length : 0);
-      } catch {
-        // Silently ignore
-      }
-    };
-
     fetchNoticeCount();
-    const interval = setInterval(fetchNoticeCount, 60_000);
-    return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchNoticeCount]);
+
+  useVisibleInterval(fetchNoticeCount, 60_000, typeof noticeUserId === "number");
 
   const role = user?.role ?? "EMPLOYEE";
   const navItems = NAV_ITEMS[role] ?? NAV_ITEMS.EMPLOYEE;
