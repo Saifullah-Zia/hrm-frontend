@@ -13,6 +13,7 @@ import {
   strengthTextColor,
 } from "@/lib/passwordStrength";
 import { BRAND_LOGO_PATH, BRAND_FULL_NAME } from "@/lib/branding";
+import OfficeWifiNotice, { isOfficeWifiError } from "./OfficeWifiNotice";
 
 interface AuthSplitCardProps {
   initialMode?: "login" | "register";
@@ -242,7 +243,11 @@ export default function AuthSplitCard({ initialMode = "login" }: AuthSplitCardPr
                   </div>
                 </div>
 
-                {loginError && (
+                {loginError && isOfficeWifiError(loginError) && (
+                  <OfficeWifiNotice email={loginForm.email} />
+                )}
+
+                {loginError && !isOfficeWifiError(loginError) && (
                   <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs p-3 rounded-xl">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{loginError}</span>
