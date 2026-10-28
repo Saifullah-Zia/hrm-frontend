@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import PwaProvider from "./components/PwaProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,10 +16,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "JCAT Solutions HRM",
   description: "Human resource management — JCAT Solutions HRM",
+  applicationName: "JCAT HRM",
+  appleWebApp: {
+    capable: true,
+    title: "JCAT HRM",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#fc0175",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -46,7 +57,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <PwaProvider />
+      </body>
     </html>
   );
 }

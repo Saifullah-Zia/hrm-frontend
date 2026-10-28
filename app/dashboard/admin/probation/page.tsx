@@ -108,7 +108,7 @@ export default function AdminProbationPage() {
             <div>
               <h2 className="text-sm font-semibold text-white/90">Pending confirmation</h2>
               <p className="text-xs text-white/35 mt-0.5">
-                Probation period ended — confirm permanent employment ({pending.length})
+                Probation period ended - confirm permanent employment ({pending.length})
               </p>
             </div>
           </div>
