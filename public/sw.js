@@ -5,9 +5,9 @@
  * We only cache immutable static build assets + icons, and show an offline
  * page when the network is unavailable.
  */
-const CACHE = "jcat-hrm-static-v1";
+const CACHE = "jcat-hrm-static-v2";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png"];
+const PRECACHE = [OFFLINE_URL, "/icons/icon-192-v2.png", "/icons/icon-512-v2.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
