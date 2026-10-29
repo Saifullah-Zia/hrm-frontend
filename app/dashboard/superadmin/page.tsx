@@ -6,6 +6,48 @@ import { announcementApi } from "@/services/announcementApi";
 import apiClient from "@/lib/apiClient";
 import { payrollApi } from "@/services/payrollApi";
 
+import { presenceApi, OnlineUsersResponse } from "@/services/presenceApi";
+import { useVisibleInterval } from "@/lib/useVisibleInterval";
+
+function timeAgo(iso: string) {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  return `${Math.floor(s / 60)}m ago`;
+}
+
+function OnlineNowCard() {
+  const [data, setData] = useState<OnlineUsersResponse | null>(null);
+  const load = () => { presenceApi.getOnline().then(setData).catch(() => {}); };
+
+  useEffect(() => { load(); }, []);
+  useVisibleInterval(load, 30_000);
+
+  return (
+    <div className="bg-[#13151e] border border-white/[0.06] rounded-2xl p-5 sm:col-span-2 lg:col-span-3">
+      <p className="text-white/40 text-xs font-medium uppercase tracking-wider">Online now</p>
+      <p className="text-3xl font-bold text-white/80 mt-2">
+        {data ? data.onlineCount : "—"}{" "}
+        <span className="text-white/30 text-xl">/ {data ? data.totalUsers : "—"} users</span>
+      </p>
+      <ul className="mt-4 divide-y divide-white/[0.06]">
+        {data?.users.map((u) => (
+          <li key={u.id} className="flex items-center justify-between py-2 text-sm">
+            <span className="text-white/80">
+              {u.name} <span className="text-white/40">{u.email}</span>
+            </span>
+            <span className="text-white/40">
+              {u.role} · {timeAgo(u.lastSeenAt)}
+            </span>
+          </li>
+        ))}
+        {data && data.users.length === 0 && (
+          <li className="py-2 text-sm text-white/40">Nobody online right now.</li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 interface DashboardStats {
   totalUsers: number;
   departments: number;
@@ -94,6 +136,7 @@ export default function SuperAdminDashboard() {
             </p>
           </div>
         ))}
+         <OnlineNowCard />
       </div>
     </div>
   );

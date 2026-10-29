@@ -6,6 +6,9 @@ import { useAuthStore } from "@/store/authStore";
 import Sidebar from "@/app/components/layout/Sidebar";
 import Navbar from "@/app/components/layout/Navbar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useVisibleInterval } from "@/lib/useVisibleInterval";
+import { getTokenExpiryMs, isTokenExpired } from "@/lib/jwtExpiry";
+import { presenceApi } from "@/services/presenceApi";
 
 const queryClient = new QueryClient();
 
@@ -14,12 +17,43 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, getRedirectPath } = useAuthStore();
+  const { isAuthenticated, token, logout, getRedirectPath } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Wait for the persisted login (localStorage) to load before deciding anything.
+  // Without this, a page refresh briefly looks "logged out" and redirects to login.
+  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
   useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  // Log out only when the token has actually expired (also on a tab left open).
+  useEffect(() => {
+    if (!hydrated || !isAuthenticated) return;
+    const exp = getTokenExpiryMs(token);
+    if (exp === null || isTokenExpired(token)) {
+      logout();
+      return;
+    }
+    const t = setTimeout(() => logout(), Math.min(exp - Date.now(), 2_147_000_000));
+    return () => clearTimeout(t);
+  }, [hydrated, isAuthenticated, token, logout]);
+
+  // Heartbeat once a minute while the tab is visible (drives "Online now")
+  useEffect(() => {
+    if (hydrated && isAuthenticated) presenceApi.heartbeat().catch(() => {});
+  }, [hydrated, isAuthenticated]);
+  useVisibleInterval(
+    () => { presenceApi.heartbeat().catch(() => {}); },
+    60_000,
+    hydrated && isAuthenticated
+  );
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated) {
       router.push("/auth/login");
       return;
@@ -29,9 +63,9 @@ export default function DashboardLayout({
     if (pathname === "/dashboard") {
       router.replace(getRedirectPath());
     }
-  }, [isAuthenticated, pathname, router, getRedirectPath]);
+  }, [hydrated, isAuthenticated, pathname, router, getRedirectPath]);
 
-  if (!isAuthenticated) return null;
+  if (!hydrated || !isAuthenticated) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
