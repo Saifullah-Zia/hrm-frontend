@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { notificationApi, EMPLOYEE_BADGES_REFRESH_EVENT } from "@/services/notificationApi";
 import { useAuthStore } from "@/store/authStore";
 import { payrollApi, PayrollDTO } from "@/services/payrollApi";
 import { openPayslipPrintView } from "@/lib/payslipExport";
@@ -24,6 +25,15 @@ export default function EmployeePayslipsPage() {
     queryFn: () => payrollApi.getByUserIdPage(userId!, { page, size: pageSize }),
     enabled: typeof userId === "number",
   });
+    // The employee has now opened their payslips → clear the sidebar badge.
+  const payslipsLoaded = payrollQuery.isSuccess;
+  useEffect(() => {
+    if (!payslipsLoaded) return;
+    notificationApi
+      .markPayslipsAsRead()
+      .then(() => window.dispatchEvent(new Event(EMPLOYEE_BADGES_REFRESH_EVENT)))
+      .catch(() => {});
+  }, [payslipsLoaded]);
 
   const pageData = payrollQuery.data;
   const rows: PayrollDTO[] = pageData?.content ?? [];

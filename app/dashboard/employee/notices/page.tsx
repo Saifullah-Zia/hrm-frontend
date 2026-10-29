@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { notificationApi, EMPLOYEE_BADGES_REFRESH_EVENT } from "@/services/notificationApi";
 import { noticeApi, NoticeDto } from "@/services/noticeApi";
 import {
   Bell,
@@ -63,9 +64,14 @@ export default function MyNoticesPage() {
     setLoading(true);
     noticeApi
       .getNoticesByUserId(userId)
-      .then((data) => {
+            .then((data) => {
         setNotices(data);
         setLoading(false);
+        // The employee has now seen their notices → clear the sidebar badge.
+        notificationApi
+          .markNoticesAsRead()
+          .then(() => window.dispatchEvent(new Event(EMPLOYEE_BADGES_REFRESH_EVENT)))
+          .catch(() => {});
       })
       .catch(() => {
         setError("Failed to load your notices");

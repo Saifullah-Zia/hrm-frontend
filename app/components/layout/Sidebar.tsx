@@ -10,7 +10,7 @@ import { chatApi } from "@/services/chatApi";
 import { leaveApi } from "@/services/leaveApi";
 import { attendanceCorrectionApi } from "@/services/attendanceCorrectionApi";
 import { probationApi } from "@/services/probationApi";
-import { noticeApi } from "@/services/noticeApi";
+import { notificationApi, EMPLOYEE_BADGES_REFRESH_EVENT } from "@/services/notificationApi";
 import { getAvatarUrl, getUserInitials } from "@/lib/avatarUrl";
 import { useVisibleInterval } from "@/lib/useVisibleInterval";
 
@@ -222,6 +222,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [pendingCorrectionCount, setPendingCorrectionCount] = useState(0);
   const [probationPendingCount, setProbationPendingCount] = useState(0);
   const [employeeNoticeCount, setEmployeeNoticeCount] = useState(0);
+  const [employeePayslipCount, setEmployeePayslipCount] = useState(0);
   const [isPayrollUnlocked, setIsPayrollUnlocked] = useState(false);
 
   // Check payroll unlock status from sessionStorage and listen to changes
@@ -348,27 +349,35 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   useVisibleInterval(fetchPendingCounts, 60_000, !!user && isAdminRole);
 
   // ── Notice count (EMPLOYEE only) ──────────────────────────────
-  const noticeUserId = user?.role === "EMPLOYEE" ? user.userId : undefined;
+    // ── Unread notices & payslips (EMPLOYEE only) ─────────────────
+  const isEmployeeRole = user?.role === "EMPLOYEE";
 
-  const fetchNoticeCount = useCallback(async () => {
-    if (typeof noticeUserId !== "number") return;
+  const fetchEmployeeBadges = useCallback(async () => {
     try {
-      const notices = await noticeApi.getNoticesByUserId(noticeUserId);
-      setEmployeeNoticeCount(Array.isArray(notices) ? notices.length : 0);
+      const counts = await notificationApi.getEmployeeBadgeCounts();
+      setEmployeeNoticeCount(counts?.notices ?? 0);
+      setEmployeePayslipCount(counts?.payslips ?? 0);
     } catch {
       // Silently ignore
     }
-  }, [noticeUserId]);
+  }, []);
 
   useEffect(() => {
-    if (!user || user.role !== "EMPLOYEE") {
+    if (!user || !isEmployeeRole) {
       setEmployeeNoticeCount(0);
+      setEmployeePayslipCount(0);
       return;
     }
-    fetchNoticeCount();
-  }, [user, fetchNoticeCount]);
+    fetchEmployeeBadges();
 
-  useVisibleInterval(fetchNoticeCount, 60_000, typeof noticeUserId === "number");
+    const handleRefresh = () => {
+      fetchEmployeeBadges();
+    };
+    window.addEventListener(EMPLOYEE_BADGES_REFRESH_EVENT, handleRefresh);
+    return () => window.removeEventListener(EMPLOYEE_BADGES_REFRESH_EVENT, handleRefresh);
+  }, [user, isEmployeeRole, fetchEmployeeBadges]);
+
+  useVisibleInterval(fetchEmployeeBadges, 30_000, !!user && isEmployeeRole);
 
   const role = user?.role ?? "EMPLOYEE";
   const navItems = NAV_ITEMS[role] ?? NAV_ITEMS.EMPLOYEE;
@@ -382,6 +391,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     if (label === "Corrections Review" && pendingCorrectionCount > 0) return { count: pendingCorrectionCount, color: "bg-amber-500" };
     if (label === "Probation" && probationPendingCount > 0) return { count: probationPendingCount, color: "bg-amber-500" };
     if (label === "My Notices" && employeeNoticeCount > 0) return { count: employeeNoticeCount, color: "bg-rose-500" };
+    if (label === "My Payslips" && employeePayslipCount > 0) return { count: employeePayslipCount, color: "bg-emerald-500" };
     return null;
   };
 

@@ -49,6 +49,15 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return res.text() as Promise<T>;
 }
 
+/** Fired after the employee opens Notices / Payslips so the sidebar badges refresh immediately. */
+export const EMPLOYEE_BADGES_REFRESH_EVENT = "employee-badges-refresh";
+
+export interface EmployeeBadgeCounts {
+  notices: number;
+  payslips: number;
+}
+
+
 export const notificationApi = {
   getNotifications: (): Promise<NotificationDTO[]> =>
     apiFetch<NotificationDTO[]>("/api/notifications"),
@@ -64,4 +73,14 @@ export const notificationApi = {
 
   markAllAsRead: (): Promise<void> =>
     apiFetch<void>("/api/notifications/read/all", { method: "PUT" }),
+
+    /** Unread "My Notices" and "My Payslips" counts for the employee sidebar. */
+  getEmployeeBadgeCounts: (): Promise<EmployeeBadgeCounts> =>
+    apiFetch<EmployeeBadgeCounts>("/api/notifications/unread/badges"),
+
+  markNoticesAsRead: (): Promise<void> =>
+    apiFetch<void>("/api/notifications/read/notices", { method: "PUT" }),
+
+  markPayslipsAsRead: (): Promise<void> =>
+    apiFetch<void>("/api/notifications/read/payslips", { method: "PUT" }),
 };
