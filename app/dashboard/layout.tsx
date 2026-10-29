@@ -24,10 +24,15 @@ export default function DashboardLayout({
 
   // Wait for the persisted login (localStorage) to load before deciding anything.
   // Without this, a page refresh briefly looks "logged out" and redirects to login.
-  const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
+ const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
-    return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    const persist = useAuthStore.persist;
+    if (!persist) {
+      setHydrated(true);
+      return;
+    }
+    if (persist.hasHydrated()) setHydrated(true);
+    return persist.onFinishHydration(() => setHydrated(true));
   }, []);
 
   // Log out only when the token has actually expired (also on a tab left open).
